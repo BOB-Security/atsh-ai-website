@@ -20,6 +20,7 @@ Shared styles are in `styles.css` and `pages.css`; shared navigation behavior is
 - Referral form on the homepage posts to `POST /api/referrals`.
 - Submissions are validated server-side and persisted in SQLite.
 - `GET /api/health` provides a basic health response.
+- `admin.html` provides a noindex admin inbox shell; `/api/admin/submissions` and status updates require a bearer token configured through `ADMIN_API_TOKEN` (32+ characters). Generate it with `openssl rand -hex 32`; do not commit it. The token stays in page memory only.
 - Referral receipt is not an approval, assignment, or commission agreement.
 - Internal source, test, documentation, and data paths are blocked from static serving.
 
@@ -36,6 +37,6 @@ Requires Node.js 22+ and a writable local directory.
 
 ## Not yet production-ready
 
-No authenticated admin inbox, human support agent, real AI provider integration, secure attachment upload, employee portal, email notifications, or deployment configuration is implemented. The in-memory rate limiter is a basic safeguard, not production-grade abuse protection. Configure persistent storage, backups, privacy/retention policies, monitoring, and security review before collecting real customer data.
+The admin inbox uses a shared bearer token rather than individual user accounts, role-based access, or an audit log. No human support agent, real AI provider integration, secure attachment upload, employee portal, email notifications, or deployment configuration is implemented. The in-memory rate limiter is a basic safeguard, not production-grade abuse protection. Configure `ADMIN_API_TOKEN` securely, persistent storage, backups, privacy/retention policies, monitoring, and security review before collecting real customer data. The admin API is disabled until a sufficiently long token is configured.
 
 The privacy and terms pages are initial drafts, not approved legal documents. Do not commit secrets or real customer data. Do not deploy or collect production submissions until the remaining safeguards are in place.
