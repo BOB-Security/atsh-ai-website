@@ -1,5 +1,6 @@
 'use strict';
 
+const crypto = require('node:crypto');
 const path = require('node:path');
 const fs = require('node:fs');
 const express = require('express');
@@ -110,6 +111,51 @@ function submit(type) {
 }
 app.post('/api/contact', rateLimit, submit('contact'));
 app.post('/api/referrals', rateLimit, submit('referral'));
+
+const allowedStatuses = new Set(['new', 'reviewing', 'approved', 'rejected', 'closed']);
+const listSubmissions = db.prepare(
+  'SELECT id, type, name, email, organization, subject, message, created_at, status FROM submissions ORDER BY created_at DESC, id DESC LIMIT ?'
+);
+const filterSubmissions = db.prepare(
+  'SELECT id, type, name, email, organization, subject, message, created_at, status FROM submissions WHERE status = ? ORDER BY created_at DESC, id DESC LIMIT ?'
+);
+const updateSubmissionStatus = db.prepare('UPDATE submissions SET status = ? WHERE id = ?');
+
+function requireAdmin(req, res, next) {
+  res.set('Cache-Control', 'no-store');
+  const configured = process.env.ADMIN_API_TOKEN || '';
+  if (configured.length < 32) {
+    return res.status(503).json({ error: 'لوحة الإدارة غير مفعّلة. يلزم ضبط ADMIN_API_TOKEN آمن على الخادم.' });
+  }
+  const match = /^Bearer (.+)$/i.exec(req.get('authorization') || '');
+  if (!match) return res.status(401).json({ error: 'يلزم تسجيل الدخول برمز الإدارة.' });
+  const supplied = Buffer.from(match[1]);
+  const expected = Buffer.from(configured);
+  if (supplied.length !== expected.length || !crypto.timingSafeEqual(supplied, expected)) {
+    return res.status(401).json({ error: 'رمز الإدارة غير صحيح.' });
+  }
+  next();
+}
+
+app.get('/api/admin/submissions', requireAdmin, (req, res) => {
+  const status = clean(req.query.status, 20);
+  if (status && !allowedStatuses.has(status)) {
+    return res.status(400).json({ error: 'حالة الطلب غير صحيحة.' });
+  }
+  const rows = status ? filterSubmissions.all(status, 100) : listSubmissions.all(100);
+  return res.json({ submissions: rows, limit: 100 });
+});
+
+app.patch('/api/admin/submissions/:id/status', requireAdmin, (req, res) => {
+  const id = Number(req.params.id);
+  const status = clean((req.body || {}).status, 20);
+  if (!Number.isSafeInteger(id) || id < 1 || !allowedStatuses.has(status)) {
+    return res.status(400).json({ error: 'رقم الطلب أو الحالة غير صحيحين.' });
+  }
+  const result = updateSubmissionStatus.run(status, id);
+  if (result.changes === 0) return res.status(404).json({ error: 'لم يتم العثور على الطلب.' });
+  return res.json({ ok: true, id, status });
+});
 app.use('/api', (_req, res) => res.status(404).json({ error: 'المسار غير موجود.' }));
 app.use((error, _req, res, _next) => {
   if (error instanceof SyntaxError && 'body' in error) return res.status(400).json({ error: 'صيغة البيانات المرسلة غير صحيحة.' });
