@@ -69,6 +69,26 @@ test('invalid email is rejected', async () => {
   assert.equal(response.status, 400);
 });
 
+test('public company pages and shared assets are served', async () => {
+  await waitForServer();
+  for (const file of [
+    '/index.html',
+    '/services.html',
+    '/products.html',
+    '/work.html',
+    '/about.html',
+    '/contact.html',
+    '/privacy.html',
+    '/terms.html',
+    '/pages.css',
+    '/site.js',
+    '/contact.js'
+  ]) {
+    const response = await fetch(base + file);
+    assert.equal(response.status, 200, file + ' should be public');
+  }
+});
+
 test('repository internals are not served as static assets', async () => {
   await waitForServer();
   for (const file of [
