@@ -27,10 +27,19 @@ app.disable('x-powered-by');
 if (process.env.TRUST_PROXY === '1') app.set('trust proxy', 1);
 app.use(helmet());
 app.use(express.json({ limit: '16kb', strict: true }));
-// Never serve source, configuration, or internal documentation as public assets.
+
+// Keep repository internals out of the public static-file server.
 app.use((req, res, next) => {
-  const pathname = decodeURIComponent(req.path);
-  if (/^\/(?:server\.js|package\.json|package-lock\.json|\.env(?:\..*)?|README\.md)$/i.test(pathname) || pathname.startsWith('/docs/')) {
+  let pathname;
+  try {
+    pathname = decodeURIComponent(req.path);
+  } catch {
+    return res.sendStatus(400);
+  }
+  if (
+    /^\/(?:server\.js|package\.json|package-lock\.json|\.env(?:\..*)?|README\.md)$/i.test(pathname) ||
+    /^\/(?:docs|test|\.git|\.github|node_modules|data)(?:\/|$)/i.test(pathname)
+  ) {
     return res.sendStatus(404);
   }
   next();
