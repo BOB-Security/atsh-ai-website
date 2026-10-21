@@ -103,3 +103,19 @@ test('repository internals are not served as static assets', async () => {
     assert.equal(response.status, 404, file + ' should not be public');
   }
 });
+
+
+test('all company pages share navigation and legal footer links', () => {
+  const root = path.resolve(__dirname, '..');
+  const pages = ['index.html', 'services.html', 'products.html', 'work.html', 'about.html', 'contact.html', 'privacy.html', 'terms.html'];
+  for (const file of pages) {
+    const html = fs.readFileSync(path.join(root, file), 'utf8');
+    assert.match(html, /<html lang="ar" dir="rtl">/, file + ' should declare Arabic RTL');
+    for (const target of pages) {
+      assert.ok(html.includes('href="' + target + '"'), file + ' should link to ' + target);
+    }
+  }
+  const contact = fs.readFileSync(path.join(root, 'contact.html'), 'utf8');
+  assert.ok(contact.includes('<script src="contact.js"></script>'), 'contact page should load its form handler');
+  assert.ok(contact.includes('id="privacyConsent"'), 'contact form should require privacy consent');
+});
