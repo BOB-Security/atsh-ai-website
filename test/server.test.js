@@ -11,7 +11,7 @@ const port = 39187;
 const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'atsh-ai-test-'));
 const child = spawn(process.execPath, ['server.js'], {
   cwd: path.resolve(__dirname, '..'),
-  env: { ...process.env, NODE_ENV: 'test', PORT: String(port), DATABASE_PATH: path.join(tempDir, 'test.sqlite') },
+  env: { ...process.env, NODE_ENV: 'test', PORT: String(port), DATABASE_PATH: path.join(tempDir, 'test.sqlite'), ADMIN_API_TOKEN: 'test-only-admin-token-0123456789-abcdefghijklmnopqrstuvwxyz' },
   stdio: 'ignore'
 });
 const base = 'http://127.0.0.1:' + port;
@@ -82,7 +82,9 @@ test('public company pages and shared assets are served', async () => {
     '/terms.html',
     '/pages.css',
     '/site.js',
-    '/contact.js'
+    '/contact.js',
+    '/admin.html',
+    '/admin.js'
   ]) {
     const response = await fetch(base + file);
     assert.equal(response.status, 200, file + ' should be public');
@@ -118,4 +120,48 @@ test('all company pages share navigation and legal footer links', () => {
   const contact = fs.readFileSync(path.join(root, 'contact.html'), 'utf8');
   assert.ok(contact.includes('<script src="contact.js"></script>'), 'contact page should load its form handler');
   assert.ok(contact.includes('id="privacyConsent"'), 'contact form should require privacy consent');
+});
+
+
+test('admin inbox rejects requests without the bearer token', async () => {
+  await waitForServer();
+  const response = await fetch(base + '/api/admin/submissions');
+  assert.equal(response.status, 401);
+  assert.equal(response.headers.get('cache-control'), 'no-store');
+});
+
+test('admin inbox lists saved submissions and updates status with valid token', async () => {
+  await waitForServer();
+  const token = 'test-only-admin-token-0123456789-abcdefghijklmnopqrstuvwxyz';
+  const list = await fetch(base + '/api/admin/submissions', {
+    headers: { authorization: 'Bearer ' + token }
+  });
+  assert.equal(list.status, 200);
+  const data = await list.json();
+  assert.ok(Array.isArray(data.submissions));
+  assert.ok(data.submissions.length >= 1);
+  const submission = data.submissions[0];
+
+  const update = await fetch(base + '/api/admin/submissions/' + submission.id + '/status', {
+    method: 'PATCH',
+    headers: { authorization: 'Bearer ' + token, 'content-type': 'application/json' },
+    body: JSON.stringify({ status: 'reviewing' })
+  });
+  assert.equal(update.status, 200);
+  assert.equal((await update.json()).status, 'reviewing');
+});
+
+test('admin inbox rejects invalid status filters and updates', async () => {
+  await waitForServer();
+  const token = 'test-only-admin-token-0123456789-abcdefghijklmnopqrstuvwxyz';
+  const list = await fetch(base + '/api/admin/submissions?status=made-up', {
+    headers: { authorization: 'Bearer ' + token }
+  });
+  assert.equal(list.status, 400);
+  const update = await fetch(base + '/api/admin/submissions/1/status', {
+    method: 'PATCH',
+    headers: { authorization: 'Bearer ' + token, 'content-type': 'application/json' },
+    body: JSON.stringify({ status: 'made-up' })
+  });
+  assert.equal(update.status, 400);
 });
