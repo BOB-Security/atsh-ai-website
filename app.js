@@ -14,17 +14,59 @@ $$(".main-nav a").forEach(link => link.addEventListener("click", () => {
   menuToggle.setAttribute("aria-expanded", "false");
 }));
 
+async function sendSubmission(url, payload, statusEl, button) {
+  const originalText = button.textContent;
+  button.disabled = true;
+  statusEl.textContent = "جارٍ إرسال الطلب بأمان...";
+  statusEl.classList.remove("hidden");
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || "تعذر إرسال الطلب.");
+    statusEl.textContent = result.reference
+      ? result.message + " الرقم المرجعي: " + result.reference
+      : result.message || "تم استلام الطلب.";
+    statusEl.classList.remove("hidden");
+  } catch (error) {
+    statusEl.textContent = error.message || "تعذر الاتصال بالخادم. حاول مرة أخرى لاحقًا.";
+    statusEl.classList.remove("hidden");
+  } finally {
+    button.disabled = false;
+    button.textContent = originalText;
+  }
+}
 function showPrototypeNotice(statusEl, message) {
   statusEl.textContent = message;
   statusEl.classList.remove("hidden");
 }
 $("#contactForm").addEventListener("submit", event => {
   event.preventDefault();
-  showPrototypeNotice($("#contactStatus"), "تم التحقق من الحقول محليًا فقط. لم يُرسل الطلب لأن ربط الخادم لم يُنفذ بعد.");
+  const form = event.currentTarget;
+  const data = new FormData(form);
+  sendSubmission("/api/contact", {
+    name: data.get("name"),
+    email: data.get("email"),
+    subject: data.get("type"),
+    message: data.get("brief"),
+    website: data.get("website") || ""
+  }, $("#contactStatus"), form.querySelector('button[type="submit"]')).then(() => {});
 });
 $("#referral").addEventListener("submit", event => {
   event.preventDefault();
-  showPrototypeNotice($("#referralStatus"), "تم التحقق من الحقول محليًا فقط. لم تُنشأ تذكرة إحالة فعلية؛ يلزم ربط النظام الخلفي ولوحة الإدارة.");
+  const form = event.currentTarget;
+  const data = new FormData(form);
+  sendSubmission("/api/referrals", {
+    name: data.get("referrer"),
+    email: data.get("email"),
+    organization: "إحالة عبر موقع atsh-ai",
+    subject: data.get("service"),
+    message: data.get("brief"),
+    website: data.get("website") || ""
+  }, $("#referralStatus"), form.querySelector('button[type="submit"]'));
 });
 
 const chatPanel = $("#chatPanel");
@@ -54,12 +96,12 @@ function respondTo(question) {
     return "نركز على حلول الذكاء الاصطناعي والبرمجيات والتكامل والتنفيذ. نحدد الحل المناسب بعد فهم احتياجك، ولا نعد بقدرة قبل تقييمها.";
   }
   if (q.includes("إحالة") || q.includes("وسيط") || q.includes("عميل")) {
-    return "يمكنك الانتقال إلى قسم «شركاء الإحالة» وتقديم بيانات أولية. قبول الفرصة أو إسنادها أو اعتماد عمولة يتطلب مراجعة وموافقة رسمية من الإدارة. نموذج الإحالة الحالي تجريبي وغير متصل بالخادم.";
+    return "يمكنك الانتقال إلى قسم «شركاء الإحالة» وتقديم بيانات أولية. قبول الفرصة أو إسنادها أو اعتماد عمولة يتطلب مراجعة وموافقة رسمية من الإدارة.";
   }
   if (q.includes("مشروع") || q.includes("تواصل")) {
-    return "يمكنك استخدام نموذج «طلب تواصل أو مشروع» أسفل الصفحة. النموذج الحالي واجهة أولية ولا يرسل بيانات فعليًا حتى ربط الخادم.";
+    return "يمكنك استخدام نموذج «طلب تواصل أو مشروع» أسفل الصفحة لإرسال طلب للمراجعة الإدارية.";
   }
-  return "شكرًا لتواصلك. أنا مساعد واجهة تجريبي حاليًا، وإجاباتي محدودة بالمعلومات العامة المعروضة هنا. يمكنك إرسال طلب عبر النموذج، لكن الإرسال الفعلي يحتاج تفعيل الخادم.";
+  return "شكرًا لتواصلك. أنا مساعد واجهة تجريبي بإجابات محدودة، ولست موظف دعم بشريًا ولا أستطيع اعتماد عروض أو اتفاقات. يمكنك إرسال طلب للمراجعة الإدارية عبر النموذج.";
 }
 $("#chatForm").addEventListener("submit", event => {
   event.preventDefault();
@@ -89,12 +131,12 @@ $("#chatAttachment").addEventListener("change", event => {
     event.target.value = "";
     return;
   }
-  status.textContent = "تم اختيار " + file.name + " محليًا فقط؛ لم يُرفع الملف إلى خادم.";
+  status.textContent = "تم اختيار " + file.name + " محليًا فقط؛ رفع المرفقات غير متاح حاليًا.";
 });
 $("#makeTicket").addEventListener("click", () => {
   closeChat();
   $("#contact").scrollIntoView({behavior:"smooth"});
   $("#contactType").value = "أخرى";
   $("#contactBrief").focus();
-  $("#contactStatus").textContent = "يمكنك كتابة طلبك في النموذج. إنشاء التذكرة وإعطاء رقم مرجعي يحتاجان إلى ربط النظام الخلفي.";
+  $("#contactStatus").textContent = "يمكنك كتابة طلبك في النموذج لإرساله إلى النظام ومراجعته إداريًا.";
 });
