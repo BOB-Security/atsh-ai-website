@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow, noarchive">
+  <meta name="theme-color" content="#10131f">
+  <title>لوحة إدارة الطلبات | atsh-ai</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="pages.css">
+  <style>
+    .admin-shell{padding:48px 0 80px}.admin-heading{margin-bottom:28px}.admin-heading h1{font-size:clamp(2rem,4vw,3rem);margin-bottom:10px}.admin-heading p{color:var(--muted)}
+    .admin-login,.admin-list{padding:24px;border:1px solid var(--page-line);border-radius:18px;background:var(--panel);margin-bottom:22px}
+    .admin-login{max-width:650px}.admin-login label{display:block;margin:12px 0 6px}.admin-login input{width:100%;padding:12px;border:1px solid var(--page-line);border-radius:10px;background:var(--bg);color:var(--text)}
+    .admin-controls{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:18px 0}.admin-controls select{padding:10px;border:1px solid var(--page-line);border-radius:10px;background:var(--bg);color:var(--text)}
+    .admin-status{color:var(--muted);line-height:1.8;min-height:1.5em}.admin-table-wrap{overflow-x:auto}.admin-table{width:100%;border-collapse:collapse;min-width:850px}.admin-table th,.admin-table td{padding:12px;text-align:right;vertical-align:top;border-bottom:1px solid var(--page-line);font-size:.88rem}.admin-table th{color:var(--cyan);white-space:nowrap}.admin-table td{color:#d5dbea}.admin-table select{background:var(--bg);color:var(--text);border:1px solid var(--page-line);padding:7px;border-radius:8px}.admin-message{white-space:pre-wrap;overflow-wrap:anywhere;max-width:300px}.admin-hidden{display:none!important}.admin-warning{color:#e8c6a1;font-size:.85rem;line-height:1.8}
+  </style>
+</head>
+<body>
+<header class="site-header"><div class="container nav-wrap"><a class="brand" href="index.html"><span class="brand-mark">a<span>i</span></span><span>atsh-ai</span></a><a href="index.html">العودة إلى الموقع ←</a></div></header>
+<main class="container admin-shell" id="main">
+  <div class="admin-heading"><div class="eyebrow">مساحة الإدارة</div><h1>متابعة طلبات التواصل</h1><p>واجهة خاصة لاستعراض الطلبات المحفوظة وتحديث حالتها. تتطلب رمز إدارة مضبوطًا على الخادم.</p></div>
+  <section class="admin-login" aria-labelledby="loginHeading">
+    <h2 id="loginHeading" style="font-size:1.3rem">الدخول إلى لوحة الإدارة</h2>
+    <label for="adminToken">رمز الإدارة</label>
+    <input id="adminToken" type="password" autocomplete="current-password" spellcheck="false" placeholder="أدخل ADMIN_API_TOKEN">
+    <div class="admin-controls"><button class="button button-primary" id="loginButton" type="button">دخول وعرض الطلبات</button><button class="button button-outline admin-hidden" id="logoutButton" type="button">خروج ومسح الرمز</button></div>
+    <p class="admin-warning">لا تضع الرمز في رابط أو رسالة عامة. لا تحفظه هذه الصفحة في التخزين المحلي؛ يُحتفظ به في ذاكرة الصفحة فقط، ويُمسح عند الخروج أو إغلاق الصفحة.</p>
+    <p id="adminStatus" class="admin-status" role="status" aria-live="polite"></p>
+  </section>
+  <section class="admin-list admin-hidden" id="adminResults" aria-labelledby="resultsHeading">
+    <h2 id="resultsHeading" style="font-size:1.4rem">الطلبات الواردة</h2>
+    <div class="admin-controls"><label for="statusFilter">تصفية الحالة</label><select id="statusFilter"><option value="">كل الحالات</option><option value="new">جديد</option><option value="reviewing">قيد المراجعة</option><option value="approved">مقبول</option><option value="rejected">مرفوض</option><option value="closed">مغلق</option></select><button class="button button-outline" id="refreshButton" type="button">تحديث القائمة</button><span id="resultCount" class="muted"></span></div>
+    <div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>الرقم</th><th>النوع</th><th>الاسم والبريد</th><th>الموضوع / الجهة</th><th>الرسالة</th><th>تاريخ الاستلام (UTC)</th><th>الحالة</th></tr></thead><tbody id="submissionRows"></tbody></table></div>
+    <p id="emptyState" class="admin-status admin-hidden">لا توجد طلبات مطابقة للتصفية الحالية.</p>
+  </section>
+</main>
+<script src="admin.js"></script>
+</body>
+</html>
