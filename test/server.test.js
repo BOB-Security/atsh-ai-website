@@ -69,9 +69,16 @@ test('invalid email is rejected', async () => {
   assert.equal(response.status, 400);
 });
 
-test('internal server files are not served as static assets', async () => {
+test('repository internals are not served as static assets', async () => {
   await waitForServer();
-  for (const file of ['/server.js', '/package.json', '/docs/BACKEND_IMPLEMENTATION_STATUS.md']) {
+  for (const file of [
+    '/server.js',
+    '/package.json',
+    '/docs/BACKEND_IMPLEMENTATION_STATUS.md',
+    '/test/server.test.js',
+    '/.github/workflows/ci.yml',
+    '/data/atsh-ai.sqlite'
+  ]) {
     const response = await fetch(base + file);
     assert.equal(response.status, 404, file + ' should not be public');
   }
