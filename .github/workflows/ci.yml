@@ -1,0 +1,22 @@
+name: Validate atsh-ai website
+
+on:
+  pull_request:
+  push:
+    branches: [main, feature/initial-website-mvp]
+
+jobs:
+  syntax-and-dependencies:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm install
+      - name: Check JavaScript syntax
+        run: npm run check
