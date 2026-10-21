@@ -88,7 +88,7 @@
 
     <section class="section forms-section" id="contact">
       <div class="container">
-        <div class="section-heading"><div><div class="eyebrow">ابدأ الحوار</div><h2>ما الذي تريد<br><span class="muted">أن نبنيه معًا؟</span></h2></div><p>اكتب ملخصًا عن التحدي أو المشروع. ستظهر لك رسالة توضح حالة النموذج؛ الإرسال الفعلي يحتاج ربط خدمة خلفية قبل الإطلاق.</p></div>
+        <div class="section-heading"><div><div class="eyebrow">ابدأ الحوار</div><h2>ما الذي تريد<br><span class="muted">أن نبنيه معًا؟</span></h2></div><p>اكتب ملخصًا عن التحدي أو المشروع. ستظهر لك رسالة توضح حالة النموذج؛ يُحفظ الطلب في النظام لمراجعته إداريًا.</p></div>
         <div class="forms-grid">
           <form class="form-card" id="contactForm">
             <h3>طلب تواصل أو مشروع</h3>
@@ -105,7 +105,7 @@
             <div class="form-kicker">PARTNER / REFERRAL</div><h3>تذكرة إحالة فرصة</h3>
             <p class="form-intro">قدّم معلومات أولية فقط. لا ترسل بيانات سرية أو معلومات شخصية لا تملك حق مشاركتها.</p>
             <label for="refName">اسم مقدم الإحالة</label><input id="refName" name="referrer" required maxlength="120" placeholder="اسمك">
-            <label for="refContact">وسيلة التواصل</label><input id="refContact" name="contact" required maxlength="254" placeholder="بريد إلكتروني أو رقم هاتف">
+            <label for="refContact">البريد الإلكتروني</label><input id="refContact" name="email" type="email" required maxlength="254" placeholder="name@example.com">
             <label for="refService">الخدمة المحتملة</label><select id="refService" name="service" required><option value="">اختر المجال</option><option>حل ذكاء اصطناعي</option><option>تطوير برمجيات</option><option>تكامل وأتمتة</option><option>استشارة تقنية</option><option>غير محدد بعد</option></select>
             <label for="refBrief">وصف مختصر للفرصة</label><textarea id="refBrief" name="brief" required maxlength="3000" rows="4" placeholder="ما الاحتياج العام للعميل؟"></textarea>
             <label class="check-row"><input type="checkbox" required> أؤكد أن لدي أساسًا مشروعًا لمشاركة هذه المعلومات مع الشركة.</label>
@@ -113,7 +113,7 @@
             <p class="form-status" id="referralStatus" role="status" aria-live="polite"></p>
           </form>
         </div>
-        <div class="prototype-note"><strong>تنبيه قبل الإطلاق:</strong> هذه نسخة واجهة أولية. النماذج لا ترسل البيانات إلى خادم ولا تُنشئ تذاكر فعلية حتى يتم بناء وربط النظام الخلفي الآمن.</div>
+        <div class="prototype-note"><strong>تنبيه قبل الإطلاق:</strong> تُحفظ الطلبات الواردة لمراجعتها إداريًا. الإرسال لا يعني قبول المشروع أو اعتماد الإحالة أو استحقاق عمولة.</div>
       </div>
     </section>
   </main>
