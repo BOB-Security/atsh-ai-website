@@ -1,24 +1,28 @@
-# atsh-ai — Website MVP (initial frontend)
+# atsh-ai website
 
-This branch introduces the first responsive Arabic-first landing-page frontend.
+Arabic-first responsive website prototype and an initial backend API for project/contact and referral submissions.
 
-## Included
-- Responsive landing page with AI/service positioning and process explanation.
-- Contact/project inquiry form UI.
-- Referral intake form UI following the documented management-approval workflow.
-- Customer-support chat widget prototype with canned responses, attachment selection UI, and ticket handoff shortcut.
-- Accessibility basics: semantic sections, labels, focus styles, skip link, reduced-motion handling.
+## Current implementation
 
-## Important implementation status
-This is a **frontend prototype only**. Forms do not submit to a server, tickets are not persisted, attachments are not uploaded, and the chat is not connected to an AI service or live support. The UI explicitly discloses this to avoid misleading visitors.
+- Responsive RTL landing page for atsh-ai.
+- Contact form posts to POST /api/contact.
+- Referral form posts to POST /api/referrals.
+- Submissions are validated server-side and persisted in SQLite.
+- GET /api/health provides a basic health response.
+- Referral receipt is not an approval, assignment, or commission agreement.
 
-## Next required engineering work
-1. Select and configure the app framework, server/API, database, and authentication.
-2. Implement validated server endpoints and persistent ticket/conversation records.
-3. Add private object storage, file validation/scanning, access control, and retention policy.
-4. Build the authenticated admin inbox and role-based access checks.
-5. Integrate a chosen AI provider only after reviewing cost, privacy, and data handling.
-6. Configure deployment/domain after the correct domain name is confirmed.
-7. Run automated checks, security tests, and production smoke tests.
+## Local development
 
-Do not publish this prototype as a fully operational customer-support service until the backend and security work above is complete.
+Requires Node.js 22+ and a writable local directory.
+
+1. Run npm install.
+2. Optionally copy .env.example to .env and configure the database path.
+3. Run npm run check.
+4. Run npm start.
+5. Open http://localhost:3000.
+
+## Not yet production-ready
+
+No authenticated admin inbox, human support agent, AI provider integration, secure attachment upload, employee portal, email notification, or deployment configuration is implemented. The current in-memory rate limiter is a basic development safeguard, not production-grade abuse protection. Configure persistent storage, backups, privacy/retention policies, monitoring, and security review before collecting real customer data.
+
+Do not commit secrets or real customer data. Do not deploy or collect production submissions until the remaining safeguards are in place.
