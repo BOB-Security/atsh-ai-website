@@ -4,6 +4,7 @@ const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
+const adminCore = require('./admin-core');
 
 const ROOT = path.join(__dirname, 'public');
 const PORT = Number(process.env.PORT || 3000);
@@ -119,6 +120,15 @@ async function handleInquiry(req, res) {
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost');
 
+  if (url.pathname.startsWith('/api/admin/') || url.pathname === '/api/site-content' || url.pathname.startsWith('/media/')) {
+    try {
+      const handled = await adminCore.handler(req, res, url);
+      if (handled !== false) return;
+    } catch (error) {
+      console.error('Admin API failure:', error.message);
+      return send(res, 500, { error: 'حدث خطأ داخلي. حاول لاحقًا.' });
+    }
+  }
   if (req.method === 'GET' && url.pathname === '/health') {
     return send(res, 200, { ok: true, service: 'atsh-ai-website' });
   }
@@ -134,6 +144,8 @@ const server = http.createServer(async (req, res) => {
   catch { return send(res, 400, { error: 'Bad path' }); }
   if (pathname === '/') pathname = '/index.html';
   if (pathname === '/admin' || pathname === '/admin/') pathname = '/admin/index.html';
+  if (pathname === '/staff/login' || pathname === '/staff/login/') pathname = '/staff/login.html';
+  if (pathname === '/staff/activate' || pathname === '/staff/activate/') pathname = '/staff/activate.html';
 
   const filePath = path.resolve(ROOT, '.' + pathname);
   if (!filePath.startsWith(ROOT + path.sep) && filePath !== path.join(ROOT, 'index.html')) {
