@@ -152,9 +152,21 @@ const server = http.createServer(async (req, res) => {
     return send(res, 403, { error: 'Forbidden' });
   }
 
-  fs.stat(filePath, (err, stat) => {
-    if (err || !stat.isFile()) return send(res, 404, { error: 'Not found' });
-    const type = MIME[path.extname(filePath).toLowerCase()] || 'application/octet-stream';
+  try {
+    let resolved = filePath;
+    let stat;
+    try { stat = await fs.promises.stat(resolved); } catch { stat = null; }
+    if (!stat || !stat.isFile()) {
+      const store = await adminCore.readStore();
+      const cmsPage = (store.content.pages || []).find(page => page.visible && page.path === url.pathname);
+      if (cmsPage) {
+        resolved = path.join(ROOT, 'cms-page.html');
+        stat = await fs.promises.stat(resolved);
+      } else {
+        return send(res, 404, { error: 'Not found' });
+      }
+    }
+    const type = MIME[path.extname(resolved).toLowerCase()] || 'application/octet-stream';
     res.writeHead(200, {
       'Content-Type': type,
       'X-Content-Type-Options': 'nosniff',
@@ -162,11 +174,20 @@ const server = http.createServer(async (req, res) => {
       'X-Frame-Options': 'DENY',
       'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
       'Content-Security-Policy': "default-src 'self'; img-src 'self' data: https:; style-src 'self'; script-src 'self'; connect-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
-      'Cache-Control': path.extname(filePath) === '.html' ? 'no-cache' : 'public, max-age=3600'
+      'Cache-Control': path.extname(resolved) === '.html' ? 'no-cache' : 'public, max-age=3600'
     });
     if (req.method === 'HEAD') return res.end();
-    fs.createReadStream(filePath).pipe(res);
-  });
+    if (path.extname(resolved) === '.html' && !url.pathname.startsWith('/admin') && !url.pathname.startsWith('/staff')) {
+      let html = await fs.promises.readFile(resolved, 'utf8');
+      if (!html.includes('src="/site-cms.js"')) html = html.replace('</body>', '<script src="/site-cms.js" defer></script></body>');
+      return res.end(html);
+    }
+    return fs.createReadStream(resolved).pipe(res);
+  } catch (error) {
+    console.error('Static response failure:', error.message);
+    if (!res.headersSent) return send(res, 500, { error: 'Internal server error' });
+    return res.end();
+  }
 });
 
 if (require.main === module) {
