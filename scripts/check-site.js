@@ -8,6 +8,7 @@ const required = [
   'public/styles.css',
   'public/app.js',
   'public/services.html',
+  'public/products.html',
   'public/about.html',
   'public/contact.html',
   'public/privacy.html',
