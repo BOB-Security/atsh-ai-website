@@ -129,6 +129,7 @@ jobs:
           echo "resource_group=$RG" >> "$GITHUB_OUTPUT"
           echo "location=$LOCATION" >> "$GITHUB_OUTPUT"
           echo "server_farm_id=$SERVER_FARM_ID" >> "$GITHUB_OUTPUT"
+          echo "needs_provision=true" >> "$GITHUB_OUTPUT"
       - name: Validate Bicep
         if: steps.resolve.outputs.needs_provision == 'true'
         run: az bicep build --file infra/azure/main.bicep
