@@ -29,7 +29,7 @@ function send(res, status, body, type = 'application/json; charset=utf-8') {
     'Referrer-Policy': 'strict-origin-when-cross-origin',
     'X-Frame-Options': 'DENY',
     'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
-    'Content-Security-Policy': "default-src 'self'; img-src 'self' data: https:; style-src 'self'; script-src 'self'; connect-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+    'Content-Security-Policy': "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
   });
   res.end(type.startsWith('application/json') ? JSON.stringify(body) : body);
 }
@@ -173,12 +173,13 @@ const server = http.createServer(async (req, res) => {
       'Referrer-Policy': 'strict-origin-when-cross-origin',
       'X-Frame-Options': 'DENY',
       'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
-      'Content-Security-Policy': "default-src 'self'; img-src 'self' data: https:; style-src 'self'; script-src 'self'; connect-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
+      'Content-Security-Policy': "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
       'Cache-Control': path.extname(resolved) === '.html' ? 'no-cache' : 'public, max-age=3600'
     });
     if (req.method === 'HEAD') return res.end();
     if (path.extname(resolved) === '.html' && !url.pathname.startsWith('/admin') && !url.pathname.startsWith('/staff')) {
       let html = await fs.promises.readFile(resolved, 'utf8');
+      if (!html.includes('href="/cms.css"')) html = html.replace('</head>', '<link rel="stylesheet" href="/cms.css"></head>');
       if (!html.includes('src="/site-cms.js"')) html = html.replace('</body>', '<script src="/site-cms.js" defer></script></body>');
       return res.end(html);
     }
