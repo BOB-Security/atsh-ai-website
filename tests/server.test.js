@@ -28,6 +28,14 @@ test('homepage serves HTML', async () => {
   assert.match(html, /atsh-ai/);
   assert.match(html, /id="project-form"/);
 });
+test('admin portal route serves a clearly inactive, noindex entry page', async () => {
+  const res = await fetch(base + '/admin');
+  assert.equal(res.status, 200);
+  const html = await res.text();
+  assert.match(html, /noindex,nofollow/);
+  assert.match(html, /التفعيل الأمني قيد الإعداد/);
+  assert.match(html, /دخول المالك/);
+});
 test('unknown file returns 404', async () => {
   const res = await fetch(base + '/missing-file.js');
   assert.equal(res.status, 404);
