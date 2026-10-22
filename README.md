@@ -17,7 +17,7 @@ Open `http://localhost:3000`; `GET /health` should return `200`.
 
 ## Azure deployment
 
-The canonical workflow is **Actions → Azure App Service — provision and deploy**. It can run manually or when the Azure infrastructure definition/workflow changes on `main`. It always runs the build and tests before changing Azure resources and uses the repository's existing Azure OIDC secrets. Website code changes alone do not trigger a production deployment.
+The canonical workflow is **Actions → Azure App Service — provision and deploy**. It runs manually or on `main` when the infrastructure, deployment workflow, server/backend, package manifests, public assets, or site checks change. It runs build and test checks before deploying and uses the repository's Azure OIDC secrets.
 
 - If `atsh-ai-website` already exists in the authenticated Azure subscription, the workflow discovers its resource group, region, and App Service plan and reuses them.
 - If the app does not exist, supply an existing resource group and a globally unique app name.
