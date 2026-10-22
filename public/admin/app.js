@@ -63,6 +63,7 @@
   }
   function renderPages() {
     const list = $('#pages-list'), select = $('#block-page'); list.replaceChildren(); select.replaceChildren();
+    [['home','الرئيسية'],['services','الخدمات'],['products','المنتجات'],['about','عن الشركة'],['contact','التواصل'],['privacy','الخصوصية'],['web-systems','الأنظمة والمواقع'],['business-bots','بوتات الأعمال'],['cloud-services','الخدمات السحابية'],['security-quality','الأمان والجودة']].forEach(([value,label]) => { const o = el('option',label); o.value = value; select.append(o); });
     for (const page of state.content.pages || []) {
       const item = el('div', undefined, 'admin-list-item');
       const title = el('div'); title.append(el('strong', page.title || page.path), el('small', page.path + (page.visible ? ' · ظاهر' : ' · مخفي')));
@@ -70,7 +71,7 @@
       list.append(item);
       const option = el('option', page.title || page.path); option.value = page.id; select.append(option);
     }
-    if (!state.content.pages.length) { list.append(el('p', 'لم تُضف صفحات مخصصة بعد.', 'admin-help')); select.append(el('option', 'الرئيسية')); select.lastChild.value = 'home'; }
+    if (!state.content.pages.length) list.append(el('p', 'لم تُضف صفحات مخصصة بعد.', 'admin-help'));
   }
   function renderBlocks() {
     const list = $('#blocks-list'); list.replaceChildren();
