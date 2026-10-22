@@ -249,11 +249,12 @@ async function handler(req, res, url) {
   }
 
   if (req.method === 'POST' && p === '/api/admin/logout') {
+    const auth = await authenticate(req);
+    if (!auth) return json(res, 401, { error: 'انتهت الجلسة أو فشل التحقق الأمني.' }, { 'Set-Cookie': cookieHeader('', true) });
     const token = parseCookies(req)[COOKIE];
     await transact(store => {
       store.sessions = store.sessions.filter(s => s.id !== hash(token || ''));
-      const actor = store.owner || null;
-      if (actor) audit(store, actor, 'auth.logout', actor.id);
+      audit(store, auth.user, 'auth.logout', auth.user.id);
     });
     return json(res, 200, { ok: true }, { 'Set-Cookie': cookieHeader('', true) });
   }
@@ -407,7 +408,7 @@ async function handler(req, res, url) {
   }
   if (p === '/api/admin/upload' && req.method === 'POST') {
     if (!hasPermission(actor, 'content.write')) return json(res, 403, { error: 'ليس لديك صلاحية رفع الصور.' });
-    let data; try { data = await readBody(req, MAX_UPLOAD + 1024); } catch (e) { return json(res, e.status || 400, { error: 'الملف غير صالح أو كبير جدًا.' }); }
+    let data; try { data = await readBody(req, Math.ceil(MAX_UPLOAD * 1.5) + 2048); } catch (e) { return json(res, e.status || 400, { error: 'الملف غير صالح أو كبير جدًا.' }); }
     const match = /^data:image\/(png|jpeg|jpg|webp|gif);base64,([A-Za-z0-9+/=]+)$/.exec(data.dataUrl || '');
     if (!match) return json(res, 400, { error: 'الصيغ المسموحة: PNG, JPEG, WEBP, GIF.' });
     const buffer = Buffer.from(match[2], 'base64');
