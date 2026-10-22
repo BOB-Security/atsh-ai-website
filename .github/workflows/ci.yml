@@ -19,7 +19,7 @@ jobs:
         with:
           node-version: '24.x'
       - name: Install
-        run: npm install
+        run: npm ci
       - name: Build checks
         run: npm run build
       - name: Server smoke tests
