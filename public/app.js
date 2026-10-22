@@ -46,27 +46,29 @@ function setLanguage(lang) {
     const key = el.dataset.i18n;
     if (dict[key] !== undefined) el.innerHTML = dict[key];
   });
-  $('#lang-switch').innerHTML = lang === 'ar' ? 'EN <span aria-hidden="true">↗</span>' : 'عربي <span aria-hidden="true">↗</span>';
-  $('#lang-switch').setAttribute('aria-label', lang === 'ar' ? 'Switch to English' : 'التبديل إلى العربية');
-  $('#menu-toggle').setAttribute('aria-label', lang === 'ar' ? 'فتح القائمة' : 'Open menu');
+  if ($('#lang-switch')) {
+    $('#lang-switch').innerHTML = lang === 'ar' ? 'EN <span aria-hidden="true">↗</span>' : 'عربي <span aria-hidden="true">↗</span>';
+    $('#lang-switch').setAttribute('aria-label', lang === 'ar' ? 'Switch to English' : 'التبديل إلى العربية');
+  }
+  if ($('#menu-toggle')) $('#menu-toggle').setAttribute('aria-label', lang === 'ar' ? 'فتح القائمة' : 'Open menu');
   document.querySelectorAll('a[data-service]').forEach(link => link.addEventListener('click', () => {
     $('#service').value = link.dataset.service;
   }, { once: true }));
 }
-$('#lang-switch').addEventListener('click', () => setLanguage(currentLang === 'ar' ? 'en' : 'ar'));
-$('#menu-toggle').addEventListener('click', () => {
+if ($('#lang-switch')) $('#lang-switch').addEventListener('click', () => setLanguage(currentLang === 'ar' ? 'en' : 'ar'));
+if ($('#menu-toggle') && $('#primary-nav')) $('#menu-toggle').addEventListener('click', () => {
   const nav = $('#primary-nav');
   const open = nav.classList.toggle('open');
   $('#menu-toggle').setAttribute('aria-expanded', String(open));
 });
 document.querySelectorAll('#primary-nav a').forEach(link => link.addEventListener('click', () => {
   $('#primary-nav').classList.remove('open');
-  $('#menu-toggle').setAttribute('aria-expanded', 'false');
+  if ($('#menu-toggle')) $('#menu-toggle').setAttribute('aria-expanded', 'false');
 }));
-$('#year').textContent = new Date().getFullYear();
+if ($('#year')) $('#year').textContent = new Date().getFullYear();
 
 const form = $('#project-form');
-form.addEventListener('submit', async event => {
+if (form) form.addEventListener('submit', async event => {
   event.preventDefault();
   const status = $('#form-status');
   status.className = 'form-status';
