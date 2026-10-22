@@ -21,7 +21,7 @@
       blocks.forEach(block => main.append(makeBlock(block)));
       return;
     }
-    const pageId = currentPage?.id || (path === '/' ? 'home' : path.replace(/^\/|\/$/g, ''));
+    const pageId = currentPage?.id || (path === '/' ? 'home' : path.replace(/^\/|\/$/g, '').replace(/\.html$/, ''));
     const blocks = (data.blocks || []).filter(b => b.visible && (b.pageId === pageId || (path === '/' && b.pageId === 'home')));
     if (!blocks.length) return;
     let section = document.querySelector('[data-cms-generated="true"]');
