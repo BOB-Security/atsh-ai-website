@@ -88,7 +88,7 @@ jobs:
           set -euo pipefail
           az account show --query '{subscription:id,name:name,tenant:tenantId}' -o table
           EXISTING_RG=$(az webapp list --query "[?name=='${{ inputs.app_name }}'].resourceGroup | [0]" -o tsv)
-          if [ -n "$EXISTING_RG" ]; then
+          if [ -n "$EXISTING_RG" ] && [ "$EXISTING_RG" != "None" ]; then
             if [ -n "$RG_INPUT" ] && [ "$RG_INPUT" != "$EXISTING_RG" ]; then
               echo "The app exists in resource group '$EXISTING_RG', not '$RG_INPUT'. Refusing to create a duplicate." >&2
               exit 1

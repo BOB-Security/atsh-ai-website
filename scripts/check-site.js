@@ -31,7 +31,7 @@ for (const marker of ['id="main-content"', 'id="project-form"', 'data-i18n']) {
 }
 for (const page of required.filter(file => file.startsWith('public/') && file.endsWith('.html'))) {
   const html = fs.readFileSync(path.join(root, page), 'utf8');
-  if (!html.includes('<html lang="ar" dir="rtl">') || !html.includes('/styles.css') || !html.includes('/app.js')) {
+  if (!/<html lang="ar" dir="rtl"(?:\\s|>)/.test(html) || !html.includes('/styles.css') || !html.includes('/app.js')) {
     console.error('Page is missing language metadata or shared assets:', page);
     process.exit(1);
   }
