@@ -47,6 +47,18 @@ app.use((req, res, next) => {
 });
 app.use(express.static(path.join(__dirname), { extensions: ['html'], dotfiles: 'deny', index: 'index.html' }));
 
+db.exec(
+  "CREATE TABLE IF NOT EXISTS cms_pages (" +
+  "id INTEGER PRIMARY KEY AUTOINCREMENT, slug TEXT NOT NULL UNIQUE, title TEXT NOT NULL, " +
+  "status TEXT NOT NULL DEFAULT 'draft' CHECK(status IN ('draft','published','archived')), " +
+  "current_revision_id INTEGER, created_at TEXT NOT NULL DEFAULT (datetime('now')), " +
+  "updated_at TEXT NOT NULL DEFAULT (datetime('now'))" +
+  "); CREATE TABLE IF NOT EXISTS cms_revisions (" +
+  "id INTEGER PRIMARY KEY AUTOINCREMENT, page_id INTEGER NOT NULL REFERENCES cms_pages(id) ON DELETE CASCADE, " +
+  "title TEXT NOT NULL, body TEXT NOT NULL, created_by TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now'))" +
+  "); CREATE INDEX IF NOT EXISTS idx_cms_revisions_page ON cms_revisions(page_id, id DESC);"
+);
+
 const rateBuckets = new Map();
 function rateLimit(req, res, next) {
   const now = Date.now();
@@ -156,6 +168,103 @@ app.patch('/api/admin/submissions/:id/status', requireAdmin, (req, res) => {
   if (result.changes === 0) return res.status(404).json({ error: 'لم يتم العثور على الطلب.' });
   return res.json({ ok: true, id, status });
 });
+
+// CMS draft API — protected by the existing admin gate. This is a first vertical slice,
+// not production identity/role management; do not expose it publicly until that work is complete.
+const cmsSlugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const cmsTitle = value => clean(value, 160);
+const cmsBody = value => typeof value === 'string' ? value.trim().slice(0, 20000) : '';
+const listCmsPages = db.prepare(
+  'SELECT p.id, p.slug, p.title, p.status, p.current_revision_id, p.created_at, p.updated_at, ' +
+  '(SELECT COUNT(*) FROM cms_revisions r WHERE r.page_id = p.id) AS revision_count ' +
+  'FROM cms_pages p ORDER BY p.updated_at DESC, p.id DESC LIMIT 200'
+);
+const getCmsPage = db.prepare(
+  'SELECT p.id, p.slug, p.title, p.status, p.current_revision_id, p.created_at, p.updated_at ' +
+  'FROM cms_pages p WHERE p.id = ?'
+);
+const getCmsRevision = db.prepare(
+  'SELECT id, page_id, title, body, created_by, created_at FROM cms_revisions WHERE id = ? AND page_id = ?'
+);
+const insertCmsPage = db.prepare(
+  "INSERT INTO cms_pages (slug, title, status) VALUES (?, ?, 'draft')"
+);
+const insertCmsRevision = db.prepare(
+  'INSERT INTO cms_revisions (page_id, title, body, created_by) VALUES (?, ?, ?, ?)'
+);
+const pointCmsPageAtRevision = db.prepare(
+  "UPDATE cms_pages SET current_revision_id = ?, title = ?, updated_at = datetime('now') WHERE id = ?"
+);
+
+app.get('/api/admin/cms/pages', requireAdmin, (_req, res) => {
+  return res.json({ pages: listCmsPages.all() });
+});
+
+app.post('/api/admin/cms/pages', requireAdmin, (req, res) => {
+  const body = req.body || {};
+  const slug = clean(body.slug, 80).toLowerCase();
+  const title = cmsTitle(body.title);
+  const content = cmsBody(body.body);
+  const actor = clean(body.actor, 120) || 'admin-token-session';
+  if (!cmsSlugPattern.test(slug) || title.length < 2 || content.length > 20000) {
+    return res.status(400).json({ error: 'تحقق من الرابط المختصر والعنوان ومحتوى المسودة.' });
+  }
+  try {
+    const result = db.transaction(() => {
+      const page = insertCmsPage.run(slug, title);
+      const revision = insertCmsRevision.run(page.lastInsertRowid, title, content, actor);
+      pointCmsPageAtRevision.run(revision.lastInsertRowid, title, page.lastInsertRowid);
+      return { pageId: Number(page.lastInsertRowid), revisionId: Number(revision.lastInsertRowid) };
+    })();
+    return res.status(201).json({ ok: true, ...result, status: 'draft' });
+  } catch (error) {
+    if (String(error.code || '').includes('SQLITE_CONSTRAINT')) {
+      return res.status(409).json({ error: 'يوجد بالفعل صفحة بهذا الرابط المختصر.' });
+    }
+    throw error;
+  }
+});
+
+app.get('/api/admin/cms/pages/:id', requireAdmin, (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isSafeInteger(id) || id < 1) return res.status(400).json({ error: 'رقم الصفحة غير صحيح.' });
+  const page = getCmsPage.get(id);
+  if (!page) return res.status(404).json({ error: 'لم يتم العثور على الصفحة.' });
+  const revision = page.current_revision_id ? getCmsRevision.get(page.current_revision_id, id) : null;
+  return res.json({ page, revision });
+});
+
+app.post('/api/admin/cms/pages/:id/revisions', requireAdmin, (req, res) => {
+  const id = Number(req.params.id);
+  const body = req.body || {};
+  const title = cmsTitle(body.title);
+  const content = cmsBody(body.body);
+  const actor = clean(body.actor, 120) || 'admin-token-session';
+  if (!Number.isSafeInteger(id) || id < 1 || title.length < 2 || typeof body.body !== 'string' || body.body.length > 20000) {
+    return res.status(400).json({ error: 'تحقق من رقم الصفحة والعنوان والمحتوى (حد أقصى 20,000 حرف).' });
+  }
+  const page = getCmsPage.get(id);
+  if (!page) return res.status(404).json({ error: 'لم يتم العثور على الصفحة.' });
+  const result = db.transaction(() => {
+    const revision = insertCmsRevision.run(id, title, content, actor);
+    pointCmsPageAtRevision.run(revision.lastInsertRowid, title, id);
+    return Number(revision.lastInsertRowid);
+  })();
+  return res.status(201).json({ ok: true, pageId: id, revisionId: result, status: page.status });
+});
+
+app.get('/api/admin/cms/pages/:id/revisions', requireAdmin, (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isSafeInteger(id) || id < 1) return res.status(400).json({ error: 'رقم الصفحة غير صحيح.' });
+  if (!getCmsPage.get(id)) return res.status(404).json({ error: 'لم يتم العثور على الصفحة.' });
+  const revisions = db.prepare(
+    'SELECT id, page_id, title, created_by, created_at FROM cms_revisions WHERE page_id = ? ORDER BY id DESC LIMIT 100'
+  ).all(id);
+  return res.json({ revisions });
+});
+
+// Publishing is intentionally not implemented in this milestone. Draft APIs never publish content.
+
 app.use('/api', (_req, res) => res.status(404).json({ error: 'المسار غير موجود.' }));
 app.use((error, _req, res, _next) => {
   if (error instanceof SyntaxError && 'body' in error) return res.status(400).json({ error: 'صيغة البيانات المرسلة غير صحيحة.' });
