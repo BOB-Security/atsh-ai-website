@@ -6,6 +6,12 @@ on:
     paths:
       - 'infra/azure/main.bicep'
       - '.github/workflows/azure-provision-deploy.yml'
+      - 'server.js'
+      - 'admin-core.js'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'public/**'
+      - 'scripts/**'
   workflow_dispatch:
     inputs:
       resource_group:
@@ -60,7 +66,7 @@ jobs:
           npm test
       - name: Prepare deployment package
         run: |
-          zip -r atsh-ai-app.zip package.json server.js public scripts
+          zip -r atsh-ai-app.zip package.json server.js admin-core.js public scripts
       - uses: actions/upload-artifact@v4
         with:
           name: atsh-ai-app
@@ -161,12 +167,22 @@ jobs:
         env:
           RG: ${{ steps.resolve.outputs.resource_group }}
           APP: ${{ inputs.app_name || 'atsh-ai-website' }}
+          ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
         run: |
+          set -euo pipefail
           az webapp config appsettings set \
             --resource-group "$RG" \
             --name "$APP" \
-            --settings NODE_ENV=production WEBSITE_NODE_DEFAULT_VERSION='~24' SCM_DO_BUILD_DURING_DEPLOYMENT=false \
+            --settings NODE_ENV=production DATA_DIR=/home/data PUBLIC_BASE_URL="https://${APP}.azurewebsites.net" WEBSITE_NODE_DEFAULT_VERSION='~24' WEBSITE_RUN_FROM_PACKAGE=1 SCM_DO_BUILD_DURING_DEPLOYMENT=false \
             --output none
+          if [ -n "$ADMIN_EMAIL" ] && [ -n "$RESEND_API_KEY" ] && [ -n "$EMAIL_FROM" ]; then
+            az webapp config appsettings set --resource-group "$RG" --name "$APP" --settings ADMIN_EMAIL="$ADMIN_EMAIL" RESEND_API_KEY="$RESEND_API_KEY" EMAIL_FROM="$EMAIL_FROM" --output none
+            echo "Owner email activation settings were applied without printing secret values."
+          else
+            echo "::warning::Owner/staff email activation is not configured. Add ADMIN_EMAIL, RESEND_API_KEY and EMAIL_FROM as GitHub Actions secrets, then redeploy."
+          fi
       - name: Deploy website package
         uses: azure/webapps-deploy@v3
         with:
