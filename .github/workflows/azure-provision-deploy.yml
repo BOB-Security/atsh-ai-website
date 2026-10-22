@@ -5,7 +5,7 @@ on:
     inputs:
       resource_group:
         description: Existing Azure Resource Group to use (do not create a duplicate app in a different group)
-        required: true
+        required: false
         type: string
       app_name:
         description: Globally unique Azure Web App name; reuse only if it belongs to this resource group
@@ -50,7 +50,7 @@ jobs:
           node-version: '24.x'
       - name: Install and verify
         run: |
-          npm install
+          npm ci
           npm run build
           npm test
       - name: Prepare deployment package
@@ -77,26 +77,55 @@ jobs:
           client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_1DF03D06E1D444CCA0654B27E8C75231 }}
           tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_5EF8FCB25D80477A8D0F2FCEE63A981A }}
           subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_A4D19EA9941D4136AF1DD6E315BFA1E2 }}
-      - name: Confirm subscription and resource group
+      - name: Resolve existing app or validate new resource group
+        id: resolve
         env:
-          RG: ${{ inputs.resource_group }}
+          RG_INPUT: ${{ inputs.resource_group }}
+          APP: ${{ inputs.app_name }}
+          LOCATION_INPUT: ${{ inputs.location }}
+        shell: bash
         run: |
+          set -euo pipefail
           az account show --query '{subscription:id,name:name,tenant:tenantId}' -o table
-          az group show --name "$RG" --query '{name:name,location:location}' -o table
+          EXISTING_RG=$(az webapp list --query "[?name=='${{ inputs.app_name }}'].resourceGroup | [0]" -o tsv)
+          if [ -n "$EXISTING_RG" ]; then
+            if [ -n "$RG_INPUT" ] && [ "$RG_INPUT" != "$EXISTING_RG" ]; then
+              echo "The app exists in resource group '$EXISTING_RG', not '$RG_INPUT'. Refusing to create a duplicate." >&2
+              exit 1
+            fi
+            RG="$EXISTING_RG"
+            LOCATION=$(az webapp show --resource-group "$RG" --name "$APP" --query location -o tsv)
+            PLAN_ID=$(az webapp show --resource-group "$RG" --name "$APP" --query serverFarmId -o tsv)
+            PLAN="${PLAN_ID##*/}"
+            echo "Found existing app: $APP in $RG ($LOCATION), plan $PLAN"
+          else
+            if [ -z "$RG_INPUT" ]; then
+              echo "No existing app named '$APP' was found. Supply an existing resource group to create it there." >&2
+              exit 1
+            fi
+            RG="$RG_INPUT"
+            az group show --name "$RG" --query '{name:name,location:location}' -o table
+            LOCATION="$LOCATION_INPUT"
+            PLAN="${APP}-plan"
+          fi
+          echo "resource_group=$RG" >> "$GITHUB_OUTPUT"
+          echo "location=$LOCATION" >> "$GITHUB_OUTPUT"
+          echo "plan_name=$PLAN" >> "$GITHUB_OUTPUT"
       - name: Validate Bicep
         run: az bicep build --file infra/azure/main.bicep
       - name: Provision or update App Service
         env:
-          RG: ${{ inputs.resource_group }}
+          RG: ${{ steps.resolve.outputs.resource_group }}
           APP: ${{ inputs.app_name }}
-          LOCATION: ${{ inputs.location }}
+          LOCATION: ${{ steps.resolve.outputs.location }}
+          PLAN: ${{ steps.resolve.outputs.plan_name }}
           SKU: ${{ inputs.plan_sku }}
         run: |
           az deployment group create \
             --resource-group "$RG" \
             --name "atsh-ai-site-${GITHUB_RUN_ID}" \
             --template-file infra/azure/main.bicep \
-            --parameters appName="$APP" location="$LOCATION" skuName="$SKU" \
+            --parameters appName="$APP" location="$LOCATION" planName="$PLAN" skuName="$SKU" \
             --query 'properties.outputs' -o json > deployment-outputs.json
           cat deployment-outputs.json
       - name: Deploy website package
