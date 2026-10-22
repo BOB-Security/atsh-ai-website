@@ -38,10 +38,13 @@ function setLanguage(lang) {
   const dict = translations[lang];
   document.documentElement.lang = lang;
   document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
-  document.title = lang === 'ar' ? 'atsh-ai | نبني التقنية لتصنع أثرًا' : 'atsh-ai | Technology that makes an impact';
-  document.querySelector('meta[name="description"]').content = lang === 'ar'
-    ? 'atsh-ai — نبني حلولًا رقمية عملية من المواقع والأنظمة إلى البوتات والخدمات السحابية.'
-    : 'atsh-ai builds practical digital solutions: websites, custom systems, business bots, and cloud services.';
+  document.title = lang === 'ar'
+    ? (document.documentElement.dataset.titleAr || 'atsh-ai | نبني التقنية لتصنع أثرًا')
+    : (document.documentElement.dataset.titleEn || 'atsh-ai | Technology that makes an impact');
+  const description = document.querySelector('meta[name="description"]');
+  if (description) description.content = lang === 'ar'
+    ? (description.dataset.descriptionAr || 'atsh-ai — نبني حلولًا رقمية عملية من المواقع والأنظمة إلى البوتات والخدمات السحابية.')
+    : (description.dataset.descriptionEn || 'atsh-ai builds practical digital solutions: websites, custom systems, business bots, and cloud services.');
   document.querySelectorAll('[data-i18n]').forEach(el => {
     const key = el.dataset.i18n;
     if (dict[key] !== undefined) el.innerHTML = dict[key];
