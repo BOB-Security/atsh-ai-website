@@ -337,7 +337,9 @@ async function handler(req, res, url) {
       const user = s.users.find(u => u.id === id);
       if (!user) return { error: 'الحساب غير موجود.' };
       if (data.role && !validRoles.has(data.role)) return { error: 'الدور غير صالح.' };
+      if ((data.role === 'Administrator' || user.role === 'Administrator') && actor.role !== 'Owner') return { error: 'تعديل حسابات المديرين محصور بالمالك.' };
       if (data.role === 'Administrator' && actor.role !== 'Owner') return { error: 'منح دور المدير محصور بالمالك.' };
+      if (data.active === false && user.role === 'Administrator' && s.users.filter(u => u.active && u.role === 'Administrator').length <= 1) return { error: 'لا يمكن تعطيل آخر حساب مدير نشط.' };
       if (data.name) user.name = clean(data.name, 120);
       if (data.role) user.role = data.role;
       if (typeof data.active === 'boolean') {
