@@ -1,6 +1,11 @@
 name: Azure App Service — provision and deploy
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'infra/azure/main.bicep'
+      - '.github/workflows/azure-provision-deploy.yml'
   workflow_dispatch:
     inputs:
       resource_group:
@@ -80,14 +85,14 @@ jobs:
       - name: Resolve existing app or validate new resource group
         id: resolve
         env:
-          RG_INPUT: ${{ inputs.resource_group }}
-          APP: ${{ inputs.app_name }}
-          LOCATION_INPUT: ${{ inputs.location }}
+          RG_INPUT: ${{ inputs.resource_group || '' }}
+          APP: ${{ inputs.app_name || 'atsh-ai-website' }}
+          LOCATION_INPUT: ${{ inputs.location || 'uaenorth' }}
         shell: bash
         run: |
           set -euo pipefail
           az account show --query '{subscription:id,name:name,tenant:tenantId}' -o table
-          EXISTING_RG=$(az webapp list --query "[?name=='${{ inputs.app_name }}'].resourceGroup | [0]" -o tsv)
+          EXISTING_RG=$(az webapp list --query "[?name=='$APP'].resourceGroup | [0]" -o tsv)
           if [ -n "$EXISTING_RG" ] && [ "$EXISTING_RG" != "None" ]; then
             if [ -n "$RG_INPUT" ] && [ "$RG_INPUT" != "$EXISTING_RG" ]; then
               echo "The app exists in resource group '$EXISTING_RG', not '$RG_INPUT'. Refusing to create a duplicate." >&2
@@ -100,11 +105,13 @@ jobs:
             echo "Found existing app: $APP in $RG ($LOCATION), plan $PLAN"
           else
             if [ -z "$RG_INPUT" ]; then
-              echo "No existing app named '$APP' was found. Supply an existing resource group to create it there." >&2
-              exit 1
+              RG="atsh-ai-rg"
+              echo "No existing app found; creating the default resource group '$RG'."
+              az group create --name "$RG" --location "$LOCATION_INPUT" --output table
+            else
+              RG="$RG_INPUT"
+              az group show --name "$RG" --query '{name:name,location:location}' -o table
             fi
-            RG="$RG_INPUT"
-            az group show --name "$RG" --query '{name:name,location:location}' -o table
             LOCATION="$LOCATION_INPUT"
             PLAN="${APP}-plan"
           fi
@@ -116,10 +123,10 @@ jobs:
       - name: Provision or update App Service
         env:
           RG: ${{ steps.resolve.outputs.resource_group }}
-          APP: ${{ inputs.app_name }}
+          APP: ${{ inputs.app_name || 'atsh-ai-website' }}
           LOCATION: ${{ steps.resolve.outputs.location }}
           PLAN: ${{ steps.resolve.outputs.plan_name }}
-          SKU: ${{ inputs.plan_sku }}
+          SKU: ${{ inputs.plan_sku || 'B1' }}
         run: |
           az deployment group create \
             --resource-group "$RG" \
@@ -131,11 +138,11 @@ jobs:
       - name: Deploy website package
         uses: azure/webapps-deploy@v3
         with:
-          app-name: ${{ inputs.app_name }}
+          app-name: ${{ inputs.app_name || 'atsh-ai-website' }}
           package: atsh-ai-app.zip
       - name: Verify live health endpoint
         env:
-          APP: ${{ inputs.app_name }}
+          APP: ${{ inputs.app_name || 'atsh-ai-website' }}
         run: |
           URL="https://${APP}.azurewebsites.net/health"
           for attempt in $(seq 1 12); do
