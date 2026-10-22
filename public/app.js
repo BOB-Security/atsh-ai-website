@@ -1,7 +1,7 @@
 'use strict';
 const translations = {
   ar: {
-    skip:'تخطي إلى المحتوى', navServices:'خدماتنا', navProcess:'كيف نعمل', navAbout:'عن الشركة', navContact:'ابدأ مشروعك',
+    skip:'تخطي إلى المحتوى', navServices:'خدماتنا', navProducts:'منتجاتنا', navProcess:'كيف نعمل', navAbout:'عن الشركة', navContact:'ابدأ مشروعك',
     eyebrow:'هندسة رقمية برؤية عملية', heroTitle:'نبني التقنية<br><span>لتصنع أثرًا.</span>', heroText:'نحوّل الأفكار إلى حلول رقمية واضحة وقابلة للتطوير — من المواقع والأنظمة المخصصة إلى بوتات الأعمال والخدمات السحابية.',
     startProject:'ابدأ مشروعك', exploreServices:'استكشف الخدمات', heroNote:'نطاق واضح. تنفيذ مدروس. وعود واقعية.', chipBuild:'بناء الأنظمة', chipCloud:'بنية سحابية', chipSecure:'أمان من البداية', heroBottom:'من الفكرة إلى حل رقمي قابل للاستخدام', scroll:'اكتشف المزيد',
     servicesEyebrow:'ما الذي نبنيه؟', servicesTitle:'حلول تقنية تخدم<br><span>احتياجًا حقيقيًا.</span>', servicesIntro:'اختر الخدمة التي تحتاجها، أو اجمع أكثر من مسار في مشروع واحد. نحدد النطاق والتسليمات قبل التنفيذ.',
@@ -16,7 +16,7 @@ const translations = {
     englishLabel:'EN',languageLabel:'Switch language'
   },
   en: {
-    skip:'Skip to content',navServices:'Services',navProcess:'Our process',navAbout:'About',navContact:'Start a project',
+    skip:'Skip to content',navServices:'Services',navProducts:'Products',navProcess:'Our process',navAbout:'About',navContact:'Start a project',
     eyebrow:'Digital engineering with purpose',heroTitle:'We build technology<br><span>that makes an impact.</span>',heroText:'We turn ideas into clear, scalable digital solutions — from websites and custom systems to business bots and cloud services.',
     startProject:'Start a project',exploreServices:'Explore services',heroNote:'Clear scope. Thoughtful execution. Realistic promises.',chipBuild:'System development',chipCloud:'Cloud infrastructure',chipSecure:'Security from day one',heroBottom:'From an idea to a usable digital solution',scroll:'Explore more',
     servicesEyebrow:'What we build',servicesTitle:'Technology for<br><span>real-world needs.</span>',servicesIntro:'Choose the service you need or combine several in one project. Scope and deliverables are defined before work begins.',
