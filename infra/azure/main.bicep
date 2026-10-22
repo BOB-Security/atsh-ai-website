@@ -1,41 +1,20 @@
-@description('Globally unique Azure App Service name. Reuse the existing app name only when deploying into its current resource group.')
+@description('Globally unique Azure App Service name.')
 @minLength(2)
 @maxLength(60)
 param appName string
 
-@description('Azure region for the Linux App Service plan.')
+@description('Azure region for the Linux App Service.')
 param location string = resourceGroup().location
 
-@description('Existing or new App Service plan name.')
-param planName string = '${appName}-plan'
-
-@description('App Service plan SKU name. Existing higher-tier plans are preserved by the workflow.')
-param skuName string = 'B1'
-
-@description('App Service plan SKU tier, preserved for existing higher-tier plans.')
-param skuTier string = 'Basic'
-
-resource plan 'Microsoft.Web/serverfarms@2023-12-01' = {
-  name: planName
-  location: location
-  kind: 'linux'
-  sku: {
-    name: skuName
-    tier: skuTier
-    size: skuName
-    capacity: 1
-  }
-  properties: {
-    reserved: true
-  }
-}
+@description('Resource ID of the existing or newly created Linux App Service plan. The plan is not modified by this template.')
+param serverFarmId string
 
 resource web 'Microsoft.Web/sites@2023-12-01' = {
   name: appName
   location: location
   kind: 'app,linux'
   properties: {
-    serverFarmId: plan.id
+    serverFarmId: serverFarmId
     httpsOnly: true
     clientAffinityEnabled: false
     publicNetworkAccess: 'Enabled'
@@ -52,5 +31,5 @@ resource web 'Microsoft.Web/sites@2023-12-01' = {
 
 output appName string = web.name
 output defaultHostName string = web.properties.defaultHostName
-output appUrl string = 'https://${web.properties.defaultHostName}'
-output planName string = plan.name
+output appUrl string = 'https://\${web.properties.defaultHostName}'
+output serverFarmId string = serverFarmId
