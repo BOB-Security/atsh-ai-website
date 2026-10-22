@@ -98,6 +98,7 @@ jobs:
         run: |
           set -euo pipefail
           az account show --query '{subscription:id,name:name,tenant:tenantId}' -o table
+          NEEDS_PROVISION=true
           EXISTING_RG=$(az webapp list --query "[?name=='$APP'].resourceGroup | [0]" -o tsv)
           if [ -n "$EXISTING_RG" ] && [ "$EXISTING_RG" != "None" ]; then
             if [ -n "$RG_INPUT" ] && [ "$RG_INPUT" != "$EXISTING_RG" ]; then
@@ -111,7 +112,8 @@ jobs:
               echo "Could not resolve the App Service plan ID from the existing web app." >&2
               exit 1
             fi
-            echo "Found existing app '$APP' in '$RG'. Reusing its plan ID without reading or modifying plan SKU."
+            NEEDS_PROVISION=false
+            echo "Found existing app '$APP' in '$RG'. Reusing it directly without ARM resource-group deployment permissions."
           else
             if [ -z "$RG_INPUT" ]; then
               RG="atsh-ai-rg"
@@ -129,7 +131,7 @@ jobs:
           echo "resource_group=$RG" >> "$GITHUB_OUTPUT"
           echo "location=$LOCATION" >> "$GITHUB_OUTPUT"
           echo "server_farm_id=$SERVER_FARM_ID" >> "$GITHUB_OUTPUT"
-          echo "needs_provision=true" >> "$GITHUB_OUTPUT"
+          echo "needs_provision=$NEEDS_PROVISION" >> "$GITHUB_OUTPUT"
       - name: Validate Bicep
         if: steps.resolve.outputs.needs_provision == 'true'
         run: az bicep build --file infra/azure/main.bicep
