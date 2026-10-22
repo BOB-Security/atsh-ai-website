@@ -265,6 +265,22 @@ async function handler(req, res, url) {
     return json(res, 200, { user: publicUser(auth.user), csrfToken: auth.session.csrf, permissions: rolePermissions[auth.user.role] || [] });
   }
 
+  if (p === '/api/admin/team/activate' && req.method === 'POST') {
+    let data; try { data = await readBody(req); } catch (e) { return json(res, e.status || 400, { error: 'بيانات غير صالحة.' }); }
+    const token = clean(data.token, 200), password = typeof data.password === 'string' ? data.password : '';
+    if (password.length < 12 || password.length > 200) return json(res, 400, { error: 'كلمة المرور يجب أن تكون 12 حرفًا على الأقل.' });
+    const result = await transact(async s => {
+      const inv = s.invitations.find(i => i.expiresAt > now() && safeEqual(i.tokenHash, hash(token)));
+      if (!inv) return { error: 'رابط الدعوة غير صالح أو منتهي.' };
+      if (s.users.some(u => u.email === inv.email) || s.owner?.email === inv.email) return { error: 'الحساب مسجل بالفعل.' };
+      const ph = await passwordHash(password);
+      const user = { id: crypto.randomUUID(), name: inv.name, email: inv.email, role: inv.role, active: true, password: ph, createdAt: new Date().toISOString(), lastLoginAt: null };
+      s.users.push(user); s.invitations = s.invitations.filter(i => i.id !== inv.id); audit(s, user, 'team.activate', user.id, { role: user.role });
+      return { user: publicUser(user) };
+    });
+    return result.error ? json(res, 400, { error: result.error }) : json(res, 201, { ok: true, message: 'تم تفعيل الحساب. يمكنك تسجيل الدخول الآن.', user: result.user });
+  }
+
   if (!p.startsWith('/api/admin/')) return false;
   const auth = await authenticate(req);
   if (!auth) return json(res, 401, { error: 'يلزم تسجيل الدخول أو انتهت الجلسة.' });
@@ -312,21 +328,6 @@ async function handler(req, res, url) {
     } catch { return json(res, 503, { error: 'تعذر إرسال الدعوة؛ راجع إعدادات البريد.' }); }
   }
 
-  if (p === '/api/admin/team/activate' && req.method === 'POST') {
-    let data; try { data = await readBody(req); } catch (e) { return json(res, e.status || 400, { error: 'بيانات غير صالحة.' }); }
-    const token = clean(data.token, 200), password = typeof data.password === 'string' ? data.password : '';
-    if (password.length < 12 || password.length > 200) return json(res, 400, { error: 'كلمة المرور يجب أن تكون 12 حرفًا على الأقل.' });
-    const result = await transact(async s => {
-      const inv = s.invitations.find(i => i.expiresAt > now() && safeEqual(i.tokenHash, hash(token)));
-      if (!inv) return { error: 'رابط الدعوة غير صالح أو منتهي.' };
-      if (s.users.some(u => u.email === inv.email) || s.owner?.email === inv.email) return { error: 'الحساب مسجل بالفعل.' };
-      const ph = await passwordHash(password);
-      const user = { id: crypto.randomUUID(), name: inv.name, email: inv.email, role: inv.role, active: true, password: ph, createdAt: new Date().toISOString(), lastLoginAt: null };
-      s.users.push(user); s.invitations = s.invitations.filter(i => i.id !== inv.id); audit(s, user, 'team.activate', user.id, { role: user.role });
-      return { user: publicUser(user) };
-    });
-    return result.error ? json(res, 400, { error: result.error }) : json(res, 201, { ok: true, message: 'تم تفعيل الحساب. يمكنك تسجيل الدخول الآن.', user: result.user });
-  }
 
   if (p.startsWith('/api/admin/team/') && req.method === 'PATCH') {
     if (!hasPermission(actor, 'team.manage')) return json(res, 403, { error: 'ليس لديك صلاحية إدارة الحسابات.' });
