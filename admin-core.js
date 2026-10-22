@@ -422,4 +422,4 @@ async function handler(req, res, url) {
   return json(res, 404, { error: 'المسار غير موجود.' });
 }
 
-module.exports = { handler, DATA_DIR, rolePermissions };
+module.exports = { handler, DATA_DIR, rolePermissions, readStore };
