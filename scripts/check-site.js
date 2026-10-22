@@ -5,6 +5,8 @@ const root = path.join(__dirname, '..');
 const required = [
   'server.js',
   'public/index.html',
+  'public/admin/index.html',
+  'public/admin.css',
   'public/styles.css',
   'public/app.js',
   'public/services.html',
@@ -29,11 +31,16 @@ for (const marker of ['id="main-content"', 'id="project-form"', 'data-i18n']) {
     process.exit(1);
   }
 }
-for (const page of required.filter(file => file.startsWith('public/') && file.endsWith('.html'))) {
+for (const page of required.filter(file => file.startsWith('public/') && file.endsWith('.html') && file !== 'public/admin/index.html')) {
   const html = fs.readFileSync(path.join(root, page), 'utf8');
   if (!html.includes('lang="ar" dir="rtl"') || !html.includes('/styles.css') || !html.includes('/app.js')) {
     console.error('Page is missing language metadata or shared assets:', page);
     process.exit(1);
   }
+}
+const adminHtml = fs.readFileSync(path.join(root, 'public/admin/index.html'), 'utf8');
+if (!adminHtml.includes('name="robots" content="noindex,nofollow"') || !adminHtml.includes('التفعيل الأمني قيد الإعداد')) {
+  console.error('Admin portal must remain unindexed and clearly show that authentication is not activated.');
+  process.exit(1);
 }
 console.log('Site structure check passed.');
