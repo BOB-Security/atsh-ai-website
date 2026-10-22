@@ -89,7 +89,7 @@
         const t = prompt('عنوان المحتوى', block.title || ''); if (t === null) return;
         const body = prompt('النص / الوصف', block.body || ''); if (body === null) return;
         block.title = t.slice(0,200); block.body = body.slice(0,5000); renderBlocks();
-      }), btn('إخفاء/إظهار', 'admin-mini-button', () => { block.visible = !block.visible; renderBlocks(); }), btn('حذف', 'admin-mini-button danger', () => { state.content.blocks = state.content.blocks.filter(b => b.id !== block.id); renderBlocks(); }));
+      }), btn('تغيير اللون', 'admin-mini-button', () => { const color = prompt('أدخل اللون بصيغة HEX مثل #36C9A8', block.color || '#d9bd79'); if (color === null) return; if (!/^#[0-9a-fA-F]{6}$/.test(color)) return flash('استخدم قيمة HEX مثل #36C9A8.', true); block.color = color; renderBlocks(); }), btn('إخفاء/إظهار', 'admin-mini-button', () => { block.visible = !block.visible; renderBlocks(); }), btn('حذف', 'admin-mini-button danger', () => { state.content.blocks = state.content.blocks.filter(b => b.id !== block.id); renderBlocks(); }));
       card.append(actions); list.append(card);
     }
     if (!state.content.blocks.length) list.append(el('p', 'لا توجد فقرات أو بطاقات مخصصة بعد.', 'admin-help'));
