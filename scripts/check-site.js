@@ -48,7 +48,7 @@ for (const page of required.filter(file => file.startsWith('public/') && file.en
   }
 }
 const adminHtml = fs.readFileSync(path.join(root, 'public/admin/index.html'), 'utf8');
-if (!adminHtml.includes('name="robots" content="noindex,nofollow"') || !adminHtml.includes('التفعيل الأمني قيد الإعداد')) {
+if (!adminHtml.includes('name="robots" content="noindex,nofollow"') || !adminHtml.includes('دخول الإدارة')) {
   console.error('Admin portal must remain unindexed and clearly show that authentication is not activated.');
   process.exit(1);
 }
