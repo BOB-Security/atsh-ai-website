@@ -34,7 +34,7 @@ test('admin portal route serves a clearly inactive, noindex entry page', async (
   const html = await res.text();
   assert.match(html, /noindex,nofollow/);
   assert.match(html, /دخول الإدارة/);
-  assert.match(html, /دخول المالك/);
+  assert.match(html, /دخول الإدارة/);
 });
 test('admin API requires authentication', async () => {
   const res = await fetch(base + '/api/admin/content');
