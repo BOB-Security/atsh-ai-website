@@ -6,6 +6,9 @@ param appName string
 @description('Azure region for the Linux App Service plan.')
 param location string = resourceGroup().location
 
+@description('Existing or new App Service plan name.')
+param planName string = '\${appName}-plan'
+
 @description('App Service plan SKU. B1 supports custom-domain preparation and always-on hosting.')
 @allowed([
   'B1'
