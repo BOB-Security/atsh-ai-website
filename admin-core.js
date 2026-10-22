@@ -349,7 +349,8 @@ async function handler(req, res, url) {
       }
       if (data.active === false && user.role === 'Administrator' && s.users.filter(u => u.active && u.role === 'Administrator').length <= 1) return { error: 'لا يمكن تعطيل آخر حساب مدير نشط.' };
       if (data.name) user.name = clean(data.name, 120);
-      if (data.role) user.role = data.role;
+      if (data.role && data.role !== user.role) { user.role = data.role; user.permissions = null; }
+      else if (data.role) user.role = data.role;
       if (typeof data.active === 'boolean') {
         if (!data.active) s.sessions = s.sessions.filter(sess => sess.userId !== user.id);
         user.active = data.active;
