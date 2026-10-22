@@ -109,7 +109,7 @@ async function verifyPassword(password, record) {
   return safeEqual(result.hash, record.hash);
 }
 function publicUser(user) {
-  return { id: user.id, name: user.name, email: user.email, role: user.role, active: user.active, createdAt: user.createdAt, lastLoginAt: user.lastLoginAt };
+  return { id: user.id, name: user.name, email: user.email, role: user.role, active: user.active, permissions: Array.isArray(user.permissions) ? user.permissions : null, createdAt: user.createdAt, lastLoginAt: user.lastLoginAt };
 }
 function hasPermission(user, permission) {
   if (!user || !user.active) return false;
