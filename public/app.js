@@ -46,6 +46,9 @@ function setLanguage(lang) {
     const key = el.dataset.i18n;
     if (dict[key] !== undefined) el.innerHTML = dict[key];
   });
+  document.querySelectorAll('[data-ar][data-en]').forEach(el => {
+    el.innerHTML = lang === 'ar' ? el.dataset.ar : el.dataset.en;
+  });
   if ($('#lang-switch')) {
     $('#lang-switch').innerHTML = lang === 'ar' ? 'EN <span aria-hidden="true">↗</span>' : 'عربي <span aria-hidden="true">↗</span>';
     $('#lang-switch').setAttribute('aria-label', lang === 'ar' ? 'Switch to English' : 'التبديل إلى العربية');
