@@ -1,0 +1,124 @@
+name: Azure App Service — provision and deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      resource_group:
+        description: Existing Azure Resource Group to use (do not create a duplicate app in a different group)
+        required: true
+        type: string
+      app_name:
+        description: Globally unique Azure Web App name; reuse only if it belongs to this resource group
+        required: true
+        type: string
+        default: atsh-ai-website
+      location:
+        description: Azure region
+        required: true
+        type: choice
+        options:
+          - uaenorth
+          - uaecentral
+          - northeurope
+          - westeurope
+        default: uaenorth
+      plan_sku:
+        description: Paid App Service plan SKU; B1 is the default for custom-domain readiness
+        required: true
+        type: choice
+        options:
+          - B1
+          - B2
+          - B3
+        default: B1
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: atsh-ai-azure-provision
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.x'
+      - name: Install and verify
+        run: |
+          npm install
+          npm run build
+          npm test
+      - name: Prepare deployment package
+        run: |
+          zip -r atsh-ai-app.zip package.json server.js public scripts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: atsh-ai-app
+          path: atsh-ai-app.zip
+          if-no-files-found: error
+
+  provision-and-deploy:
+    runs-on: ubuntu-latest
+    needs: verify
+    environment: azure-production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: atsh-ai-app
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_1DF03D06E1D444CCA0654B27E8C75231 }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_5EF8FCB25D80477A8D0F2FCEE63A981A }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_A4D19EA9941D4136AF1DD6E315BFA1E2 }}
+      - name: Confirm subscription and resource group
+        env:
+          RG: ${{ inputs.resource_group }}
+        run: |
+          az account show --query '{subscription:id,name:name,tenant:tenantId}' -o table
+          az group show --name "$RG" --query '{name:name,location:location}' -o table
+      - name: Validate Bicep
+        run: az bicep build --file infra/azure/main.bicep
+      - name: Provision or update App Service
+        env:
+          RG: ${{ inputs.resource_group }}
+          APP: ${{ inputs.app_name }}
+          LOCATION: ${{ inputs.location }}
+          SKU: ${{ inputs.plan_sku }}
+        run: |
+          az deployment group create \
+            --resource-group "$RG" \
+            --name "atsh-ai-site-${GITHUB_RUN_ID}" \
+            --template-file infra/azure/main.bicep \
+            --parameters appName="$APP" location="$LOCATION" skuName="$SKU" \
+            --query 'properties.outputs' -o json > deployment-outputs.json
+          cat deployment-outputs.json
+      - name: Deploy website package
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ inputs.app_name }}
+          package: atsh-ai-app.zip
+      - name: Verify live health endpoint
+        env:
+          APP: ${{ inputs.app_name }}
+        run: |
+          URL="https://${APP}.azurewebsites.net/health"
+          for attempt in $(seq 1 12); do
+            CODE=$(curl --silent --show-error --output /tmp/health.json --write-out '%{http_code}' "$URL" || true)
+            if [ "$CODE" = "200" ] && grep -q '"ok":true' /tmp/health.json; then
+              echo "Health check passed: $URL"
+              cat /tmp/health.json
+              exit 0
+            fi
+            echo "Waiting for App Service startup (attempt $attempt, HTTP $CODE)"
+            sleep 10
+          done
+          echo "Live health check failed. Do not proceed to domain binding."
+          cat /tmp/health.json || true
+          exit 1
