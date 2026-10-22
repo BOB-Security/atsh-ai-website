@@ -26,6 +26,10 @@ The canonical workflow is **Actions → Azure App Service — provision and depl
 
 Infrastructure definition and detailed instructions: [infra/azure/README.md](infra/azure/README.md).
 
+## Admin portal
+
+The initial admin entry page is available at `/admin`. The requirements are documented in [docs/ADMIN-DASHBOARD-SPEC.md](docs/ADMIN-DASHBOARD-SPEC.md). The current page is intentionally a non-functional preview: password login, email activation, durable data storage, and admin APIs are **not enabled yet**. Do not treat it as an authenticated control panel or enter credentials there. Complete the identity/email provider and durable storage configuration before enabling authentication.
+
 ## Inquiry form
 
 The form is not a durable CRM or database. To enable real inquiries, set `INQUIRY_WEBHOOK_URL` to a trusted HTTPS endpoint, test the receiving service, and define retention/deletion and access policies. Until configured, the website clearly reports that online submission is not active.
