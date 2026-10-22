@@ -133,6 +133,7 @@ const server = http.createServer(async (req, res) => {
   try { pathname = decodeURIComponent(url.pathname); }
   catch { return send(res, 400, { error: 'Bad path' }); }
   if (pathname === '/') pathname = '/index.html';
+  if (pathname === '/admin' || pathname === '/admin/') pathname = '/admin/index.html';
 
   const filePath = path.resolve(ROOT, '.' + pathname);
   if (!filePath.startsWith(ROOT + path.sep) && filePath !== path.join(ROOT, 'index.html')) {
