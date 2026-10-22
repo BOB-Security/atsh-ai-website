@@ -1,0 +1,71 @@
+@description('Globally unique Azure App Service name. Reuse the existing app name only when deploying into its current resource group.')
+@minLength(2)
+@maxLength(60)
+param appName string
+
+@description('Azure region for the Linux App Service plan.')
+param location string = resourceGroup().location
+
+@description('App Service plan SKU. B1 supports custom-domain preparation and always-on hosting.')
+@allowed([
+  'B1'
+  'B2'
+  'B3'
+])
+param skuName string = 'B1'
+
+var planName = '${appName}-plan'
+
+resource plan 'Microsoft.Web/serverfarms@2023-12-01' = {
+  name: planName
+  location: location
+  kind: 'linux'
+  sku: {
+    name: skuName
+    tier: 'Basic'
+    size: skuName
+    capacity: 1
+  }
+  properties: {
+    reserved: true
+  }
+}
+
+resource web 'Microsoft.Web/sites@2023-12-01' = {
+  name: appName
+  location: location
+  kind: 'app,linux'
+  properties: {
+    serverFarmId: plan.id
+    httpsOnly: true
+    clientAffinityEnabled: false
+    publicNetworkAccess: 'Enabled'
+    siteConfig: {
+      linuxFxVersion: 'NODE|24-lts'
+      alwaysOn: true
+      http20Enabled: true
+      minTlsVersion: '1.2'
+      ftpsState: 'Disabled'
+      healthCheckPath: '/health'
+      appSettings: [
+        {
+          name: 'NODE_ENV'
+          value: 'production'
+        }
+        {
+          name: 'WEBSITE_NODE_DEFAULT_VERSION'
+          value: '~24'
+        }
+        {
+          name: 'SCM_DO_BUILD_DURING_DEPLOYMENT'
+          value: 'false'
+        }
+      ]
+    }
+  }
+}
+
+output appName string = web.name
+output defaultHostName string = web.properties.defaultHostName
+output appUrl string = 'https://${web.properties.defaultHostName}'
+output planName string = plan.name
