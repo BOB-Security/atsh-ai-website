@@ -46,6 +46,12 @@ resource web 'Microsoft.Web/sites@2023-12-01' = {
       minTlsVersion: '1.2'
       ftpsState: 'Disabled'
       healthCheckPath: '/health'
+      appSettings: [
+        { name: 'NODE_ENV', value: 'production' }
+        { name: 'DATA_DIR', value: '/home/data' }
+        { name: 'WEBSITE_RUN_FROM_PACKAGE', value: '1' }
+        { name: 'PUBLIC_BASE_URL', value: 'https://${appName}.azurewebsites.net' }
+      ]
     }
   }
 }
