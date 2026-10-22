@@ -26,9 +26,18 @@ The canonical workflow is **Actions → Azure App Service — provision and depl
 
 Infrastructure definition and detailed instructions: [infra/azure/README.md](infra/azure/README.md).
 
-## Admin portal
+## Admin portal and CMS
 
-The initial admin entry page is available at `/admin`. The requirements are documented in [docs/ADMIN-DASHBOARD-SPEC.md](docs/ADMIN-DASHBOARD-SPEC.md). The current page is intentionally a non-functional preview: password login, email activation, durable data storage, and admin APIs are **not enabled yet**. Do not treat it as an authenticated control panel or enter credentials there. Complete the identity/email provider and durable storage configuration before enabling authentication.
+The admin portal is at `/admin`; the separate staff entry is `/staff/login`. The backend provides owner bootstrap by one-time email code, password login with scrypt password hashes, secure HttpOnly session cookies and CSRF validation, role-checked APIs, staff invitations, account suspension/deletion, task assignment/status, audit events, image uploads, and a CMS store for pages, blocks, images and theme colors. The CMS renders saved blocks on public pages and can serve newly created CMS pages.
+
+The initial owner account is **not pre-created**. Before first activation, configure the following GitHub Actions repository secrets, then allow the Azure deployment workflow to apply them as App Service settings:
+- `ADMIN_EMAIL`: the owner's personal email address.
+- `RESEND_API_KEY`: Resend API key.
+- `EMAIL_FROM`: a sender address verified with the email provider.
+
+Without these secrets, owner activation and team invitations stay disabled and show a configuration error. Never place secrets or passwords in Git, source files, or chat messages.
+
+The admin store and uploaded images are placed in `DATA_DIR=/home/data` on App Service so app redeployments do not replace them. This JSON-file store is a **single-instance MVP**, not a highly available database. Do not scale out or use it for sensitive customer records until the data is migrated to a managed database with backups, restore testing, and a reviewed retention policy. Successful build/deployment does not by itself verify email delivery or production authentication; test those separately.
 
 ## Inquiry form
 
