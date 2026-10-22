@@ -31,5 +31,5 @@ resource web 'Microsoft.Web/sites@2023-12-01' = {
 
 output appName string = web.name
 output defaultHostName string = web.properties.defaultHostName
-output appUrl string = 'https://\${web.properties.defaultHostName}'
+output appUrl string = 'https://${web.properties.defaultHostName}'
 output serverFarmId string = serverFarmId
