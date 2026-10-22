@@ -5,43 +5,132 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex,nofollow">
   <meta name="theme-color" content="#0a0b10">
-  <title>إدارة atsh-ai</title>
+  <title>لوحة إدارة atsh-ai</title>
   <link rel="stylesheet" href="/styles.css">
   <link rel="stylesheet" href="/admin.css">
+  <script src="/admin/app.js" defer></script>
 </head>
 <body class="admin-body">
   <header class="admin-topbar">
     <a class="brand" href="/" aria-label="atsh-ai"><span class="brand-mark">a<span>i</span></span><span class="brand-word">atsh<span>-ai</span></span></a>
-    <a class="admin-back" href="/">العودة إلى الموقع ↗</a>
+    <div class="admin-top-actions"><span id="admin-user-label">وضع الإدارة الآمن</span><a class="admin-back" href="/">العودة إلى الموقع ↗</a></div>
   </header>
   <main class="admin-shell">
-    <section class="admin-welcome">
-      <p class="eyebrow"><span class="status-dot"></span> بوابة الإدارة</p>
-      <h1>مساحة عمل <span>atsh-ai</span></h1>
-      <p>إدارة محتوى الموقع والخدمات والمنتجات وطلبات العملاء من مكان واحد.</p>
-    </section>
-    <section class="admin-gate" aria-labelledby="gate-title">
-      <div class="admin-lock" aria-hidden="true">⌑</div>
-      <h2 id="gate-title">دخول المالك</h2>
-      <p>ستُفعّل إمكانية الدخول بعد ربط البريد الشخصي والتحقق منه وإعداد خدمة إرسال رسائل التفعيل بشكل آمن.</p>
-      <div class="admin-notice" role="status">
-        <strong>التفعيل الأمني قيد الإعداد</strong>
-        <span>لم يتم إنشاء كلمة مرور افتراضية، ولم تُحفظ أي بيانات دخول في الموقع أو المستودع.</span>
+    <section id="auth-view" class="admin-auth-grid">
+      <div class="admin-welcome">
+        <p class="eyebrow"><span class="status-dot"></span> بوابة الإدارة الخاصة</p>
+        <h1>إدارة <span>atsh-ai</span><br>من مكان واحد.</h1>
+        <p>تحكم في محتوى الموقع، صفحاتك، بطاقاتك، ألوانك، صورك، فريقك ومهامك من خلال حساب موثّق.</p>
+        <ul class="admin-benefits"><li>حساب مالك مفعّل بالبريد</li><li>صلاحيات منفصلة لكل عضو</li><li>تغييرات المحتوى تُحفظ في مخزن الخادم</li></ul>
       </div>
-      <form class="admin-login-preview" aria-label="نموذج الدخول غير المفعّل">
-        <label for="admin-email">البريد الإلكتروني الشخصي</label>
-        <input id="admin-email" type="email" autocomplete="username" placeholder="البريد الذي ستستخدمه للإدارة" disabled>
-        <label for="admin-password">كلمة المرور</label>
-        <input id="admin-password" type="password" autocomplete="current-password" placeholder="تُنشأ بعد تأكيد البريد" disabled>
-        <button class="button button-primary" type="button" disabled>الدخول غير مفعّل بعد</button>
-      </form>
-      <p class="admin-footnote">لن يُطلب منك إرسال كلمة المرور هنا. إعداد الحساب يتم من خلال قناة آمنة بعد تأكيد البريد ومزوّد التفعيل.</p>
+      <section class="admin-gate" aria-labelledby="auth-title">
+        <div class="admin-lock" aria-hidden="true">⌑</div>
+        <h2 id="auth-title">دخول الإدارة</h2>
+        <p id="auth-description">إذا كانت هذه أول مرة، أرسل رمز التفعيل إلى بريد المالك المضبوط في إعدادات الخادم.</p>
+        <div id="auth-message" class="admin-notice" role="status" hidden></div>
+        <form id="login-form" class="admin-form">
+          <label for="login-email">البريد الإلكتروني</label><input id="login-email" type="email" autocomplete="username" required placeholder="البريد المسجل">
+          <label for="login-password">كلمة المرور</label><input id="login-password" type="password" autocomplete="current-password" required minlength="12" placeholder="12 حرفًا على الأقل">
+          <button class="button button-primary" type="submit">تسجيل الدخول</button>
+        </form>
+        <div id="bootstrap-box" class="admin-subform" hidden>
+          <button id="request-code" class="button button-quiet" type="button">إرسال رمز تفعيل المالك إلى البريد الموثّق</button>
+          <form id="bootstrap-form" class="admin-form" hidden>
+            <label for="bootstrap-code">رمز التفعيل المرسل إلى البريد</label><input id="bootstrap-code" inputmode="numeric" autocomplete="one-time-code" required minlength="8" maxlength="8">
+            <label for="bootstrap-password">أنشئ كلمة مرور قوية</label><input id="bootstrap-password" type="password" autocomplete="new-password" required minlength="12" maxlength="200">
+            <button class="button button-primary" type="submit">تأكيد البريد وإنشاء حساب المالك</button>
+          </form>
+        </div>
+      </section>
     </section>
-    <section class="admin-modules" aria-label="أقسام اللوحة المخططة">
-      <article><span>01</span><h3>الموقع والمحتوى</h3><p>إدارة النصوص العربية والإنجليزية والصفحات.</p></article>
-      <article><span>02</span><h3>الخدمات والمنتجات</h3><p>تحديث الخدمات والمنتجات وحالة ظهورها.</p></article>
-      <article><span>03</span><h3>طلبات العملاء</h3><p>متابعة الطلبات بعد ربط مخزن بيانات دائم وآمن.</p></article>
-      <article><span>04</span><h3>الأمان وسجل النشاط</h3><p>إدارة الصلاحيات ومراجعة العمليات الإدارية.</p></article>
+
+    <section id="dashboard-view" hidden>
+      <div class="admin-dashboard-heading"><div><p class="eyebrow">مساحة العمل</p><h1>لوحة التحكم <span>atsh-ai</span></h1><p id="dashboard-summary">إدارة الموقع والفريق والمهمات.</p></div><button id="logout-button" class="button button-quiet" type="button">تسجيل الخروج</button></div>
+      <nav class="admin-tabs" aria-label="أقسام لوحة التحكم">
+        <button type="button" data-panel="content" class="is-active">محرر الموقع</button>
+        <button type="button" data-panel="team">الفريق والصلاحيات</button>
+        <button type="button" data-panel="tasks">المهام</button>
+        <button type="button" data-panel="audit">سجل النشاط</button>
+      </nav>
+
+      <section class="admin-panel" id="panel-content">
+        <div class="admin-section-head"><div><h2>محرر الموقع المرئي</h2><p>أنشئ صفحات وفقرات وبطاقات، وعدّل النصوص والصور والألوان. المحتوى الجديد يظهر في منطقة المحتوى المضافة للموقع.</p></div><button id="save-content" class="button button-primary" type="button">حفظ التغييرات</button></div>
+        <div class="admin-editor-grid">
+          <article class="admin-card">
+            <h3>ألوان الهوية</h3><p class="admin-help">اختر أي درجة لونية أو أدخل قيمة HEX سداسية.</p>
+            <div class="admin-colors">
+              <label>اللون الأساسي <input type="color" data-theme="primary" value="#d9bd79"></label>
+              <label>الخلفية <input type="color" data-theme="background" value="#0a0b10"></label>
+              <label>خلفية البطاقات <input type="color" data-theme="surface" value="#151722"></label>
+              <label>النص <input type="color" data-theme="text" value="#f4f3ef"></label>
+              <label>النص الثانوي <input type="color" data-theme="muted" value="#aeb0bb"></label>
+            </div>
+          </article>
+          <article class="admin-card">
+            <h3>إضافة صفحة</h3>
+            <form id="page-form" class="admin-form">
+              <label for="page-title">عنوان الصفحة</label><input id="page-title" required maxlength="160" placeholder="مثال: حلول الأعمال">
+              <label for="page-path">مسار الصفحة بالإنجليزية أو العربية</label><input id="page-path" required maxlength="80" placeholder="business-solutions">
+              <label class="admin-check"><input id="page-visible" type="checkbox" checked> إظهار الصفحة في المحتوى المضاف</label>
+              <button class="button button-quiet" type="submit">إضافة صفحة</button>
+            </form>
+            <div id="pages-list" class="admin-list"></div>
+          </article>
+          <article class="admin-card admin-card-wide">
+            <h3>إضافة فقرة أو بطاقة أو صورة</h3>
+            <form id="block-form" class="admin-form">
+              <div class="admin-two-col">
+                <div><label for="block-page">الصفحة</label><select id="block-page" required></select></div>
+                <div><label for="block-type">نوع المحتوى</label><select id="block-type"><option value="heading">عنوان</option><option value="text">فقرة نصية</option><option value="card">بطاقة</option><option value="image">صورة</option></select></div>
+              </div>
+              <label for="block-title">العنوان</label><input id="block-title" maxlength="200" placeholder="عنوان المحتوى">
+              <label for="block-body">النص أو الوصف</label><textarea id="block-body" rows="4" maxlength="5000" placeholder="اكتب المحتوى هنا"></textarea>
+              <div class="admin-two-col">
+                <div><label for="block-color">لون البطاقة / العنصر</label><input id="block-color" type="color" value="#d9bd79"></div>
+                <div><label for="block-image-file">رفع صورة (حتى 4MB)</label><input id="block-image-file" type="file" accept="image/png,image/jpeg,image/webp,image/gif"></div>
+              </div>
+              <div id="image-preview" class="admin-image-preview" hidden></div>
+              <label class="admin-check"><input id="block-visible" type="checkbox" checked> إظهار المحتوى</label>
+              <button class="button button-quiet" type="submit">إضافة المحتوى</button>
+            </form>
+            <div id="blocks-list" class="admin-block-list"></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="admin-panel" id="panel-team" hidden>
+        <div class="admin-section-head"><div><h2>حسابات الفريق والصلاحيات</h2><p>الدعوة تُرسل إلى البريد. لا تُشارك كلمات المرور بين أعضاء الفريق.</p></div></div>
+        <article class="admin-card">
+          <h3>دعوة عضو جديد</h3>
+          <form id="team-form" class="admin-form">
+            <div class="admin-two-col"><div><label for="team-name">الاسم</label><input id="team-name" required maxlength="120"></div><div><label for="team-email">البريد الإلكتروني</label><input id="team-email" type="email" required maxlength="254"></div></div>
+            <label for="team-role">الدور والصلاحيات الأساسية</label><select id="team-role"><option value="Assistant">مساعد</option><option value="Staff">عامل</option><option value="Manager">مشرف</option><option value="Read-only">قراءة فقط</option><option value="Administrator">مدير — للمالك فقط</option></select>
+            <button class="button button-primary" type="submit">إنشاء الحساب وإرسال دعوة التفعيل</button>
+          </form>
+        </article>
+        <div id="team-list" class="admin-table-wrap"></div>
+      </section>
+
+      <section class="admin-panel" id="panel-tasks" hidden>
+        <div class="admin-section-head"><div><h2>إسناد المهام ومتابعتها</h2><p>أنشئ مهامًا للفريق وتابع حالتها. العامل يستطيع تحديث المهام المسندة إليه فقط.</p></div></div>
+        <article class="admin-card">
+          <h3>مهمة جديدة</h3>
+          <form id="task-form" class="admin-form">
+            <label for="task-title">عنوان المهمة</label><input id="task-title" required maxlength="180">
+            <label for="task-description">التفاصيل</label><textarea id="task-description" rows="3" maxlength="3000"></textarea>
+            <div class="admin-two-col"><div><label for="task-assignee">إسناد إلى</label><select id="task-assignee"><option value="">غير مسندة</option></select></div><div><label for="task-priority">الأولوية</label><select id="task-priority"><option value="normal">عادية</option><option value="low">منخفضة</option><option value="high">مرتفعة</option><option value="urgent">عاجلة</option></select></div></div>
+            <label for="task-due">موعد الاستحقاق</label><input id="task-due" type="date">
+            <button class="button button-primary" type="submit">إنشاء المهمة</button>
+          </form>
+        </article>
+        <div id="tasks-list" class="admin-block-list"></div>
+      </section>
+
+      <section class="admin-panel" id="panel-audit" hidden>
+        <div class="admin-section-head"><div><h2>سجل النشاط الإداري</h2><p>يعرض التغييرات المهمة دون كلمات مرور أو أسرار.</p></div><button id="refresh-audit" class="button button-quiet" type="button">تحديث السجل</button></div>
+        <div id="audit-list" class="admin-table-wrap"></div>
+      </section>
+      <p id="dashboard-message" class="admin-flash" role="status" hidden></p>
     </section>
   </main>
 </body>
