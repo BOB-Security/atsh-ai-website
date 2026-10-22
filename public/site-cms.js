@@ -11,6 +11,13 @@
     for (const [key, cssVar] of Object.entries(vars)) if (/^#[0-9a-f]{6}$/i.test(theme[key] || '')) { root.style.setProperty(cssVar, theme[key]); root.style.setProperty(globalVars[key], theme[key]); }
     const path = location.pathname.replace(/\/+$/, '') || '/';
     const currentPage = (data.pages || []).find(p => p.path === path && p.visible);
+    const nav = document.querySelector('.primary-nav');
+    if (nav) {
+      nav.querySelectorAll('[data-cms-link="true"]').forEach(a => a.remove());
+      (data.pages || []).filter(page => page.visible).forEach(page => {
+        const link = document.createElement('a'); link.href = page.path; link.textContent = page.title; link.dataset.cmsLink = 'true'; nav.append(link);
+      });
+    }
     if (document.body.dataset.cmsPage === 'template') {
       const page = currentPage;
       const main = document.querySelector('#cms-main');
