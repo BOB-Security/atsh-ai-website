@@ -159,10 +159,15 @@ jobs:
           EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
         run: |
           set -euo pipefail
+          HOST=$(az webapp show --resource-group "$RG" --name "$APP" --query defaultHostName -o tsv)
+          if [ -z "$HOST" ] || [ "$HOST" = "None" ]; then
+            echo "Could not resolve Azure's assigned default hostname." >&2
+            exit 1
+          fi
           az webapp config appsettings set \
             --resource-group "$RG" \
             --name "$APP" \
-            --settings NODE_ENV=production DATA_DIR=/home/data PUBLIC_BASE_URL="https://${APP}.azurewebsites.net" WEBSITE_NODE_DEFAULT_VERSION='~24' WEBSITE_RUN_FROM_PACKAGE=1 SCM_DO_BUILD_DURING_DEPLOYMENT=false \
+            --settings NODE_ENV=production DATA_DIR=/home/data PUBLIC_BASE_URL="https://${HOST}" WEBSITE_NODE_DEFAULT_VERSION='~24' WEBSITE_RUN_FROM_PACKAGE=1 SCM_DO_BUILD_DURING_DEPLOYMENT=false \
             --output none
           if [ -n "$ADMIN_EMAIL" ] && [ -n "$RESEND_API_KEY" ] && [ -n "$EMAIL_FROM" ]; then
             az webapp config appsettings set --resource-group "$RG" --name "$APP" --settings ADMIN_EMAIL="$ADMIN_EMAIL" RESEND_API_KEY="$RESEND_API_KEY" EMAIL_FROM="$EMAIL_FROM" --output none
@@ -177,9 +182,15 @@ jobs:
           package: atsh-ai-app.zip
       - name: Verify live health endpoint
         env:
+          RG: ${{ steps.resolve.outputs.resource_group }}
           APP: ${{ inputs.app_name || 'atsh-ai-website' }}
         run: |
-          URL="https://${APP}.azurewebsites.net/health"
+          HOST=$(az webapp show --resource-group "$RG" --name "$APP" --query defaultHostName -o tsv)
+          if [ -z "$HOST" ] || [ "$HOST" = "None" ]; then
+            echo "Could not resolve Azure's assigned default hostname." >&2
+            exit 1
+          fi
+          URL="https://${HOST}/health"
           for attempt in $(seq 1 12); do
             CODE=$(curl --silent --show-error --output /tmp/health.json --write-out '%{http_code}' "$URL" || true)
             if [ "$CODE" = "200" ] && grep -q '"ok":true' /tmp/health.json; then
