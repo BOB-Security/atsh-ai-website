@@ -11,6 +11,7 @@ const CODE_TTL = 10 * 60 * 1000;
 const SESSION_TTL = 8 * 60 * 60 * 1000;
 const MAX_UPLOAD = 4 * 1024 * 1024;
 const validRoles = new Set(['Administrator', 'Manager', 'Staff', 'Assistant', 'Read-only']);
+const allPermissions = ['content.read','content.write','team.read','team.invite','team.manage','tasks.read','tasks.assign','tasks.update_own','inquiries.read','audit.read','settings.manage'];
 const rolePermissions = {
   Owner: ['*'],
   Administrator: ['content.read','content.write','team.read','team.invite','team.manage','tasks.read','tasks.assign','tasks.update_own','inquiries.read','audit.read'],
@@ -112,7 +113,7 @@ function publicUser(user) {
 }
 function hasPermission(user, permission) {
   if (!user || !user.active) return false;
-  const list = rolePermissions[user.role] || [];
+  const list = Array.isArray(user.permissions) ? user.permissions : (rolePermissions[user.role] || []);
   return list.includes('*') || list.includes(permission);
 }
 function audit(store, actor, action, target, detail = {}) {
@@ -309,7 +310,7 @@ async function handler(req, res, url) {
 
   if (p === '/api/admin/team' && req.method === 'GET') {
     if (!hasPermission(actor, 'team.read')) return json(res, 403, { error: 'ليس لديك صلاحية عرض الفريق.' });
-    return json(res, 200, { users: store.users.map(publicUser), roles: [...validRoles] });
+    return json(res, 200, { users: store.users.map(publicUser), roles: [...validRoles], permissions: allPermissions, roleDefaults: rolePermissions });
   }
   if (p === '/api/admin/team' && req.method === 'POST') {
     if (!hasPermission(actor, 'team.invite')) return json(res, 403, { error: 'ليس لديك صلاحية دعوة أعضاء.' });
@@ -340,6 +341,12 @@ async function handler(req, res, url) {
       if (data.role && !validRoles.has(data.role)) return { error: 'الدور غير صالح.' };
       if ((data.role === 'Administrator' || user.role === 'Administrator') && actor.role !== 'Owner') return { error: 'تعديل حسابات المديرين محصور بالمالك.' };
       if (data.role === 'Administrator' && actor.role !== 'Owner') return { error: 'منح دور المدير محصور بالمالك.' };
+      if (Array.isArray(data.permissions)) {
+        if (!['Owner','Administrator'].includes(actor.role)) return { error: 'تعديل الصلاحيات محصور بالمالك أو مدير مخوّل.' };
+        if (actor.role !== 'Owner' && user.id === actor.id) return { error: 'لا يمكنك تعديل صلاحيات حسابك بنفسك.' };
+        if (data.permissions.some(permission => !allPermissions.includes(permission) || (actor.role !== 'Owner' && !(rolePermissions[actor.role] || []).includes(permission)))) return { error: 'تتضمن الصلاحيات المطلوبة إذنًا غير مسموح لك بمنحه.' };
+        user.permissions = [...new Set(data.permissions)];
+      }
       if (data.active === false && user.role === 'Administrator' && s.users.filter(u => u.active && u.role === 'Administrator').length <= 1) return { error: 'لا يمكن تعطيل آخر حساب مدير نشط.' };
       if (data.name) user.name = clean(data.name, 120);
       if (data.role) user.role = data.role;
