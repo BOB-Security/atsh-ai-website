@@ -156,6 +156,10 @@ const server = http.createServer(async (req, res) => {
   });
 });
 
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`atsh-ai website listening on port ${PORT}`);
-});
+if (require.main === module) {
+  server.listen(PORT, '0.0.0.0', () => {
+    console.log(`atsh-ai website listening on port ${PORT}`);
+  });
+}
+
+module.exports = server;
