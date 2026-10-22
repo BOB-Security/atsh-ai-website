@@ -9,13 +9,11 @@ param location string = resourceGroup().location
 @description('Existing or new App Service plan name.')
 param planName string = '${appName}-plan'
 
-@description('App Service plan SKU. B1 supports custom-domain preparation and always-on hosting.')
-@allowed([
-  'B1'
-  'B2'
-  'B3'
-])
+@description('App Service plan SKU name. Existing higher-tier plans are preserved by the workflow.')
 param skuName string = 'B1'
+
+@description('App Service plan SKU tier, preserved for existing higher-tier plans.')
+param skuTier string = 'Basic'
 
 resource plan 'Microsoft.Web/serverfarms@2023-12-01' = {
   name: planName
@@ -23,7 +21,7 @@ resource plan 'Microsoft.Web/serverfarms@2023-12-01' = {
   kind: 'linux'
   sku: {
     name: skuName
-    tier: 'Basic'
+    tier: skuTier
     size: skuName
     capacity: 1
   }

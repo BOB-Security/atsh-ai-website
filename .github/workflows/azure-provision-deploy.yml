@@ -88,6 +88,8 @@ jobs:
           RG_INPUT: ${{ inputs.resource_group || '' }}
           APP: ${{ inputs.app_name || 'atsh-ai-website' }}
           LOCATION_INPUT: ${{ inputs.location || 'uaenorth' }}
+          SKU_INPUT: ${{ inputs.plan_sku || 'B1' }}
+          EVENT_NAME: ${{ github.event_name }}
         shell: bash
         run: |
           set -euo pipefail
@@ -102,7 +104,23 @@ jobs:
             LOCATION=$(az webapp show --resource-group "$RG" --name "$APP" --query location -o tsv)
             PLAN_ID=$(az webapp show --resource-group "$RG" --name "$APP" --query serverFarmId -o tsv)
             PLAN="${PLAN_ID##*/}"
-            echo "Found existing app: $APP in $RG ($LOCATION), plan $PLAN"
+            CURRENT_SKU=$(az appservice plan show --ids "$PLAN_ID" --query sku.name -o tsv)
+            CURRENT_TIER=$(az appservice plan show --ids "$PLAN_ID" --query sku.tier -o tsv)
+            if [ "$CURRENT_TIER" = "Free" ]; then
+              SKU="$SKU_INPUT"
+              TIER="Basic"
+            elif [ "$EVENT_NAME" = "push" ]; then
+              SKU="$CURRENT_SKU"
+              TIER="$CURRENT_TIER"
+            elif [ "$CURRENT_TIER" = "Basic" ]; then
+              SKU="$SKU_INPUT"
+              TIER="Basic"
+            else
+              SKU="$CURRENT_SKU"
+              TIER="$CURRENT_TIER"
+              echo "Preserving existing $TIER plan tier and SKU $SKU to avoid an accidental downgrade."
+            fi
+            echo "Found existing app: $APP in $RG ($LOCATION), plan $PLAN ($TIER / $SKU)"
           else
             if [ -z "$RG_INPUT" ]; then
               RG="atsh-ai-rg"
@@ -114,10 +132,14 @@ jobs:
             fi
             LOCATION="$LOCATION_INPUT"
             PLAN="${APP}-plan"
+            SKU="$SKU_INPUT"
+            TIER="Basic"
           fi
           echo "resource_group=$RG" >> "$GITHUB_OUTPUT"
           echo "location=$LOCATION" >> "$GITHUB_OUTPUT"
           echo "plan_name=$PLAN" >> "$GITHUB_OUTPUT"
+          echo "plan_sku=$SKU" >> "$GITHUB_OUTPUT"
+          echo "plan_tier=$TIER" >> "$GITHUB_OUTPUT"
       - name: Validate Bicep
         run: az bicep build --file infra/azure/main.bicep
       - name: Provision or update App Service
@@ -126,13 +148,14 @@ jobs:
           APP: ${{ inputs.app_name || 'atsh-ai-website' }}
           LOCATION: ${{ steps.resolve.outputs.location }}
           PLAN: ${{ steps.resolve.outputs.plan_name }}
-          SKU: ${{ inputs.plan_sku || 'B1' }}
+          SKU: ${{ steps.resolve.outputs.plan_sku }}
+          TIER: ${{ steps.resolve.outputs.plan_tier }}
         run: |
           az deployment group create \
             --resource-group "$RG" \
             --name "atsh-ai-site-${GITHUB_RUN_ID}" \
             --template-file infra/azure/main.bicep \
-            --parameters appName="$APP" location="$LOCATION" planName="$PLAN" skuName="$SKU" \
+            --parameters appName="$APP" location="$LOCATION" planName="$PLAN" skuName="$SKU" skuTier="$TIER" \
             --query 'properties.outputs' -o json > deployment-outputs.json
           cat deployment-outputs.json
       - name: Set runtime settings without replacing existing app settings
