@@ -4,6 +4,15 @@ const path = require('node:path');
 const root = path.join(__dirname, '..');
 const required = [
   'server.js',
+  'admin-core.js',
+  'public/cms.css',
+  'public/cms-page.html',
+  'public/site-cms.js',
+  'public/admin/app.js',
+  'public/admin/dashboard.css',
+  'public/staff/login.html',
+  'public/staff/activate.html',
+  'public/staff/app.js',
   'public/index.html',
   'public/admin/index.html',
   'public/admin.css',
@@ -42,5 +51,9 @@ const adminHtml = fs.readFileSync(path.join(root, 'public/admin/index.html'), 'u
 if (!adminHtml.includes('name="robots" content="noindex,nofollow"') || !adminHtml.includes('التفعيل الأمني قيد الإعداد')) {
   console.error('Admin portal must remain unindexed and clearly show that authentication is not activated.');
   process.exit(1);
+}
+const adminClient = fs.readFileSync(path.join(root, 'public/admin/app.js'), 'utf8');
+for (const marker of ['/api/admin/content', '/api/admin/team', '/api/admin/tasks', '/api/admin/upload']) {
+  if (!adminClient.includes(marker)) { console.error('Admin client is missing API integration:', marker); process.exit(1); }
 }
 console.log('Site structure check passed.');
