@@ -169,11 +169,14 @@ jobs:
             --name "$APP" \
             --settings NODE_ENV=production DATA_DIR=/home/data PUBLIC_BASE_URL="https://${HOST}" WEBSITE_NODE_DEFAULT_VERSION='~24' WEBSITE_RUN_FROM_PACKAGE=1 SCM_DO_BUILD_DURING_DEPLOYMENT=false \
             --output none
-          if [ -n "$ADMIN_EMAIL" ] && [ -n "$RESEND_API_KEY" ] && [ -n "$EMAIL_FROM" ]; then
+          if [ -n "$ADMIN_EMAIL" ] && [ -n "$RESEND_API_KEY" ]; then
+            # Resend's onboarding sender is for initial testing only; a verified domain sender
+            # can be supplied later through the EMAIL_FROM repository secret.
+            if [ -z "$EMAIL_FROM" ]; then EMAIL_FROM="onboarding@resend.dev"; fi
             az webapp config appsettings set --resource-group "$RG" --name "$APP" --settings ADMIN_EMAIL="$ADMIN_EMAIL" RESEND_API_KEY="$RESEND_API_KEY" EMAIL_FROM="$EMAIL_FROM" --output none
             echo "Owner email activation settings were applied without printing secret values."
           else
-            echo "::warning::Owner/staff email activation is not configured. Add ADMIN_EMAIL, RESEND_API_KEY and EMAIL_FROM as GitHub Actions secrets, then redeploy."
+            echo "::warning::Owner/staff email activation is not configured. Add ADMIN_EMAIL and RESEND_API_KEY as GitHub Actions secrets, then redeploy."
           fi
       - name: Deploy website package
         uses: azure/webapps-deploy@v3
