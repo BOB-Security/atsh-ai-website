@@ -67,7 +67,7 @@
     for (const page of state.content.pages || []) {
       const item = el('div', undefined, 'admin-list-item');
       const title = el('div'); title.append(el('strong', page.title || page.path), el('small', page.path + (page.visible ? ' · ظاهر' : ' · مخفي')));
-      item.append(title, btn('إخفاء/إظهار', 'admin-mini-button', () => { page.visible = !page.visible; renderPages(); }), btn('حذف', 'admin-mini-button danger', () => { state.content.pages = state.content.pages.filter(p => p.id !== page.id); state.content.blocks = state.content.blocks.filter(b => b.pageId !== page.id); renderPages(); renderBlocks(); }));
+      item.append(title, btn('تعديل', 'admin-mini-button', () => { const nextTitle = prompt('عنوان الصفحة', page.title || ''); if (nextTitle === null) return; const nextPath = normalizePath(prompt('مسار الصفحة', (page.path || '').replace(/^\\//, '')) || ''); if (!nextPath) return flash('المسار غير صالح.', true); if (state.content.pages.some(p => p.id !== page.id && p.path === '/' + nextPath)) return flash('المسار مستخدم بالفعل.', true); page.title = nextTitle.slice(0,160); page.path = '/' + nextPath; renderPages(); }), btn('إخفاء/إظهار', 'admin-mini-button', () => { page.visible = !page.visible; renderPages(); }), btn('حذف', 'admin-mini-button danger', () => { state.content.pages = state.content.pages.filter(p => p.id !== page.id); state.content.blocks = state.content.blocks.filter(b => b.pageId !== page.id); renderPages(); renderBlocks(); }));
       list.append(item);
       const option = el('option', page.title || page.path); option.value = page.id; select.append(option);
     }
