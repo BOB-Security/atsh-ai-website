@@ -7,7 +7,7 @@ param appName string
 param location string = resourceGroup().location
 
 @description('Existing or new App Service plan name.')
-param planName string = '\${appName}-plan'
+param planName string = '${appName}-plan'
 
 @description('App Service plan SKU. B1 supports custom-domain preparation and always-on hosting.')
 @allowed([
@@ -16,8 +16,6 @@ param planName string = '\${appName}-plan'
   'B3'
 ])
 param skuName string = 'B1'
-
-var planName = '${appName}-plan'
 
 resource plan 'Microsoft.Web/serverfarms@2023-12-01' = {
   name: planName
