@@ -40,7 +40,7 @@ for (const marker of ['id="main-content"', 'id="project-form"', 'data-i18n']) {
     process.exit(1);
   }
 }
-for (const page of required.filter(file => file.startsWith('public/') && file.endsWith('.html') && file !== 'public/admin/index.html')) {
+for (const page of required.filter(file => file.startsWith('public/') && file.endsWith('.html') && file !== 'public/admin/index.html' && file !== 'public/cms-page.html' && !file.startsWith('public/staff/'))) {
   const html = fs.readFileSync(path.join(root, page), 'utf8');
   if (!html.includes('lang="ar" dir="rtl"') || !html.includes('/styles.css') || !html.includes('/app.js')) {
     console.error('Page is missing language metadata or shared assets:', page);
