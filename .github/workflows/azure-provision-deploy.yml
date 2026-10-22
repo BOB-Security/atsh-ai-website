@@ -43,7 +43,7 @@ permissions:
 
 concurrency:
   group: atsh-ai-azure-provision
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   verify:
@@ -135,6 +135,16 @@ jobs:
             --parameters appName="$APP" location="$LOCATION" planName="$PLAN" skuName="$SKU" \
             --query 'properties.outputs' -o json > deployment-outputs.json
           cat deployment-outputs.json
+      - name: Set runtime settings without replacing existing app settings
+        env:
+          RG: ${{ steps.resolve.outputs.resource_group }}
+          APP: ${{ inputs.app_name || 'atsh-ai-website' }}
+        run: |
+          az webapp config appsettings set \
+            --resource-group "$RG" \
+            --name "$APP" \
+            --settings NODE_ENV=production WEBSITE_NODE_DEFAULT_VERSION='~24' SCM_DO_BUILD_DURING_DEPLOYMENT=false \
+            --output none
       - name: Deploy website package
         uses: azure/webapps-deploy@v3
         with:
