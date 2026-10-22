@@ -109,23 +109,11 @@ jobs:
             LOCATION=$(az webapp show --resource-group "$RG" --name "$APP" --query location -o tsv)
             PLAN_ID=$(az webapp show --resource-group "$RG" --name "$APP" --query serverFarmId -o tsv)
             PLAN="${PLAN_ID##*/}"
-            CURRENT_SKU=$(az appservice plan show --ids "$PLAN_ID" --query sku.name -o tsv)
-            CURRENT_TIER=$(az appservice plan show --ids "$PLAN_ID" --query sku.tier -o tsv)
-            if [ "$CURRENT_TIER" = "Free" ]; then
-              SKU="$SKU_INPUT"
-              TIER="Basic"
-            elif [ "$EVENT_NAME" = "push" ]; then
-              SKU="$CURRENT_SKU"
-              TIER="$CURRENT_TIER"
-            elif [ "$CURRENT_TIER" = "Basic" ]; then
-              SKU="$SKU_INPUT"
-              TIER="Basic"
-            else
-              SKU="$CURRENT_SKU"
-              TIER="$CURRENT_TIER"
-              echo "Preserving existing $TIER plan tier and SKU $SKU to avoid an accidental downgrade."
-            fi
-            echo "Found existing app: $APP in $RG ($LOCATION), plan $PLAN ($TIER / $SKU)"
+            # Existing app: deploy the package in place without reading or changing its plan.
+            SKU="$SKU_INPUT"
+            TIER="Basic"
+            echo "Found existing app: $APP in $RG ($LOCATION), plan $PLAN. Skipping resource provisioning."
+            echo "needs_provision=false" >> "$GITHUB_OUTPUT"
           else
             if [ -z "$RG_INPUT" ]; then
               RG="atsh-ai-rg"
@@ -139,6 +127,7 @@ jobs:
             PLAN="${APP}-plan"
             SKU="$SKU_INPUT"
             TIER="Basic"
+            echo "needs_provision=true" >> "$GITHUB_OUTPUT"
           fi
           echo "resource_group=$RG" >> "$GITHUB_OUTPUT"
           echo "location=$LOCATION" >> "$GITHUB_OUTPUT"
@@ -146,8 +135,10 @@ jobs:
           echo "plan_sku=$SKU" >> "$GITHUB_OUTPUT"
           echo "plan_tier=$TIER" >> "$GITHUB_OUTPUT"
       - name: Validate Bicep
+        if: steps.resolve.outputs.needs_provision == 'true'
         run: az bicep build --file infra/azure/main.bicep
       - name: Provision or update App Service
+        if: steps.resolve.outputs.needs_provision == 'true'
         env:
           RG: ${{ steps.resolve.outputs.resource_group }}
           APP: ${{ inputs.app_name || 'atsh-ai-website' }}
