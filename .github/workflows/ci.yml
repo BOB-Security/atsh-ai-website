@@ -17,6 +17,7 @@ on:
       - 'package.json'
       - 'package-lock.json'
       - 'server.js'
+      - 'admin-core.js'
       - 'public/**'
       - 'scripts/**'
       - 'tests/**'
