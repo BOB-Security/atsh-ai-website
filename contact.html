@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="أرسل استفسارًا أو ملخصًا عن مشروعك إلى atsh-ai عبر نموذج التواصل.">
+  <meta name="theme-color" content="#10131f">
+  <title>تواصل معنا | atsh-ai</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="pages.css">
+</head><body><a class="skip-link" href="#main">تجاوز إلى المحتوى</a>
+<header class="site-header">
+  <div class="container nav-wrap">
+    <a class="brand" href="index.html" aria-label="atsh-ai — الرئيسية"><span class="brand-mark">a<span>i</span></span><span>atsh-ai</span></a>
+    <button class="menu-toggle" id="menuToggle" aria-expanded="false" aria-controls="mainNav">القائمة <span aria-hidden="true">☰</span></button>
+    <nav id="mainNav" class="main-nav" aria-label="التنقل الرئيسي">
+      <a href="index.html">الرئيسية</a>
+      <a href="services.html">الخدمات</a>
+      <a href="products.html">المنتجات</a>
+      <a href="work.html">الأعمال</a>
+      <a href="about.html">عن الشركة</a>
+      <a href="contact.html" aria-current="page">تواصل معنا</a>
+    </nav>
+  </div>
+</header><main id="main">
+<section class="page-hero"><div class="container"><div class="eyebrow">تواصل معنا</div><h1>احكِ لنا عن <span class="gradient-text">احتياجك.</span></h1><p>أرسل ملخصًا واضحًا عن المشكلة أو المشروع. سيُحفظ الطلب للمراجعة الإدارية، وستظهر رسالة توضح نتيجة الإرسال.</p></div></section>
+<section class="page-content"><div class="container contact-layout">
+<form class="form-card" id="contactForm">
+<h2>طلب تواصل أو مشروع</h2>
+<label for="contactName">الاسم</label><input id="contactName" name="name" autocomplete="name" required maxlength="120" placeholder="اسمك أو اسم الجهة">
+<label for="contactEmail">البريد الإلكتروني</label><input id="contactEmail" name="email" type="email" autocomplete="email" required maxlength="254" placeholder="name@example.com">
+<label for="contactType">نوع الطلب</label><select id="contactType" name="type" required><option value="">اختر نوع الطلب</option><option>حل ذكاء اصطناعي</option><option>تطوير موقع أو منصة</option><option>تطبيق أو نظام مخصص</option><option>تكامل وأتمتة</option><option>استشارة تقنية</option><option>أخرى</option></select>
+<label for="contactBrief">ملخص الاحتياج</label><textarea id="contactBrief" name="brief" required maxlength="3000" rows="5" placeholder="ما المشكلة التي تريد حلها؟"></textarea>
+<div class="honeypot" aria-hidden="true"><label for="website">اترك هذا الحقل فارغًا</label><input id="website" name="website" tabindex="-1" autocomplete="off"></div>
+<label class="check-row"><input id="privacyConsent" type="checkbox" required> أوافق على استخدام بياناتي للرد على هذا الطلب وفق سياسة الخصوصية.</label>
+<button class="button button-primary button-full" type="submit">إرسال الطلب <span aria-hidden="true">←</span></button>
+<p class="form-status" id="contactStatus" role="status" aria-live="polite"></p>
+</form>
+<aside class="contact-details"><span class="page-label">قبل الإرسال</span><h2>ماذا تكتب في الطلب؟</h2><p>يساعدنا الوصف المختصر على فهم ما تحتاج إليه وتحديد الخطوة التالية.</p><ul><li>ما المشكلة أو الهدف؟</li><li>من سيستخدم الحل؟</li><li>هل يوجد موعد أو قيد مهم؟</li><li>ما النتيجة التي تتوقعها؟</li></ul><div class="legal-note">لا ترسل كلمات مرور أو بيانات مالية أو معلومات شخصية حساسة. إرسال النموذج لا يعني قبول المشروع أو الاتفاق على سعر أو موعد تسليم.</div>
+</aside></div></section></main><footer class="site-footer">
+  <div class="container footer-main"><a class="brand" href="index.html"><span class="brand-mark">a<span>i</span></span><span>atsh-ai</span></a><p>نبني التقنية لتصنع أثرًا.</p><a href="contact.html">ابدأ محادثة حول مشروعك ←</a></div>
+  <div class="container footer-bottom"><span>© <span id="year"></span> atsh-ai</span><span>ذكاء اصطناعي · تعاون · تنفيذ</span><div class="page-footer-links"><a href="privacy.html">سياسة الخصوصية</a><a href="terms.html">شروط الاستخدام</a></div></div>
+</footer>
+<script src="site.js"></script>
+<script src="contact.js"></script></body>
+</html>

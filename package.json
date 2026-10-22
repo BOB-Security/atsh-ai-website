@@ -1,0 +1,20 @@
+{
+  "name": "atsh-ai-website",
+  "version": "0.1.0",
+  "private": true,
+  "description": "atsh-ai website and initial inquiry API",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "check": "node --check server.js && node --check app.js && node --check site.js && node --check contact.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.2.0",
+    "express": "^5.1.0",
+    "helmet": "^8.1.0"
+  }
+}
