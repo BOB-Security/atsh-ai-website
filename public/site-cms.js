@@ -7,7 +7,8 @@
     const theme = data.theme || {};
     const root = document.documentElement;
     const vars = { primary: '--cms-primary', background: '--cms-background', surface: '--cms-surface', text: '--cms-text', muted: '--cms-muted' };
-    for (const [key, cssVar] of Object.entries(vars)) if (/^#[0-9a-f]{6}$/i.test(theme[key] || '')) root.style.setProperty(cssVar, theme[key]);
+    const globalVars = { primary: '--gold', background: '--bg', surface: '--panel2', text: '--text', muted: '--muted' };
+    for (const [key, cssVar] of Object.entries(vars)) if (/^#[0-9a-f]{6}$/i.test(theme[key] || '')) { root.style.setProperty(cssVar, theme[key]); root.style.setProperty(globalVars[key], theme[key]); }
     const path = location.pathname.replace(/\/+$/, '') || '/';
     const currentPage = (data.pages || []).find(p => p.path === path && p.visible);
     if (document.body.dataset.cmsPage === 'template') {
