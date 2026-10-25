@@ -120,7 +120,7 @@ async function handleInquiry(req, res) {
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost');
 
-  if (url.pathname.startsWith('/api/admin/') || url.pathname === '/api/site-content' || url.pathname.startsWith('/media/')) {
+  if (url.pathname.startsWith('/api/admin/') || url.pathname === '/api/site-content' || url.pathname === '/api/pricing' || url.pathname === '/api/quotes' || url.pathname.startsWith('/media/')) {
     try {
       const handled = await adminCore.handler(req, res, url);
       if (handled !== false) return;
