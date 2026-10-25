@@ -14,6 +14,8 @@ const required = [
   'public/staff/activate.html',
   'public/staff/app.js',
   'public/index.html',
+  'public/pricing.html',
+  'public/pricing.js',
   'public/admin/index.html',
   'public/admin.css',
   'public/styles.css',
@@ -42,7 +44,7 @@ for (const marker of ['id="main-content"', 'id="project-form"', 'data-i18n']) {
 }
 for (const page of required.filter(file => file.startsWith('public/') && file.endsWith('.html') && file !== 'public/admin/index.html' && file !== 'public/cms-page.html' && !file.startsWith('public/staff/'))) {
   const html = fs.readFileSync(path.join(root, page), 'utf8');
-  if (!html.includes('lang="ar" dir="rtl"') || !html.includes('/styles.css') || !html.includes('/app.js')) {
+  if (!html.includes('lang="ar" dir="rtl"') || !html.includes('/styles.css') || !(page === 'public/pricing.html' ? html.includes('/pricing.js') : html.includes('/app.js'))) {
     console.error('Page is missing language metadata or shared assets:', page);
     process.exit(1);
   }
@@ -53,7 +55,7 @@ if (!adminHtml.includes('name="robots" content="noindex,nofollow"') || !adminHtm
   process.exit(1);
 }
 const adminClient = fs.readFileSync(path.join(root, 'public/admin/app.js'), 'utf8');
-for (const marker of ['/api/admin/content', '/api/admin/team', '/api/admin/tasks', '/api/admin/upload']) {
+for (const marker of ['/api/admin/content', '/api/admin/team', '/api/admin/tasks', '/api/admin/upload', '/api/admin/pricing', '/api/quotes']) {
   if (!adminClient.includes(marker)) { console.error('Admin client is missing API integration:', marker); process.exit(1); }
 }
 console.log('Site structure check passed.');
