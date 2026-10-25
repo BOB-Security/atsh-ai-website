@@ -6,9 +6,12 @@
     const data = await res.json();
     const theme = data.theme || {};
     const root = document.documentElement;
-    const vars = { primary: '--cms-primary', background: '--cms-background', surface: '--cms-surface', text: '--cms-text', muted: '--cms-muted' };
-    const globalVars = { primary: '--gold', background: '--bg', surface: '--panel2', text: '--text', muted: '--muted' };
+    const vars = { primary: '--cms-primary', accent: '--cms-accent', background: '--cms-background', surface: '--cms-surface', text: '--cms-text', muted: '--cms-muted', cardBorder: '--cms-card-border' };
+    const globalVars = { primary: '--gold', accent: '--purple', background: '--bg', surface: '--panel2', text: '--text', muted: '--muted', cardBorder: '--line' };
     for (const [key, cssVar] of Object.entries(vars)) if (/^#[0-9a-f]{6}$/i.test(theme[key] || '')) { root.style.setProperty(cssVar, theme[key]); root.style.setProperty(globalVars[key], theme[key]); }
+    const fontMap = { 'IBM Plex Sans Arabic': 'IBM Plex Sans Arabic', Cairo: 'Cairo', Tajawal: 'Tajawal', 'Noto Sans Arabic': 'Noto Sans Arabic' };
+    if (fontMap[theme.fontAr]) { root.style.setProperty('--font-ar', `\"${fontMap[theme.fontAr]}\",sans-serif`); document.body.style.fontFamily = `\"${fontMap[theme.fontAr]}\",sans-serif`; }
+    if (['12px','18px','24px'].includes(theme.cardRadius)) root.style.setProperty('--radius-md', theme.cardRadius);
     const path = location.pathname.replace(/\/+$/, '') || '/';
     const currentPage = (data.pages || []).find(p => p.path === path && p.visible);
     const nav = document.querySelector('.primary-nav');
