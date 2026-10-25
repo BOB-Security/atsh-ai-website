@@ -35,7 +35,7 @@ function validEmail(value) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) && 
 function defaultStore() {
   return {
     version: 1, owner: null, users: [], sessions: [], challenges: [], invitations: [],
-    tasks: [], audit: [], content: { version: 1, theme: { primary: '#d9bd79', background: '#0a0b10', surface: '#151722', text: '#f4f3ef', muted: '#aeb0bb' }, pages: [], blocks: [] }
+    tasks: [], audit: [], content: { version: 1, theme: { primary: '#36c6bd', accent: '#a99aff', background: '#0b1020', surface: '#182338', text: '#f4f7fb', muted: '#aab7ca', cardBorder: '#334155', fontAr: 'IBM Plex Sans Arabic', cardRadius: '18px' }, pages: [], blocks: [] }
   };
 }
 async function readStore() {
@@ -298,9 +298,11 @@ async function handler(req, res, url) {
     let data; try { data = await readBody(req, 512 * 1024); } catch (e) { return json(res, e.status || 400, { error: 'بيانات غير صالحة.' }); }
     if (!data || !Array.isArray(data.pages) || !Array.isArray(data.blocks) || typeof data.theme !== 'object') return json(res, 400, { error: 'صيغة المحتوى غير صالحة.' });
     const content = safeDetail(data);
-    for (const key of ['primary','background','surface','text','muted']) {
+    for (const key of ['primary','accent','background','surface','text','muted','cardBorder']) {
       if (content.theme?.[key] && !/^#[0-9a-fA-F]{6}$/.test(content.theme[key])) return json(res, 400, { error: 'الألوان يجب أن تكون بصيغة HEX سداسية.' });
     }
+    if (content.theme?.fontAr && !['IBM Plex Sans Arabic','Cairo','Tajawal','Noto Sans Arabic'].includes(content.theme.fontAr)) return json(res, 400, { error: 'الخط المحدد غير مسموح.' });
+    if (content.theme?.cardRadius && !['12px','18px','24px'].includes(content.theme.cardRadius)) return json(res, 400, { error: 'استدارة البطاقة غير مسموحة.' });
     content.pages = content.pages.slice(0, 100).map(page => ({ id: clean(page.id, 80) || slug(page.title), title: clean(page.title, 160), path: '/' + slug(page.path || page.title), visible: page.visible !== false, language: page.language === 'en' ? 'en' : 'ar' }));
     content.blocks = content.blocks.slice(0, 300).map(block => ({ id: clean(block.id, 80) || crypto.randomUUID(), pageId: clean(block.pageId, 80) || 'home', type: ['text','card','image','heading'].includes(block.type) ? block.type : 'text', title: clean(block.title, 200), body: clean(block.body, 5000), image: /^\/media\/[a-f0-9-]{36}\.(png|jpg|jpeg|webp|gif)$/.test(block.image || '') ? block.image : '', color: /^#[0-9a-fA-F]{6}$/.test(block.color || '') ? block.color : '', visible: block.visible !== false }));
     content.version = (store.content.version || 0) + 1;
