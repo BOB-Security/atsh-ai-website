@@ -55,7 +55,11 @@ if (!adminHtml.includes('name="robots" content="noindex,nofollow"') || !adminHtm
   process.exit(1);
 }
 const adminClient = fs.readFileSync(path.join(root, 'public/admin/app.js'), 'utf8');
-for (const marker of ['/api/admin/content', '/api/admin/team', '/api/admin/tasks', '/api/admin/upload', '/api/admin/pricing', '/api/quotes']) {
+for (const marker of ['/api/admin/content', '/api/admin/team', '/api/admin/tasks', '/api/admin/upload', '/api/admin/pricing']) {
   if (!adminClient.includes(marker)) { console.error('Admin client is missing API integration:', marker); process.exit(1); }
+}
+const server = fs.readFileSync(path.join(root, 'server.js'), 'utf8');
+for (const marker of ["url.pathname === '/api/pricing'", "url.pathname === '/api/quotes'"]) {
+  if (!server.includes(marker)) { console.error('Server is missing pricing route:', marker); process.exit(1); }
 }
 console.log('Site structure check passed.');
