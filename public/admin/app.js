@@ -57,7 +57,8 @@
     try {
       state.content = await api('/api/admin/content');
       const theme = state.content.theme || {};
-      $$('[data-theme]').forEach(i => i.value = /^#[0-9a-f]{6}$/i.test(theme[i.dataset.theme] || '') ? theme[i.dataset.theme] : '#d9bd79');
+      $('[data-theme]').forEach(i => i.value = /^#[0-9a-f]{6}$/i.test(theme[i.dataset.theme] || '') ? theme[i.dataset.theme] : (i.dataset.theme === 'primary' ? '#36c6bd' : i.dataset.theme === 'accent' ? '#a99aff' : i.dataset.theme === 'background' ? '#0b1020' : i.dataset.theme === 'surface' ? '#182338' : i.dataset.theme === 'text' ? '#f4f7fb' : i.dataset.theme === 'muted' ? '#aab7ca' : '#334155'));
+      $('[data-theme-select]').forEach(i => i.value = theme[i.dataset.themeSelect] || (i.dataset.themeSelect === 'fontAr' ? 'IBM Plex Sans Arabic' : '18px'));
       renderPages(); renderBlocks();
     } catch (e) { flash(e.message, true); }
   }
@@ -102,7 +103,8 @@
     state.content.pages.push({ id: crypto.randomUUID(), title, path: '/' + path, visible: $('#page-visible').checked, language: 'ar' });
     $('#page-title').value = ''; $('#page-path').value = ''; renderPages(); flash('أُضيفت الصفحة إلى مسودة المحتوى. اضغط حفظ التغييرات لنشرها.');
   });
-  $$('[data-theme]').forEach(input => input.addEventListener('input', () => { state.content.theme ||= {}; state.content.theme[input.dataset.theme] = input.value; }));
+  $('[data-theme]').forEach(input => input.addEventListener('input', () => { state.content.theme ||= {}; state.content.theme[input.dataset.theme] = input.value; }));
+  $('[data-theme-select]').forEach(input => input.addEventListener('change', () => { state.content.theme ||= {}; state.content.theme[input.dataset.themeSelect] = input.value; }));
   $('#block-image-file').addEventListener('change', async e => {
     const file = e.target.files?.[0]; state.image = '';
     if (!file) { $('#image-preview').hidden = true; return; }
