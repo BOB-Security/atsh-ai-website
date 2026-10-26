@@ -75,4 +75,7 @@ router.post('/project-inquiries', async (req, res, next) => {
     next(err);
   }
 });
+
+router.get('/design-theme/:scope',async(req,res,next)=>{try{const scope=z.enum(['public','portal','admin','all']).parse(req.params.scope);const {rows}=await getPool().query("SELECT version_number,settings,published_at FROM design_versions WHERE organization_id=$1 AND status='published' AND scope IN ($2,'all') ORDER BY version_number DESC LIMIT 1",[req.app.locals.organizationId,scope]);res.setHeader('Cache-Control','no-store');res.json({theme:rows[0]?.settings||{},version:rows[0]?.version_number||null,publishedAt:rows[0]?.published_at||null});}catch(e){next(e);}});
+
 module.exports = router;
