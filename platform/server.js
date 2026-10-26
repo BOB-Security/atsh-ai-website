@@ -12,6 +12,7 @@ const adminRoutes = require('./src/routes/admin');
 const assistantRoutes = require('./src/routes/assistant');
 const opsRoutes = require('./src/routes/ops');
 const teamRoutes = require('./src/routes/team');
+const portalRoutes = require('./src/routes/portal');
 
 const config = loadConfig();
 const app = express();
@@ -59,6 +60,7 @@ app.use('/api/public', publicRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/ops', opsRoutes);
 app.use('/api/team', teamRoutes);
+app.use('/api/portal', portalRoutes);
 app.use(express.static(path.join(__dirname,'public'), { index: 'index.html', fallthrough: true }));
 app.get('/:slug', async (req,res,next) => {
   try {
