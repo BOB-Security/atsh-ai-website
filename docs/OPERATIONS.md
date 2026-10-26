@@ -51,6 +51,6 @@ A healthy liveness response does not prove that email, AI, storage, DNS, backup 
 
 ## Current limitations
 - Hosting inventory and backup-run APIs track records; provider-specific backup execution and restore automation are not yet implemented.
-- Customer AI agent records and knowledge-source metadata exist; independent tenant key management, usage billing and all third-party channels require provider adapters and acceptance tests.
+- Customer AI agents now have a tenant-scoped OpenAI-compatible runtime, approved per-agent knowledge documents, an embeddable widget with an origin allowlist, conversation isolation and token metering. Independent per-customer secret resolution, cost-based billing, and non-OpenAI-compatible providers still require provider adapters and acceptance tests.
 - Payment collection and a full customer portal are intentionally not enabled.
 - English coverage exists on the main landing page; all standalone content and admin workflows still require bilingual review.
