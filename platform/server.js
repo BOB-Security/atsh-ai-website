@@ -51,6 +51,7 @@ app.get('/ready', async (_req,res) => {
 });
 app.use('/api/public/project-inquiries', intakeLimiter);
 app.use('/api/public/pricing/estimate', intakeLimiter);
+app.use('/api/public/support-tickets', intakeLimiter);
 app.use('/api/admin/auth/login', loginLimiter);
 app.use('/api/public/assistant', assistantLimiter, assistantRoutes);
 app.use('/api/public', publicRoutes);
