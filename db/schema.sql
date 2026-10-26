@@ -135,7 +135,7 @@ CREATE TABLE IF NOT EXISTS projects (
   reference text NOT NULL UNIQUE,
   name text NOT NULL,
   scope jsonb NOT NULL DEFAULT '{}'::jsonb,
-  status text NOT NULL DEFAULT 'discovery' CHECK (status IN ('discovery','scoped','approved','in_progress','blocked','review','changes_requested','client_approved','deploying','delivered','cancelled')),
+  status text NOT NULL DEFAULT 'discovery' CHECK (status IN ('discovery','scoped','approved','in_progress','blocked','review','preview_ready','changes_requested','client_approved','deploying','delivered','cancelled')),
   preview_url text,
   target_date date,
   assigned_user_id uuid REFERENCES users(id) ON DELETE SET NULL,
@@ -522,3 +522,7 @@ CREATE TABLE IF NOT EXISTS support_ticket_messages (
  created_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_ticket_messages_thread ON support_ticket_messages(ticket_id,created_at);
+
+-- db/011_project_preview_ready_status.sql
+ALTER TABLE projects DROP CONSTRAINT IF EXISTS projects_status_check;
+ALTER TABLE projects ADD CONSTRAINT projects_status_check CHECK (status IN ('discovery','scoped','approved','in_progress','blocked','review','preview_ready','changes_requested','client_approved','deploying','delivered','cancelled'));
