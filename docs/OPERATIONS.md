@@ -7,8 +7,10 @@ This rebuild is isolated on `rebuild/atsh-ai-from-scratch`. The existing `main` 
 1. PostgreSQL 15 or newer, with TLS for hosted environments.
 2. Node.js 22 or newer.
 3. A verified outbound email sender and Resend API key for invitations, quote delivery and approval requests.
-4. An OpenAI-compatible model endpoint and API key to activate the public assistant. Without these, the assistant deliberately returns an unconfigured response.
-5. A hosting secret store and Azure deployment identity for staging. Do not place secrets in repository files or client JavaScript.
+4. Azure Blob Storage for encrypted platform database backups, plus a separately stored 32-byte backup encryption key.
+5. A dedicated, disposable, empty PostgreSQL database for manually confirmed restore tests.
+6. An OpenAI-compatible model endpoint and API key to activate the public assistant. Without these, the assistant deliberately returns an unconfigured response.
+7. A hosting secret store and Azure deployment identity for staging. Do not place secrets in repository files or client JavaScript.
 
 ## Environment contract
 - `DATABASE_URL`: PostgreSQL connection string.
@@ -35,6 +37,11 @@ npm start
 ```
 Bootstrap creates the organization, owner and initial least-privilege roles. Keep the bootstrap password out of logs and shell history. Once the owner can sign in, rotate or remove the one-time bootstrap environment variables.
 
+## Database backup and restore test
+The daily encrypted PostgreSQL backup workflow remains disabled until these repository secrets are set: `BACKUP_ENABLED=true`, `PLATFORM_DATABASE_URL`, `BACKUP_ENCRYPTION_KEY` (64 hex characters), and `AZURE_BACKUP_STORAGE_CONNECTION_STRING`. The workflow uploads an AES-256-GCM encrypted custom-format `pg_dump` to Azure Blob Storage and records the result in `backup_runs`. Configure an Azure Blob lifecycle rule using the `retentionuntil` index tag; the database retention date alone does not delete blobs.
+
+A restore test is deliberately manual because it copies production database data into the target. Configure `RESTORE_TEST_DATABASE_URL` to a dedicated, disposable, isolated and empty database, then run the `ATSH AI isolated backup restore test` workflow and explicitly confirm the target. The script refuses a non-empty target and records `restore_tested` only after `pg_restore` and table-count checks succeed. Never point it at production.
+
 ## Health checks
 - `GET /health`: process liveness only.
 - `GET /ready`: checks organization configuration and PostgreSQL connectivity.
@@ -50,7 +57,7 @@ A healthy liveness response does not prove that email, AI, storage, DNS, backup 
 - Do not deploy to production until CI, migrations, browser tests, provider checks, restore tests and rollback procedures have been verified.
 
 ## Current limitations
-- Hosting inventory and backup-run APIs track records; provider-specific backup execution and restore automation are not yet implemented.
+- The platform database has an encrypted Azure Blob backup workflow and a manually confirmed restore test. Backups of customer websites, files, databases, domains and third-party hosting resources still require provider-specific adapters and secrets.
 - Customer AI agents now have a tenant-scoped OpenAI-compatible runtime, approved per-agent knowledge documents, an embeddable widget with an origin allowlist, conversation isolation and token metering. Independent per-customer secret resolution, cost-based billing, and non-OpenAI-compatible providers still require provider adapters and acceptance tests.
 - Payment collection and a full customer portal are intentionally not enabled.
 - English coverage exists on the main landing page; all standalone content and admin workflows still require bilingual review.
