@@ -34,8 +34,8 @@ router.patch('/projects/:id/status',requirePermission('projects.manage'),async(r
 router.post('/projects/:id/approvals',requirePermission('projects.manage'),async(req,res,next)=>{try{
  const s=z.object({approvalType:z.enum(['scope','quote','preview','final_release']),note:z.string().max(2000).optional().default('')}).strict().parse(req.body);
  const cfg=req.app.locals.config;if(!cfg.resendApiKey||!cfg.emailFrom||!cfg.publicBaseUrl)return res.status(503).json({error:'يجب إعداد البريد الإلكتروني وعنوان الموقع قبل طلب موافقة العميل.'});
- const project=(await getPool().query('SELECT p.id,p.reference,p.name,c.email,c.display_name FROM projects p JOIN customers c ON c.id=p.customer_id WHERE p.id=$1 AND p.organization_id=$2',[req.params.id,req.app.locals.organizationId])).rows[0];
- if(!project)return res.status(404).json({error:'المشروع غير موجود.'});if(!project.email)return res.status(400).json({error:'لا يوجد بريد إلكتروني للعميل في سجله.'});
+ const project=(await getPool().query('SELECT p.id,p.reference,p.name,p.status,c.email,c.display_name FROM projects p JOIN customers c ON c.id=p.customer_id WHERE p.id=$1 AND p.organization_id=$2',[req.params.id,req.app.locals.organizationId])).rows[0];
+ if(!project)return res.status(404).json({error:'المشروع غير موجود.'});if(s.approvalType==='final_release'&&project.status!=='preview_ready')return res.status(409).json({error:'لا يمكن طلب الموافقة النهائية إلا بعد تجهيز المعاينة واعتمادها للمراجعة.'});if(!project.email)return res.status(400).json({error:'لا يوجد بريد إلكتروني للعميل في سجله.'});
  const token=require('node:crypto').randomBytes(32).toString('base64url'),hash=require('node:crypto').createHash('sha256').update(token).digest('hex'),expires=new Date(Date.now()+7*24*60*60*1000);
  const {rows}=await getPool().query("INSERT INTO project_approvals(project_id,approval_type,status,approver_name,approver_email,note,approval_token_hash,token_expires_at) VALUES($1,$2,'requested',$3,$4,$5,$6,$7) RETURNING id",[project.id,s.approvalType,project.display_name,project.email,s.note,hash,expires]);
  const link=cfg.publicBaseUrl.replace(/\/$/,'')+'/project-approval.html?token='+encodeURIComponent(token);
