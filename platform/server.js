@@ -58,7 +58,7 @@ app.use('/api/team', teamRoutes);
 app.use(express.static(path.join(__dirname,'public'), { index: 'index.html', fallthrough: true }));
 app.get('/:slug', async (req,res,next) => {
   try {
-    const slug=String(req.params.slug||'').replace(/\\.html$/,'');
+    const slug=String(req.params.slug||'').replace(/\.html$/,'');
     if (!/^[a-z0-9-]{2,80}$/.test(slug)) return next();
     if (!app.locals.organizationId) return next();
     const {getPool}=require('./src/db');
