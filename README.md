@@ -26,7 +26,7 @@ Set the required environment variables from `docs/OPERATIONS.md`. The app expose
 - `/admin` — protected operations console.
 - `/project-builder.html` and `/project-builder-en.html` — Arabic/English project intake.
 - `/pricing.html` and `/pricing-en.html` — server-calculated estimates from the active catalog.
-- `/support.html` and `/support-en.html` — support intake.\n- `/portal.html` — protected customer portal for projects, quotes, project updates and support tickets.
+- `/support.html` and `/support-en.html` — support intake.\n- `/portal.html` and `/portal-en.html` — protected Arabic/English customer portal for projects, quotes, project updates and support tickets.
 - `/services.html`, `/hosting.html`, `/ai-solutions.html`, `/process.html`, `/faq.html`, and English equivalents.
 
 ## Important limits
