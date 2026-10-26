@@ -10,7 +10,7 @@
     "start": "node server.js",
     "dev": "node --watch server.js",
     "build": "node --check server.js && node --check src/config.js && node --check src/db.js && node --check src/auth.js && node --check src/routes/public.js && node --check src/routes/admin.js && node --check src/routes/assistant.js && node --check src/routes/ops.js && node --check src/routes/team.js && node --check scripts/migrate.js && node --check scripts/bootstrap.js && node --check public/app.js && node --check public/admin.js && node --check public/assistant.js && node --check public/builder.js && node --check public/team-activate.js && node --check public/project-approval.js && node --check public/quote-response.js && node --check public/pricing.js && node --check public/support.js && node --check public/agent-widget.js && node --check public/builder-en.js && node --check public/pricing-en.js && node --check public/support-en.js && node --check scripts/backup-database.js && node --check scripts/restore-test.js && node --check src/routes/portal.js && node --check public/portal.js && node --check public/portal-en.js",
-    "test": "node --test",
+    "test": "node --test test/platform.test.js",
     "db:migrate": "node scripts/migrate.js",
     "db:bootstrap": "node scripts/bootstrap.js",
     "backup:database": "node scripts/backup-database.js",
