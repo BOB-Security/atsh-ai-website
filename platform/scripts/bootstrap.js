@@ -16,10 +16,10 @@ const {passwordHash}=require('../src/auth');
   let role=(await client.query("SELECT id FROM roles WHERE organization_id=$1 AND name='Owner'",[org.id])).rows[0];
   if(!role)role=(await client.query("INSERT INTO roles(organization_id,name,permissions,is_system) VALUES($1,'Owner','[\"*\"]'::jsonb,true) RETURNING id",[org.id])).rows[0];
   const roleSeeds=[
-   ['Administrator',['dashboard.read','content.read','content.manage','catalog.read','catalog.manage','leads.read','leads.manage','customers.read','customers.manage','projects.read','projects.manage','tasks.read','tasks.manage','quotes.read','quotes.manage','hosting.read','hosting.manage','backups.read','backups.manage','tickets.read','tickets.manage','knowledge.read','knowledge.manage','team.read','team.invite','team.manage']],
+   ['Administrator',['dashboard.read','content.read','content.manage','catalog.read','catalog.manage','leads.read','leads.manage','customers.read','customers.manage','projects.read','projects.manage','tasks.read','tasks.manage','quotes.read','quotes.manage','hosting.read','hosting.manage','backups.read','backups.manage','tickets.read','tickets.manage','knowledge.read','knowledge.manage','ai.read','ai.manage','integrations.read','integrations.manage','team.read','team.invite','team.manage']],
    ['Project Manager',['dashboard.read','content.read','leads.read','customers.read','projects.read','projects.manage','tasks.read','tasks.manage','quotes.read','tickets.read']],
    ['Support',['dashboard.read','customers.read','projects.read','tasks.read','tickets.read','tickets.manage','knowledge.read']],
-   ['AI Manager',['dashboard.read','knowledge.read','knowledge.manage','catalog.read','tickets.read']],
+   ['AI Manager',['dashboard.read','knowledge.read','knowledge.manage','ai.read','ai.manage','integrations.read','integrations.manage','catalog.read','tickets.read']],
    ['Finance',['dashboard.read','customers.read','quotes.read','quotes.manage','hosting.read']],
    ['Read-only',['dashboard.read','leads.read','customers.read','projects.read','tasks.read','quotes.read','hosting.read','backups.read','tickets.read','knowledge.read','team.read']]
   ];
