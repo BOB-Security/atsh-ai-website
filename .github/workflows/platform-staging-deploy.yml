@@ -1,0 +1,84 @@
+name: ATSH AI v2 staging deploy
+on:
+  workflow_dispatch:
+    inputs:
+      resource_group:
+        description: Existing Azure resource group for the v2 staging app
+        required: true
+        type: string
+      app_name:
+        description: Existing staging Web App name; must end with -staging
+        required: true
+        type: string
+permissions:
+  contents: read
+  id-token: write
+jobs:
+  deploy-staging:
+    if: github.ref == 'refs/heads/rebuild/atsh-ai-from-scratch'
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+      PGSSLMODE: require
+      DEFAULT_ORGANIZATION_SLUG: atsh-ai
+      OWNER_EMAIL: ${{ secrets.STAGING_OWNER_EMAIL }}
+      OWNER_NAME: ${{ secrets.STAGING_OWNER_NAME }}
+      OWNER_PASSWORD: ${{ secrets.STAGING_OWNER_PASSWORD }}
+    defaults:
+      run:
+        working-directory: platform
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate staging target and required configuration
+        env:
+          APP_NAME: ${{ inputs.app_name }}
+          RESOURCE_GROUP: ${{ inputs.resource_group }}
+        run: |
+          [[ "$APP_NAME" == *-staging ]] || { echo "Refusing deployment: app_name must end in -staging."; exit 1; }
+          [[ -n "$RESOURCE_GROUP" ]] || { echo "Resource group is required."; exit 1; }
+          [[ -n "$DATABASE_URL" && -n "$OWNER_EMAIL" && -n "$OWNER_PASSWORD" ]] || { echo "Configure staging database and bootstrap secrets first."; exit 1; }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --package-lock-only
+      - run: npm install
+      - run: npm run build
+      - run: npm test
+      - run: npm run db:migrate
+      - run: npm run db:bootstrap
+      - name: Create deployment package
+        run: zip -r ../atsh-ai-v2-staging.zip . -x 'node_modules/*' '.data/*' '*.log'
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Verify required Azure app settings without printing values
+        env:
+          APP_NAME: ${{ inputs.app_name }}
+          RESOURCE_GROUP: ${{ inputs.resource_group }}
+        run: |
+          settings=$(az webapp config appsettings list --name "$APP_NAME" --resource-group "$RESOURCE_GROUP" --query "[].name" -o tsv)
+          for key in DATABASE_URL PUBLIC_BASE_URL RESEND_API_KEY EMAIL_FROM AI_API_KEY AI_MODEL; do
+            echo "$settings" | grep -qx "$key" || { echo "Missing required App Service setting: $key"; exit 1; }
+          done
+      - name: Set non-secret runtime settings
+        env:
+          APP_NAME: ${{ inputs.app_name }}
+          RESOURCE_GROUP: ${{ inputs.resource_group }}
+        run: az webapp config appsettings set --name "$APP_NAME" --resource-group "$RESOURCE_GROUP" --settings NODE_ENV=production SCM_DO_BUILD_DURING_DEPLOYMENT=true WEBSITE_NODE_DEFAULT_VERSION=~22
+      - uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ inputs.app_name }}
+          package: ./atsh-ai-v2-staging.zip
+      - name: Verify deployed readiness
+        env:
+          APP_NAME: ${{ inputs.app_name }}
+        run: |
+          for i in $(seq 1 24); do
+            code=$(curl -sS -o /tmp/ready.json -w '%{http_code}' "https://$APP_NAME.azurewebsites.net/ready" || true)
+            if [[ "$code" == "200" ]]; then cat /tmp/ready.json; exit 0; fi
+            sleep 10
+          done
+          echo "Staging app did not become ready. Do not switch production traffic."
+          exit 1
