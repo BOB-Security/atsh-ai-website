@@ -27,6 +27,7 @@ app.use(compression());
 app.use(express.json({ limit: '64kb', strict: true }));
 app.use(cookieParser());
 app.use((req, res, next) => {
+  if (['POST','PUT','PATCH','DELETE'].includes(req.method) && req.get('origin')) { try { if (new URL(req.get('origin')).host !== req.get('host')) return res.status(403).json({error:'طلب من مصدر غير مسموح.'}); } catch { return res.status(403).json({error:'مصدر الطلب غير صالح.'}); } }
   res.setHeader('Referrer-Policy','strict-origin-when-cross-origin');
   res.setHeader('X-Content-Type-Options','nosniff');
   res.setHeader('Permissions-Policy','camera=(), microphone=(), geolocation=()');
@@ -49,6 +50,7 @@ app.get('/ready', async (_req,res) => {
   } catch { res.status(503).json({ok:false,database:false}); }
 });
 app.use('/api/public/project-inquiries', intakeLimiter);
+app.use('/api/public/pricing/estimate', intakeLimiter);
 app.use('/api/admin/auth/login', loginLimiter);
 app.use('/api/public/assistant', assistantLimiter, assistantRoutes);
 app.use('/api/public', publicRoutes);
