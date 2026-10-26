@@ -4,7 +4,7 @@ const {z}=require('zod');
 const {getPool}=require('../db');
 const crypto=require('node:crypto');
 const router=express.Router();
-const schema=z.object({message:z.string().trim().min(2).max(2000),locale:z.enum(['ar','en']).default('ar'),conversationId:z.string().uuid().optional(),consent:z.literal(true)}).strict();
+const schema=z.object({message:z.string().trim().min(2).max(2000),locale:z.enum(['ar','en']).default('ar'),consent:z.literal(true)}).strict();
 router.post('/chat',async(req,res,next)=>{
  try{
   const input=schema.parse(req.body);
@@ -21,7 +21,7 @@ router.post('/chat',async(req,res,next)=>{
   const data=await response.json();
   const answer=data.choices?.[0]?.message?.content;
   if(typeof answer!=='string'||!answer.trim())return res.status(502).json({error:'No assistant response available.'});
-  const conversationId=input.conversationId||crypto.randomUUID();
+  const conversationId=crypto.randomUUID();
   await getPool().query('INSERT INTO conversations(id,organization_id,channel,status,metadata) VALUES($1,$2,\'website\',\'open\',$3::jsonb) ON CONFLICT (id) DO UPDATE SET updated_at=now()', [conversationId,org,JSON.stringify({locale:input.locale,consentAt:new Date().toISOString()})]);
   await getPool().query('INSERT INTO messages(conversation_id,sender_type,body,citations) VALUES($1,\'visitor\',$2,\'[]\'::jsonb),($1,\'assistant\',$3,$4::jsonb)',[conversationId,input.message,answer,JSON.stringify(articles.map(a=>({title:input.locale==='ar'?a.title_ar:a.title_en})))]);
   res.json({ok:true,conversationId,answer,escalationRecommended:!articles.length});
