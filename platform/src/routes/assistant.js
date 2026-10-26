@@ -23,7 +23,7 @@ router.post('/chat',async(req,res,next)=>{
    await db.query('UPDATE assistant_sessions SET expires_at=now()+interval \'2 hours\' WHERE conversation_id=$1',[conversationId]);
   }else{
    sessionToken=crypto.randomBytes(32).toString('base64url');conversationId=crypto.randomUUID();
-   await db.query('INSERT INTO conversations(id,organization_id,channel,status,metadata) VALUES($1,$2,\'website\',\'open\',$3::jsonb)',[conversationId,org,JSON.stringify({locale,consentAt:new Date().toISOString()})]);
+   await db.query('INSERT INTO conversations(id,organization_id,channel,status,metadata) VALUES($1,$2,\'website\',\'open\',$3::jsonb)',[conversationId,org,JSON.stringify({locale:input.locale,consentAt:new Date().toISOString()})]);
    await db.query('INSERT INTO assistant_sessions(organization_id,conversation_id,token_hash,expires_at) VALUES($1,$2,$3,now()+interval \'2 hours\')',[org,conversationId,digest(sessionToken)]);
   }
   const {rows:articles}=await db.query('SELECT title_ar,title_en,body_ar,body_en FROM knowledge_articles WHERE organization_id=$1 AND status=\'approved\' ORDER BY updated_at DESC LIMIT 100',[org]);
