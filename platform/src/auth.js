@@ -40,7 +40,7 @@ async function login(req,res,next) {
     await getPool().query('INSERT INTO auth_sessions(user_id,token_hash,expires_at) VALUES($1,$2,$3)',[user.id,digest(token),expires]);
     await getPool().query('UPDATE users SET last_login_at=now() WHERE id=$1',[user.id]);
     setCookie(res,token,req.app.locals.config.production);
-    res.json({ok:true,user:{id:user.id,email:user.email,name:user.full_name,roles:user.roles}});
+    res.json({ok:true,user:{id:user.id,email:user.email,name:user.full_name,roles:user.roles,permissions:user.permission_sets.flat()}});
   } catch(err){next(err);}
 }
 async function requireAuth(req,res,next) {
