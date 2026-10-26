@@ -11,16 +11,20 @@ router.use(requireAuth);
 router.get('/dashboard',requirePermission('dashboard.read'),async(req,res,next)=>{
  try{
   const org=req.app.locals.organizationId,db=getPool();
-  const [leads,customers,projects,tasks,quotes,renewals,backups]=await Promise.all([
+  const [leads,customers,projects,tasks,quotes,renewals,backups,overdueTasks,openTickets,quotesAwaiting,scopeChanges]=await Promise.all([
    db.query("SELECT status,count(*)::int count FROM leads WHERE organization_id=$1 GROUP BY status",[org]),
    db.query("SELECT status,count(*)::int count FROM customers WHERE organization_id=$1 GROUP BY status",[org]),
    db.query("SELECT status,count(*)::int count FROM projects WHERE organization_id=$1 GROUP BY status",[org]),
    db.query("SELECT status,count(*)::int count FROM tasks WHERE organization_id=$1 GROUP BY status",[org]),
    db.query("SELECT status,count(*)::int count FROM quotes WHERE organization_id=$1 GROUP BY status",[org]),
    db.query("SELECT count(*)::int count FROM subscriptions WHERE organization_id=$1 AND status='active' AND renews_at <= current_date + interval '30 days'",[org]),
-   db.query("SELECT status,count(*)::int count FROM backup_runs WHERE organization_id=$1 AND created_at > now()-interval '30 days' GROUP BY status",[org])
+   db.query("SELECT status,count(*)::int count FROM backup_runs WHERE organization_id=$1 AND created_at > now()-interval '30 days' GROUP BY status",[org]),
+   db.query("SELECT count(*)::int count FROM tasks WHERE organization_id=$1 AND due_at<now() AND status<>'done'",[org]),
+   db.query("SELECT count(*)::int count FROM support_tickets WHERE organization_id=$1 AND status NOT IN ('resolved','closed')",[org]),
+   db.query("SELECT count(*)::int count FROM quotes WHERE organization_id=$1 AND status='issued' AND (valid_until IS NULL OR valid_until>=current_date)",[org]),
+   db.query("SELECT count(*)::int count FROM project_change_requests WHERE organization_id=$1 AND status IN ('submitted','under_review','quoted')",[org])
   ]);
-  res.json({leads:leads.rows,customers:customers.rows,projects:projects.rows,tasks:tasks.rows,quotes:quotes.rows,renewalsDue30Days:renewals.rows[0].count,backups:backups.rows});
+  res.json({leads:leads.rows,customers:customers.rows,projects:projects.rows,tasks:tasks.rows,quotes:quotes.rows,renewalsDue30Days:renewals.rows[0].count,backups:backups.rows,overdueTasks:overdueTasks.rows[0].count,openTickets:openTickets.rows[0].count,quotesAwaiting:quotesAwaiting.rows[0].count,scopeChanges:scopeChanges.rows[0].count});
  }catch(e){next(e);}
 });
 router.get('/leads',requirePermission('leads.read'),async(req,res,next)=>{try{const {rows}=await getPool().query('SELECT l.id,l.reference,l.status,l.source,l.project_goal,l.solution_type,l.assigned_user_id,c.email,l.created_at FROM leads l LEFT JOIN customers c ON c.id=l.customer_id AND c.organization_id=l.organization_id WHERE l.organization_id=$1 ORDER BY l.created_at DESC LIMIT 500',[req.app.locals.organizationId]);res.json({leads:rows});}catch(e){next(e);}});
