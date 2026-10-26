@@ -1,7 +1,7 @@
 # ATSH AI Platform v2 — operator runbook
 
 ## Safety boundary
-This rebuild is isolated on `rebuild/atsh-ai-from-scratch`. The existing `main` branch and its Azure deployment workflow have not been replaced. The v2 app lives under `platform/` until acceptance is complete. Do not point production traffic at it yet.
+This rebuild is isolated on `rebuild/atsh-ai-from-scratch`. The existing `main` branch and its Azure deployment workflow have not been replaced. The v2 app lives under `platform/` until acceptance is complete. Database migrations currently extend through `015_design_versioning.sql`. Do not point production traffic at it yet.
 
 ## Required services
 1. PostgreSQL 15 or newer, with TLS for hosted environments.
@@ -36,6 +36,12 @@ npm test
 npm start
 ```
 Bootstrap creates the organization, owner and initial least-privilege roles. Keep the bootstrap password out of logs and shell history. Once the owner can sign in, rotate or remove the one-time bootstrap environment variables.
+
+## Customer portal
+An authorized team member with `customers.manage` can send a customer portal invitation from the customer record. The customer activates the invitation at `/portal.html` or `/portal-en.html` with a password of at least 14 characters. Portal sessions use a separate opaque cookie and session table. The portal API scopes projects, quotes, updates and tickets to the authenticated customer record; internal support notes are filtered by message visibility. Revoking portal access disables the account and deletes its active sessions. Validate invitation delivery, expiry, revocation, and cross-customer access in staging before production use.
+
+## Design-system publishing
+Theme edits are saved as drafts with an explicit scope (`public`, `portal`, `admin`, or `all`). The admin console provides a preview and version history. Only the separate publish action changes the selected scope; rollback creates a new version and records its reason. Public pages and portal/admin interfaces load only published theme versions for their scope. Test contrast, responsive layout, RTL/LTR and keyboard navigation before publishing.
 
 ## Database backup and restore test
 The daily encrypted PostgreSQL backup workflow remains disabled until these repository secrets are set: `BACKUP_ENABLED=true`, `PLATFORM_DATABASE_URL`, `BACKUP_ENCRYPTION_KEY` (64 hex characters), and `AZURE_BACKUP_STORAGE_CONNECTION_STRING`. The workflow uploads an AES-256-GCM encrypted custom-format `pg_dump` to Azure Blob Storage and records the result in `backup_runs`. Configure an Azure Blob lifecycle rule for the backup container/prefix and the agreed age-based retention period; the `retentionuntil` tag is audit metadata, not an automatic deletion rule. The database retention date alone does not delete blobs.
