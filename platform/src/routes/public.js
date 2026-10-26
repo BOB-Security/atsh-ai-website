@@ -20,6 +20,7 @@ router.get('/services', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+router.post('/quote-response',async(req,res,next)=>{try{const s=z.object({token:z.string().min(30).max(200),decision:z.enum(['accepted','rejected'])}).strict().parse(req.body);const hash=require('node:crypto').createHash('sha256').update(s.token).digest('hex');const {rows}=await getPool().query("UPDATE quotes SET status=$2,response_token_hash=NULL,response_token_expires_at=NULL,accepted_at=CASE WHEN $2='accepted' THEN now() ELSE accepted_at END,updated_at=now() WHERE response_token_hash=$1 AND response_token_expires_at>now() AND status='issued' AND (valid_until IS NULL OR valid_until>=current_date) RETURNING reference,status",[hash,s.decision]);if(!rows[0])return res.status(400).json({error:'رابط العرض غير صالح أو انتهت صلاحيته.'});res.json({ok:true,reference:rows[0].reference,decision:rows[0].status});}catch(e){if(e.name==='ZodError')return res.status(400).json({error:'بيانات الرد غير صالحة.'});next(e);}});
 router.post('/project-approvals/confirm',async(req,res,next)=>{try{
  const s=z.object({token:z.string().min(30).max(200),decision:z.enum(['approved','rejected']),note:z.string().max(2000).optional().default('')}).strict().parse(req.body);
  const hash=require('node:crypto').createHash('sha256').update(s.token).digest('hex'),client=await getPool().connect();
