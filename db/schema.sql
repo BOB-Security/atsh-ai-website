@@ -591,3 +591,7 @@ CREATE TABLE IF NOT EXISTS customer_project_updates (
  created_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_customer_project_updates_project ON customer_project_updates(project_id,created_at DESC);
+
+-- db/014_ticket_message_visibility.sql
+ALTER TABLE support_ticket_messages ADD COLUMN IF NOT EXISTS visibility text NOT NULL DEFAULT 'internal' CHECK (visibility IN ('customer','internal'));
+UPDATE support_ticket_messages SET visibility='customer' WHERE sender_type IN ('customer','system');
