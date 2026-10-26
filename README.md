@@ -26,7 +26,7 @@ Set the required environment variables from `docs/OPERATIONS.md`. The app expose
 - `/admin` — protected operations console.
 - `/project-builder.html` and `/project-builder-en.html` — Arabic/English project intake.
 - `/pricing.html` and `/pricing-en.html` — server-calculated estimates from the active catalog.
-- `/support.html` and `/support-en.html` — support intake.
+- `/support.html` and `/support-en.html` — support intake.\n- `/portal.html` — protected customer portal for projects, quotes, project updates and support tickets.
 - `/services.html`, `/hosting.html`, `/ai-solutions.html`, `/process.html`, `/faq.html`, and English equivalents.
 
 ## Important limits
@@ -35,6 +35,6 @@ Set the required environment variables from `docs/OPERATIONS.md`. The app expose
 - Final project release requires a one-time, expiring client approval.
 - Customer AI agents require an approved knowledge base, an active agent, and configured origin allowlisting.
 - The platform database backup workflow is disabled until the required repository secrets are configured.
-- Hosting inventory records do not provision customer hosting. Customer-site backup automation, independent per-customer secret management, payment processing and a full customer portal remain gated items.
+- Hosting inventory records do not provision customer hosting. Customer-site backup automation, independent per-customer AI secret management and payment processing remain gated items. The customer portal baseline exists but still requires end-to-end and security acceptance.
 
 See [`docs/OPERATIONS.md`](docs/OPERATIONS.md) and [`docs/TRACEABILITY.md`](docs/TRACEABILITY.md) before operating this branch.
