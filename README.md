@@ -1,48 +1,40 @@
-# atsh-ai — Official Website
+# ATSH AI — Platform Rebuild (v2)
 
-The public website is a bilingual Arabic/English Node.js application prepared for Azure App Service. The deployment baseline is intentionally small: the public website, static service pages, a health endpoint, and an inquiry form that never claims success unless a configured HTTPS receiver confirms it.
+This branch contains an isolated rebuild of the ATSH AI system based on the unified reference specification. The v2 application is in `platform/`; database migrations are in `db/`; operational requirements and requirement traceability are in `docs/`.
 
-## Verify locally
+## Safety boundary
+- Branch: `rebuild/atsh-ai-from-scratch`
+- Production `main` remains unchanged.
+- The legacy root-level application files are retained only as historical reference during the rebuild and are not the v2 runtime.
+- This branch is not production-deployed. Do not point the production domain at it until the acceptance gates in `docs/TRACEABILITY.md` are met.
 
-Requires Node.js 24 or newer.
+## Platform commands
+Run from `platform/` with Node.js 22+:
 
 ```sh
-npm ci
+npm install
+npm run db:migrate
+npm run db:bootstrap
 npm run build
 npm test
 npm start
 ```
 
-Open `http://localhost:3000`; `GET /health` should return `200`.
+Set the required environment variables from `docs/OPERATIONS.md`. The app exposes:
+- `/health` — process liveness.
+- `/ready` — database and organization readiness.
+- `/admin` — protected operations console.
+- `/project-builder.html` and `/project-builder-en.html` — Arabic/English project intake.
+- `/pricing.html` and `/pricing-en.html` — server-calculated estimates from the active catalog.
+- `/support.html` and `/support-en.html` — support intake.
+- `/services.html`, `/hosting.html`, `/ai-solutions.html`, `/process.html`, `/faq.html`, and English equivalents.
 
-## Azure deployment
+## Important limits
+- Commercial pricing must be approved by the owner before publication.
+- Formal quotes are issued by email and require an explicit customer response.
+- Final project release requires a one-time, expiring client approval.
+- Customer AI agents require an approved knowledge base, an active agent, and configured origin allowlisting.
+- The platform database backup workflow is disabled until the required repository secrets are configured.
+- Hosting inventory records do not provision customer hosting. Customer-site backup automation, independent per-customer secret management, payment processing and a full customer portal remain gated items.
 
-The canonical workflow is **Actions → Azure App Service — provision and deploy**. It runs manually or on `main` when the infrastructure, deployment workflow, server/backend, package manifests, public assets, or site checks change. It runs build and test checks before deploying and uses the repository's Azure OIDC secrets.
-
-- If `atsh-ai-website` already exists in the authenticated Azure subscription, the workflow discovers its resource group, region, and App Service plan and reuses them.
-- If the app does not exist, supply an existing resource group and a globally unique app name.
-- The default App Service plan is `B1`, which is paid. Check the actual regional price and available credits before running the workflow.
-- The workflow tests the live `/health` endpoint. Do not bind the custom domain until the live test passes.
-
-Infrastructure definition and detailed instructions: [infra/azure/README.md](infra/azure/README.md).
-
-## Admin portal and CMS
-
-The admin portal is at `/admin`; the separate staff entry is `/staff/login`. The backend provides owner bootstrap by one-time email code, password login with scrypt password hashes, secure HttpOnly session cookies and CSRF validation, role-checked APIs, staff invitations, account suspension/deletion, task assignment/status, audit events, image uploads, and a CMS store for pages, blocks, images and theme colors. The CMS renders saved blocks on public pages and can serve newly created CMS pages.
-
-The initial owner account is **not pre-created**. Before first activation, configure the following GitHub Actions repository secrets, then allow the Azure deployment workflow to apply them as App Service settings:
-- `ADMIN_EMAIL`: the owner's personal email address.
-- `RESEND_API_KEY`: Resend API key.
-- `EMAIL_FROM`: a sender address verified with the email provider.
-
-Without these secrets, owner activation and team invitations stay disabled and show a configuration error. Never place secrets or passwords in Git, source files, or chat messages.
-
-The admin store and uploaded images are placed in `DATA_DIR=/home/data` on App Service so app redeployments do not replace them. This JSON-file store is a **single-instance MVP**, not a highly available database. Do not scale out or use it for sensitive customer records until the data is migrated to a managed database with backups, restore testing, and a reviewed retention policy. Successful build/deployment does not by itself verify email delivery or production authentication; test those separately.
-
-## Inquiry form
-
-The form is not a durable CRM or database. To enable real inquiries, set `INQUIRY_WEBHOOK_URL` to a trusted HTTPS endpoint, test the receiving service, and define retention/deletion and access policies. Until configured, the website clearly reports that online submission is not active.
-
-## Security boundaries
-
-Do not commit secrets, access tokens, customer data, or private keys. A successful build is not proof that the production deployment, inquiry receiver, or custom domain is operational. Those states must be checked independently.
+See [`docs/OPERATIONS.md`](docs/OPERATIONS.md) and [`docs/TRACEABILITY.md`](docs/TRACEABILITY.md) before operating this branch.
