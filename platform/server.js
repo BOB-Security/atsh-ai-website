@@ -8,6 +8,7 @@ const path = require('node:path');
 const { loadConfig } = require('./src/config');
 const { checkDatabase, closePool } = require('./src/db');
 const publicRoutes = require('./src/routes/public');
+const adminRoutes = require('./src/routes/admin');
 
 const config = loadConfig();
 const app = express();
@@ -32,6 +33,7 @@ app.use((req, res, next) => {
 const publicLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 100, standardHeaders: 'draft-8', legacyHeaders: false });
 app.use('/api', publicLimiter);
 app.locals.organizationId = process.env.DEFAULT_ORGANIZATION_ID || '';
+app.locals.config = config;
 app.get('/health', (_req,res) => res.status(200).json({ok:true,service:'atsh-ai-platform',version:'2.0.0'}));
 app.get('/ready', async (_req,res) => {
   try {
@@ -41,6 +43,7 @@ app.get('/ready', async (_req,res) => {
   } catch { res.status(503).json({ok:false,database:false}); }
 });
 app.use('/api/public', publicRoutes);
+app.use('/api/admin', adminRoutes);
 app.use(express.static(path.join(__dirname,'public'), { index: 'index.html', fallthrough: true }));
 app.use((req,res) => {
   if (req.path.startsWith('/api/')) return res.status(404).json({error:'المسار غير موجود.'});
@@ -52,7 +55,16 @@ app.use((err, _req, res, _next) => {
   console.error('request_error', { name:err.name, message:config.production?'request failed':err.message });
   res.status(500).json({error:'حدث خطأ داخلي. حاول لاحقًا.'});
 });
-const server = app.listen(config.port, () => console.log(`ATSH AI platform listening on ${config.port}`));
+const server = app.listen(config.port, async () => {
+  try {
+    if (!app.locals.organizationId && config.databaseUrl) {
+      const { getPool } = require('./src/db');
+      const result = await getPool().query('SELECT id FROM organizations WHERE slug=$1 LIMIT 1', [config.defaultOrganizationSlug]);
+      app.locals.organizationId = result.rows[0]?.id || '';
+    }
+    console.log(`ATSH AI platform listening on ${config.port}; organization=${app.locals.organizationId ? 'configured' : 'missing'}`);
+  } catch (error) { console.error('platform_startup_warning', { message: config.production ? 'database organization lookup failed' : error.message }); }
+});
 async function shutdown() { server.close(); await closePool(); process.exit(0); }
 process.on('SIGTERM', shutdown);
 process.on('SIGINT', shutdown);
