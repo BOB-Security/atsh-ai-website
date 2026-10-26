@@ -11,6 +11,7 @@ const publicRoutes = require('./src/routes/public');
 const adminRoutes = require('./src/routes/admin');
 const assistantRoutes = require('./src/routes/assistant');
 const opsRoutes = require('./src/routes/ops');
+const teamRoutes = require('./src/routes/team');
 
 const config = loadConfig();
 const app = express();
@@ -48,6 +49,7 @@ app.use('/api/public', publicRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/public/assistant', assistantRoutes);
 app.use('/api/ops', opsRoutes);
+app.use('/api/team', teamRoutes);
 app.use(express.static(path.join(__dirname,'public'), { index: 'index.html', fallthrough: true }));
 app.use((req,res) => {
   if (req.path.startsWith('/api/')) return res.status(404).json({error:'المسار غير موجود.'});
