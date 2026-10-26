@@ -1,7 +1,7 @@
 # ATSH AI Platform v2 — operator runbook
 
 ## Safety boundary
-This rebuild is isolated on `rebuild/atsh-ai-from-scratch`. The existing `main` branch and its Azure deployment workflow have not been replaced. The v2 app lives under `platform/` until acceptance is complete. Database migrations currently extend through `015_design_versioning.sql`. Do not point production traffic at it yet.
+This rebuild is isolated on `rebuild/atsh-ai-from-scratch`. The existing `main` branch and its Azure deployment workflow have not been replaced. The v2 app lives under `platform/` until acceptance is complete. Database migrations currently extend through `016_project_change_requests.sql`. Do not point production traffic at it yet.
 
 ## Required services
 1. PostgreSQL 15 or newer, with TLS for hosted environments.
@@ -39,6 +39,9 @@ Bootstrap creates the organization, owner and initial least-privilege roles. Kee
 
 ## Customer portal
 An authorized team member with `customers.manage` can send a customer portal invitation from the customer record. The customer activates the invitation at `/portal.html` or `/portal-en.html` with a password of at least 14 characters. Portal sessions use a separate opaque cookie and session table. The portal API scopes projects, quotes, updates and tickets to the authenticated customer record; internal support notes are filtered by message visibility. Revoking portal access disables the account and deletes its active sessions. Validate invitation delivery, expiry, revocation, and cross-customer access in staging before production use.
+
+## Project scope changes
+Customers can submit a change request from the portal. Operations staff must review the requested work, record the setup/monthly/annual price impact and notes, and set the request to `quoted` before the customer can approve or reject it. The system refuses to mark a change implemented unless the customer has explicitly approved it. Implementation appends the approved request to project scope history. Price impacts are stored in minor currency units; approve commercial rounding and change-control policy before production use.
 
 ## Design-system publishing
 Theme edits are saved as drafts with an explicit scope (`public`, `portal`, `admin`, or `all`). The admin console provides a preview and version history. Only the separate publish action changes the selected scope; rollback creates a new version and records its reason. Public pages and portal/admin interfaces load only published theme versions for their scope. Test contrast, responsive layout, RTL/LTR and keyboard navigation before publishing.
