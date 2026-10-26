@@ -43,14 +43,9 @@ jobs:
       - run: npm install --package-lock-only
       - run: npm install
       - run: npm run build
+      - run: npm test
       - run: npm run db:migrate
       - run: npm run db:bootstrap
-      - name: Verify Azure app settings without printing values
-        env:
-          APP_NAME: ${{ inputs.app_name }}
-          RESOURCE_GROUP: ${{ inputs.resource_group }}
-        run: |
-          az appsettings list --name "$APP_NAME" --resource-group "$RESOURCE_GROUP" >/dev/null 2>&1 && true || true
       - name: Create deployment package
         run: zip -r ../atsh-ai-v2-staging.zip . -x 'node_modules/*' '.data/*' '*.log'
       - uses: azure/login@v2
@@ -58,6 +53,15 @@ jobs:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Verify required Azure app settings without printing values
+        env:
+          APP_NAME: ${{ inputs.app_name }}
+          RESOURCE_GROUP: ${{ inputs.resource_group }}
+        run: |
+          settings=$(az webapp config appsettings list --name "$APP_NAME" --resource-group "$RESOURCE_GROUP" --query "[].name" -o tsv)
+          for key in DATABASE_URL PUBLIC_BASE_URL; do
+            echo "$settings" | grep -qx "$key" || { echo "Missing required App Service setting: $key"; exit 1; }
+          done
       - name: Set non-secret runtime settings
         env:
           APP_NAME: ${{ inputs.app_name }}
