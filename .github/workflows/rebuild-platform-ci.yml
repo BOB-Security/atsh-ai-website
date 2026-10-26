@@ -1,0 +1,33 @@
+name: ATSH AI Platform Rebuild CI
+on:
+  push:
+    branches: [rebuild/atsh-ai-from-scratch]
+    paths:
+      - 'platform/**'
+      - 'db/**'
+      - '.github/workflows/rebuild-platform-ci.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'platform/**'
+      - 'db/**'
+      - '.github/workflows/rebuild-platform-ci.yml'
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: platform
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: platform/package-lock.json
+      - run: npm install --package-lock-only
+      - run: npm install
+      - run: npm run build
+      - run: npm test
