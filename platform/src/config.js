@@ -19,6 +19,7 @@ function loadConfig(env = process.env) {
     resendApiKey: env.RESEND_API_KEY || '',
     emailFrom: env.EMAIL_FROM || '',
     aiProvider: env.AI_PROVIDER || '',
+    aiBaseUrl: env.AI_BASE_URL || 'https://api.openai.com/v1',
     aiApiKey: env.AI_API_KEY || '',
     aiModel: env.AI_MODEL || '',
     defaultOrganizationSlug: env.DEFAULT_ORGANIZATION_SLUG || 'atsh-ai',
