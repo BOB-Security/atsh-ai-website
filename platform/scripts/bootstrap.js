@@ -28,6 +28,7 @@ const {passwordHash}=require('../src/auth');
   if(!user){user=(await client.query("INSERT INTO users(organization_id,email,full_name,password_hash,status) VALUES($1,$2,$3,$4,'active') RETURNING id",[org.id,email,fullName,await passwordHash(password)])).rows[0];}
   await client.query('INSERT INTO user_roles(user_id,role_id) VALUES($1,$2) ON CONFLICT DO NOTHING',[user.id,role.id]);
   await client.query("INSERT INTO site_settings(organization_id,settings) VALUES($1,'{}'::jsonb) ON CONFLICT (organization_id) DO NOTHING",[org.id]);
+  await client.query("INSERT INTO design_versions(organization_id,version_number,scope,status,settings,created_by,published_by,published_at,reason) SELECT $1,1,'all','published',ss.settings,$2,$2,now(),'Initial published theme baseline' FROM site_settings ss WHERE ss.organization_id=$1 AND NOT EXISTS (SELECT 1 FROM design_versions dv WHERE dv.organization_id=$1)",[org.id,user.id]);
   await client.query('COMMIT');
   console.log(JSON.stringify({ok:true,organizationId:org.id,organizationSlug:slug,ownerEmail:email},null,2));
  }catch(e){await client.query('ROLLBACK');console.error(e.message);process.exitCode=1;}
