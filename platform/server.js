@@ -56,6 +56,21 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/ops', opsRoutes);
 app.use('/api/team', teamRoutes);
 app.use(express.static(path.join(__dirname,'public'), { index: 'index.html', fallthrough: true }));
+app.get('/:slug', async (req,res,next) => {
+  try {
+    const slug=String(req.params.slug||'').replace(/\\.html$/,'');
+    if (!/^[a-z0-9-]{2,80}$/.test(slug)) return next();
+    if (!app.locals.organizationId) return next();
+    const {getPool}=require('./src/db');
+    const result=await getPool().query('SELECT slug,title_ar,title_en,body_ar,body_en FROM site_pages WHERE organization_id=$1 AND slug=$2 AND visible=true LIMIT 1',[app.locals.organizationId,slug]);
+    const page=result.rows[0]; if(!page)return next();
+    const locale=req.acceptsLanguages('en')&&!req.acceptsLanguages('ar')?'en':'ar';
+    const title=locale==='en'?page.title_en:page.title_ar, blocks=locale==='en'?page.body_en:page.body_ar;
+    const esc=v=>String(v==null?'':v).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+    const body=(Array.isArray(blocks)?blocks:[]).map(b=>{const text=esc(b.text||b.content||'');if(b.type==='heading')return '<h2>'+text+'</h2>';if(b.type==='list'&&Array.isArray(b.items))return '<ul>'+b.items.map(i=>'<li>'+esc(i)+'</li>').join('')+'</ul>';if(b.type==='link'){const href=String(b.href||'');if(!href.startsWith('/')&&!/^https:\/\//i.test(href))return '<p>'+text+'</p>';return '<p><a href="'+esc(href)+'">'+text+'</a></p>';}return '<p>'+text+'</p>';}).join('');
+    res.status(200).type('html').send('<!doctype html><html lang="'+locale+'" dir="'+(locale==='ar'?'rtl':'ltr')+'"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+esc(title)+' — ATSH AI</title><link rel="stylesheet" href="/styles.css"></head><body><header class="header"><a class="brand" href="/">atsh<span>·</span>ai</a><a class="button primary" href="/project-builder.html">ابدأ مشروعك</a></header><main class="wrap section"><p class="eyebrow">ATSH AI</p><h1>'+esc(title)+'</h1>'+body+'</main><footer class="footer"><div class="wrap"><a href="/">ATSH AI</a></div></footer></body></html>');
+  } catch(err) { next(err); }
+});
 app.use((req,res) => {
   if (req.path.startsWith('/api/')) return res.status(404).json({error:'المسار غير موجود.'});
   res.status(404).sendFile(path.join(__dirname,'public','404.html'), err => { if (err && !res.headersSent) res.status(404).send('Not found'); });
