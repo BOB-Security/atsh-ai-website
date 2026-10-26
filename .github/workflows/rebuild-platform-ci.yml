@@ -17,6 +17,28 @@ permissions:
 jobs:
   validate:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: atsh_ai_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d atsh_ai_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/atsh_ai_test
+      PGSSL: disable
+      DEFAULT_ORGANIZATION_SLUG: atsh-ai
+      OWNER_EMAIL: owner@test.local
+      OWNER_NAME: CI Owner
+      OWNER_PASSWORD: ThisIsOnlyATestPassword_123!
     defaults:
       run:
         working-directory: platform
@@ -28,4 +50,6 @@ jobs:
       - run: npm install --package-lock-only
       - run: npm install
       - run: npm run build
+      - run: npm run db:migrate
+      - run: npm run db:bootstrap
       - run: npm test
