@@ -24,9 +24,9 @@ async function encryptArchive(rawFile,encryptedFile,key){const iv=crypto.randomB
   tempDir=await fs.promises.mkdtemp(path.join(os.tmpdir(),'atsh-backup-'));const raw=path.join(tempDir,'database.dump'),encrypted=path.join(tempDir,'database.enc');
   await runPgDump(raw);const finalFile=await encryptArchive(raw,encrypted,key);
   const service=BlobServiceClient.fromConnectionString(cfg.AZURE_STORAGE_CONNECTION_STRING),containerName=cfg.BACKUP_CONTAINER||'atsh-ai-db-backups',container=service.getContainerClient(containerName);await container.createIfNotExists();
-  const now=new Date(),stamp=now.toISOString().replace(/[:.]/g,'-'),blobName=org.slug+'/'+now.getUTCFullYear()+'/'+String(now.getUTCMonth()+1).padStart(2,'0')+'/'+stamp+'-'+crypto.randomUUID()+'.atshbak',blob=container.getBlockBlobClient(blobName);
-  const stat=await fs.promises.stat(finalFile);await blob.uploadFile(finalFile,{blobHTTPHeaders:{blobContentType:'application/octet-stream'},metadata:{format:'ATSHBK01',encrypted:'aes-256-gcm',organization:org.slug,createdat:now.toISOString(),sizebytes:String(stat.size)}});
-  const retentionUntil=new Date(now.getTime()+retentionDays*86400000).toISOString().slice(0,10),artifactRef='azure-blob://'+containerName+'/'+blobName;
+  const now=new Date(),retentionUntil=new Date(now.getTime()+retentionDays*86400000).toISOString().slice(0,10),stamp=now.toISOString().replace(/[:.]/g,'-'),blobName=org.slug+'/'+now.getUTCFullYear()+'/'+String(now.getUTCMonth()+1).padStart(2,'0')+'/'+stamp+'-'+crypto.randomUUID()+'.atshbak',blob=container.getBlockBlobClient(blobName);
+  const stat=await fs.promises.stat(finalFile);await blob.uploadFile(finalFile,{blobHTTPHeaders:{blobContentType:'application/octet-stream'},metadata:{format:'ATSHBK01',encrypted:'aes-256-gcm',organization:org.slug,createdat:now.toISOString(),sizebytes:String(stat.size)}});await blob.setTags({organization:org.slug,retentionuntil:retentionUntil});
+  const artifactRef='azure-blob://'+containerName+'/'+blobName;
   await pool.query("UPDATE backup_runs SET status='succeeded',finished_at=now(),retention_until=$2,artifact_ref=$3,error_summary=NULL WHERE id=$1",[runId,retentionUntil,artifactRef]);
   console.log(JSON.stringify({ok:true,runId,organization:org.slug,artifactRef,encrypted:true,bytes:stat.size,retentionUntil}));
  }catch(err){
