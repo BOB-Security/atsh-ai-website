@@ -44,12 +44,14 @@ router.post('/chat',async(req,res,next)=>{
  }catch(e){if(e.name==='ZodError')return res.status(400).json({error:'راجع رسالة المحادثة والموافقة المطلوبة.'});next(e);}
 });
 
+router.options('/agents/:id/chat',async(req,res,next)=>{try{const origin=req.get('origin');if(!origin)return res.sendStatus(204);const agent=(await getPool().query('SELECT settings,status FROM ai_agents WHERE id=$1 AND organization_id=$2',[req.params.id,req.app.locals.organizationId])).rows[0];const allowed=agent?.settings?.allowedOrigins||[];if(!Array.isArray(allowed)||!allowed.includes(origin))return res.sendStatus(403);res.setHeader('Access-Control-Allow-Origin',origin);res.setHeader('Vary','Origin');res.setHeader('Access-Control-Allow-Methods','POST, OPTIONS');res.setHeader('Access-Control-Allow-Headers','Content-Type');return res.sendStatus(204);}catch(e){next(e);}});
 router.post('/agents/:id/chat',async(req,res,next)=>{try{
  const input=z.object({message:z.string().trim().min(2).max(2000),sessionToken:z.string().min(30).max(200).optional(),consent:z.literal(true)}).strict().parse(req.body);
  const cfg=req.app.locals.config,org=req.app.locals.organizationId,db=getPool();
  if(!cfg.aiApiKey)return res.status(503).json({error:'خدمة المساعد غير مهيأة لدى المزود.'});
- const agent=(await db.query("SELECT id,customer_id,name,purpose,provider,model,status,monthly_token_limit FROM ai_agents WHERE id=$1 AND organization_id=$2",[req.params.id,org])).rows[0];
+ const agent=(await db.query("SELECT id,customer_id,name,purpose,provider,model,status,monthly_token_limit,settings FROM ai_agents WHERE id=$1 AND organization_id=$2",[req.params.id,org])).rows[0];
  if(!agent||agent.status!=='active')return res.status(404).json({error:'المساعد غير متاح.'});
+ const origin=req.get('origin');if(origin){const allowed=agent.settings?.allowedOrigins||[];if(!Array.isArray(allowed)||!allowed.includes(origin))return res.status(403).json({error:'هذا النطاق غير مسموح له باستخدام المساعد.'});res.setHeader('Access-Control-Allow-Origin',origin);res.setHeader('Vary','Origin');}
  if(agent.provider!=='openai-compatible')return res.status(503).json({error:'نوع المزود غير مدعوم في مسار التشغيل الحالي.'});
  let sessionToken=input.sessionToken,conversationId;
  if(sessionToken){const session=(await db.query("SELECT s.conversation_id FROM assistant_sessions s JOIN conversations c ON c.id=s.conversation_id WHERE s.organization_id=$1 AND s.token_hash=$2 AND s.expires_at>now() AND c.agent_id=$3",[org,digest(sessionToken),agent.id])).rows[0];if(!session)return res.status(400).json({error:'انتهت جلسة المساعد أو لا تخص هذا المساعد.'});conversationId=session.conversation_id;await db.query("UPDATE assistant_sessions SET expires_at=now()+interval '2 hours' WHERE conversation_id=$1",[conversationId]);}
