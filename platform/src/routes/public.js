@@ -20,6 +20,12 @@ router.get('/services', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+router.post('/project-approvals/confirm',async(req,res,next)=>{try{
+ const s=z.object({token:z.string().min(30).max(200),decision:z.enum(['approved','rejected']),note:z.string().max(2000).optional().default('')}).strict().parse(req.body);
+ const hash=require('node:crypto').createHash('sha256').update(s.token).digest('hex'),client=await getPool().connect();
+ try{await client.query('BEGIN');const {rows}=await client.query("SELECT a.id,a.project_id,a.approval_type,p.reference FROM project_approvals a JOIN projects p ON p.id=a.project_id WHERE a.approval_token_hash=$1 AND a.status='requested' AND a.token_expires_at>now() FOR UPDATE",[hash]);const approval=rows[0];if(!approval){await client.query('ROLLBACK');return res.status(400).json({error:'رابط الموافقة غير صالح أو انتهت صلاحيته.'});}await client.query("UPDATE project_approvals SET status=$2,approved_at=CASE WHEN $2='approved' THEN now() ELSE NULL END,note=CASE WHEN $3='' THEN note ELSE note || E'\\n' || $3 END,approval_token_hash=NULL,token_expires_at=NULL WHERE id=$1",[approval.id,s.decision,s.note]);if(approval.approval_type==='final_release'&&s.decision==='approved')await client.query("UPDATE projects SET status='client_approved',client_approved_at=now(),updated_at=now() WHERE id=$1",[approval.project_id]);await client.query('COMMIT');res.json({ok:true,reference:approval.reference,decision:s.decision});}
+ catch(e){await client.query('ROLLBACK');throw e;}finally{client.release();}
+ }catch(e){if(e.name==='ZodError')return res.status(400).json({error:'بيانات الموافقة غير صالحة.'});next(e);}});
 const intakeSchema = z.object({
   name: z.string().trim().min(2).max(120),
   email: z.string().trim().email().max(254),
