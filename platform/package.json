@@ -12,7 +12,8 @@
     "build": "node --check server.js && node --check src/config.js && node --check src/db.js && node --check src/auth.js && node --check src/routes/public.js && node --check src/routes/admin.js && node --check src/routes/assistant.js && node --check src/routes/ops.js && node --check src/routes/team.js && node --check scripts/migrate.js && node --check scripts/bootstrap.js && node --check public/app.js && node --check public/admin.js && node --check public/assistant.js && node --check public/builder.js && node --check public/team-activate.js && node --check public/project-approval.js && node --check public/quote-response.js && node --check public/pricing.js && node --check public/support.js && node --check public/agent-widget.js && node --check public/builder-en.js && node --check public/pricing-en.js && node --check public/support-en.js",
     "test": "node --test",
     "db:migrate": "node scripts/migrate.js",
-    "db:bootstrap": "node scripts/bootstrap.js"
+    "db:bootstrap": "node scripts/bootstrap.js",
+    "backup:database": "node scripts/backup-database.js"
   },
   "dependencies": {
     "compression": "^1.8.1",
@@ -21,6 +22,7 @@
     "express-rate-limit": "^8.1.0",
     "helmet": "^8.1.0",
     "pg": "^8.16.3",
-    "zod": "^4.1.12"
+    "zod": "^4.1.12",
+    "@azure/storage-blob": "^12.28.0"
   }
 }
