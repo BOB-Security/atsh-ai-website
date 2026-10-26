@@ -6,7 +6,7 @@ const {requireAuth,requirePermission,login,logout}=require('../auth');
 const router=express.Router();
 router.post('/auth/login',login);
 router.post('/auth/logout',requireAuth,logout);
-router.get('/auth/me',requireAuth,(req,res)=>res.json({user:{id:req.user.id,email:req.user.email,name:req.user.full_name,roles:req.user.roles}}));
+router.get('/auth/me',requireAuth,(req,res)=>res.json({user:{id:req.user.id,email:req.user.email,name:req.user.full_name,roles:req.user.roles,permissions:req.permissionSets||[]}}));
 router.use(requireAuth);
 router.get('/dashboard',requirePermission('dashboard.read'),async(req,res,next)=>{
  try{
