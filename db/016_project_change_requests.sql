@@ -16,8 +16,7 @@ CREATE TABLE IF NOT EXISTS project_change_requests (
  customer_decision_at timestamptz,
  reviewed_by uuid REFERENCES users(id) ON DELETE SET NULL,
  created_at timestamptz NOT NULL DEFAULT now(),
- updated_at timestamptz NOT NULL DEFAULT now(),
- FOREIGN KEY(project_id,customer_id) REFERENCES projects(id,customer_id) DEFERRABLE INITIALLY DEFERRED
+ updated_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_project_change_requests_queue ON project_change_requests(organization_id,status,created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_project_change_requests_customer ON project_change_requests(customer_id,created_at DESC);
