@@ -20,7 +20,7 @@ app.set('trust proxy', process.env.TRUST_PROXY === 'true' ? 1 : false);
 app.use(helmet({ contentSecurityPolicy: { directives: {
   defaultSrc: ["'self'"], baseUri: ["'self'"], objectSrc: ["'none'"],
   frameAncestors: ["'none'"], imgSrc: ["'self'", 'data:', 'https:'],
-  styleSrc: ["'self'", "'unsafe-inline'"], scriptSrc: ["'self'"],
+  styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'], fontSrc: ["'self'", 'data:', 'https://fonts.gstatic.com'], scriptSrc: ["'self'"],
   connectSrc: ["'self'"], upgradeInsecureRequests: config.production ? [] : null
 }}}));
 app.use(compression());
@@ -34,6 +34,9 @@ app.use((req, res, next) => {
   next();
 });
 const publicLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 100, standardHeaders: 'draft-8', legacyHeaders: false });
+const loginLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 10, standardHeaders: 'draft-8', legacyHeaders: false, message: {error:'محاولات دخول كثيرة. انتظر ثم حاول مجددًا.'} });
+const intakeLimiter = rateLimit({ windowMs: 60 * 60 * 1000, limit: 8, standardHeaders: 'draft-8', legacyHeaders: false, message: {error:'تم تجاوز عدد الطلبات المسموح مؤقتًا.'} });
+const assistantLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 20, standardHeaders: 'draft-8', legacyHeaders: false, message: {error:'تم تجاوز حد المحادثات مؤقتًا.'} });
 app.use('/api', publicLimiter);
 app.locals.organizationId = process.env.DEFAULT_ORGANIZATION_ID || '';
 app.locals.config = config;
@@ -45,9 +48,11 @@ app.get('/ready', async (_req,res) => {
     res.json({ok:true,database:db.ok});
   } catch { res.status(503).json({ok:false,database:false}); }
 });
+app.use('/api/public/project-inquiries', intakeLimiter);
+app.use('/api/admin/auth/login', loginLimiter);
+app.use('/api/public/assistant', assistantLimiter, assistantRoutes);
 app.use('/api/public', publicRoutes);
 app.use('/api/admin', adminRoutes);
-app.use('/api/public/assistant', assistantRoutes);
 app.use('/api/ops', opsRoutes);
 app.use('/api/team', teamRoutes);
 app.use(express.static(path.join(__dirname,'public'), { index: 'index.html', fallthrough: true }));
