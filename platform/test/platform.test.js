@@ -15,3 +15,6 @@ test('AI assistant uses approved knowledge and refuses unconfigured operation',(
 test('migration sequence includes approval, quote and team token schemas',()=>{for(const f of ['001_initial_schema.sql','002_auth_and_content.sql','003_knowledge_and_integrations.sql','004_team_invitations.sql','005_explicit_client_approvals.sql','006_quote_approval_tokens.sql','007_assistant_sessions.sql'])assert.ok(fs.existsSync(path.join(root,'db',f)),f+' missing');});
 
 test('assistant continuity uses opaque scoped session tokens and human escalation',()=>{const ai=fs.readFileSync(path.join(root,'platform/src/routes/assistant.js'),'utf8');assert.match(ai,/assistant_sessions/);assert.match(ai,/escalationTicketReference/);assert.match(ai,/status='waiting_human'/);});
+
+test('pricing estimates are server-calculated and snapshot catalog items',()=>{const pub=fs.readFileSync(path.join(root,'platform/src/routes/public.js'),'utf8');assert.match(pub,/router\.get\('\/pricing'/);assert.match(pub,/router\.post\('\/pricing\/estimate'/);assert.match(pub,/BigInt\(plan\.setup_amount_minor\)/);assert.match(pub,/estimateOnly:true/);});
+test('public support and project intake require consent',()=>{const pub=fs.readFileSync(path.join(root,'platform/src/routes/public.js'),'utf8');assert.match(pub,/router\.post\('\/support-tickets'/);assert.match(pub,/consent:z\.literal\(true\)/);});
