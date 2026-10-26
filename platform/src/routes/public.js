@@ -4,6 +4,7 @@ const { z } = require('zod');
 const { getPool } = require('../db');
 const router = express.Router();
 
+router.get('/site-content',async(req,res,next)=>{try{const org=req.app.locals.organizationId;const [settings,pages]=await Promise.all([getPool().query('SELECT settings,updated_at FROM site_settings WHERE organization_id=$1',[org]),getPool().query('SELECT slug,title_ar,title_en,body_ar,body_en,sort_order FROM site_pages WHERE organization_id=$1 AND visible ORDER BY sort_order,slug',[org])]);res.json({settings:settings.rows[0]?.settings||{},pages:pages.rows});}catch(e){next(e);}});
 router.get('/services', async (req, res, next) => {
   try {
     const org = req.app.locals.organizationId;
