@@ -1,0 +1,65 @@
+'use strict';
+const express = require('express');
+const { z } = require('zod');
+const { getPool } = require('../db');
+const router = express.Router();
+
+router.get('/services', async (req, res, next) => {
+  try {
+    const org = req.app.locals.organizationId;
+    const { rows } = await getPool().query(
+      `SELECT c.slug AS category, c.name_ar AS category_ar, c.name_en AS category_en,
+              p.id, p.slug, p.name_ar, p.name_en, p.description_ar, p.description_en,
+              p.setup_amount_minor, p.monthly_amount_minor, p.annual_amount_minor, p.currency,
+              p.features
+       FROM service_categories c JOIN service_plans p ON p.category_id = c.id
+       WHERE c.organization_id = $1 AND p.organization_id = $1 AND c.active AND p.active
+       ORDER BY c.sort_order, p.sort_order`, [org]);
+    res.json({ services: rows });
+  } catch (err) { next(err); }
+});
+
+const intakeSchema = z.object({
+  name: z.string().trim().min(2).max(120),
+  email: z.string().trim().email().max(254),
+  phone: z.string().trim().max(40).optional().default(''),
+  locale: z.enum(['ar','en']).default('ar'),
+  goal: z.string().trim().min(5).max(1000),
+  solutionType: z.enum(['website','ecommerce','web_app','mobile_app','custom_system','automation','ai_assistant','integration','unsure']),
+  brief: z.record(z.string(), z.unknown()).default({}),
+  consent: z.literal(true)
+});
+router.post('/project-inquiries', async (req, res, next) => {
+  try {
+    const input = intakeSchema.parse(req.body);
+    const db = getPool();
+    const org = req.app.locals.organizationId;
+    const client = await db.connect();
+    try {
+      await client.query('BEGIN');
+      const existing = await client.query(
+        'SELECT id FROM customers WHERE organization_id=$1 AND lower(email)=lower($2) LIMIT 1',
+        [org, input.email]);
+      let customerId = existing.rows[0]?.id;
+      if (!customerId) {
+        const inserted = await client.query(
+          `INSERT INTO customers (organization_id,display_name,email,phone,preferred_locale,status,source)
+           VALUES ($1,$2,$3,$4,$5,'lead','website') RETURNING id`,
+          [org,input.name,input.email,input.phone,input.locale]);
+        customerId = inserted.rows[0].id;
+      }
+      const reference = 'ATS-' + require('node:crypto').randomBytes(4).toString('hex').toUpperCase();
+      const lead = await client.query(
+        `INSERT INTO leads (organization_id,customer_id,reference,status,source,project_goal,solution_type,brief,consent_at)
+         VALUES ($1,$2,$3,'new','website',$4,$5,$6::jsonb,now()) RETURNING id,reference,created_at`,
+        [org,customerId,reference,input.goal,input.solutionType,JSON.stringify(input.brief)]);
+      await client.query('COMMIT');
+      res.status(201).json({ ok: true, reference: lead.rows[0].reference, receivedAt: lead.rows[0].created_at });
+    } catch (err) { await client.query('ROLLBACK'); throw err; }
+    finally { client.release(); }
+  } catch (err) {
+    if (err.name === 'ZodError') return res.status(400).json({ error: 'راجع بيانات الطلب ثم حاول مرة أخرى.', issues: err.issues.map(i => ({path:i.path,message:i.message})) });
+    next(err);
+  }
+});
+module.exports = router;
