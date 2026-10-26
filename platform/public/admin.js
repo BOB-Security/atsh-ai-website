@@ -1,7 +1,7 @@
 'use strict';
 const $=s=>document.querySelector(s);
 const panels=['dashboard','leads','customers','projects','tasks','quotes','catalog','site-content','hosting','backups','tickets','knowledge','ai-agents','integrations','subscriptions','team','notifications','audit'];
-const endpoints={hosting:'/api/ops/hosting-assets',backups:'/api/ops/backups',tickets:'/api/ops/tickets',knowledge:'/api/ops/knowledge','ai-agents':'/api/ops/ai-agents',integrations:'/api/ops/integrations',subscriptions:'/api/ops/subscriptions',team:'/api/team/',notifications:'/api/admin/notifications',audit:'/api/admin/audit'};
+const endpoints={hosting:'/api/ops/hosting-assets',backups:'/api/ops/backups',tickets:'/api/ops/tickets',knowledge:'/api/ops/knowledge','site-content':'/api/ops/site-content','ai-agents':'/api/ops/ai-agents',integrations:'/api/ops/integrations',subscriptions:'/api/ops/subscriptions',team:'/api/team/',notifications:'/api/admin/notifications',audit:'/api/admin/audit'};
 function esc(v){return String(v==null?'':v).replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[c]));}
 async function api(path,options={}){const url=path.startsWith('/api/')?path:'/api/admin'+path;const r=await fetch(url,{credentials:'same-origin',headers:{'Content-Type':'application/json',...(options.headers||{})},...options});const data=await r.json().catch(()=>({}));if(!r.ok)throw Error(data.error||'تعذر تنفيذ الطلب');return data;}
 function showLogin(){$('#login-panel').hidden=false;$('#console').hidden=true;$('#logout').hidden=true;}
