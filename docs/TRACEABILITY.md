@@ -18,9 +18,9 @@ This matrix maps the reference specification to the isolated implementation trac
 | Customer AI agents | `ai_agents`, approved agent knowledge, token metering, origin allowlist, `agent-widget.js` | Partial runtime | Independent per-customer secret management, cost-based billing, non-OpenAI providers and channel adapters |
 | Hosting/domain inventory | `hosting_assets`, ops APIs | Inventory only | Provider adapters and real provider health/expiry checks |
 | Backup history | `backup_runs`, encrypted PostgreSQL backup to Azure Blob, manual isolated restore-test workflow | Partial | Enable secrets, configure blob lifecycle, add customer-hosting provider adapters and alerting |
-| Support tickets | `support_tickets`, public intake, ops APIs, notification fan-out | Partial | Assignment UI, threaded messages, SLA timers and outbound notifications |
-| CMS/theme management | `site_pages`, `site_settings`, ops APIs, escaped structured-block renderer | Partial | Full block editor, preview/publish workflow and all-page theme application |
-| Security and audit | Helmet, rate limits, parameterized SQL, audit logs in some mutations | Partial | CSRF/origin checks, complete audit coverage, dependency scanning, penetration review |
+| Support tickets | `support_tickets`, public and portal intake, assignment UI, threaded messages, customer/internal visibility, SLA trigger and ops APIs | Partial | End-to-end customer reply/email tests, SLA policy approval, alerting and browser acceptance |
+| CMS/theme management | `site_pages`, `site_settings`, ops APIs, escaped structured-block renderer | Partial | Full block editor, preview/publish workflow, theme version history/rollback and all-page theme application |
+| Customer portal | `customer_portal_accounts`, isolated sessions, scoped projects/quotes/tickets, customer-visible project updates, portal invitations and revocation | Baseline implemented | Email activation E2E, tenant-isolation attack tests, bilingual UX, files/invoices and full portal acceptance |\n| Security and audit | Helmet, rate limits, parameterized SQL, audit logs in some mutations | Partial | CSRF/origin checks, complete audit coverage, dependency scanning, penetration review |
 | Azure deployment | isolated CI plus manual staging workflow guarded to `-staging` apps | Not deployed | Configure Azure OIDC/secrets and staging app, green CI, browser smoke test, rollback plan |
 
 ## Hard release gates
