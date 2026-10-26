@@ -17,11 +17,11 @@ This matrix maps the reference specification to the isolated implementation trac
 | AI assistant grounded in approved knowledge | `knowledge_articles`, `platform/src/routes/assistant.js` | Partial | Provider configuration, prompt-injection tests, citations, retention policy, human handoff workflow |
 | Customer AI agents | `ai_agents`, approved agent knowledge, token metering, origin allowlist, `agent-widget.js` | Partial runtime | Independent per-customer secret management, cost-based billing, non-OpenAI providers and channel adapters |
 | Hosting/domain inventory | `hosting_assets`, ops APIs | Inventory only | Provider adapters and real provider health/expiry checks |
-| Backup history | `backup_runs`, ops APIs | Tracking only | Actual backup jobs, independent artifact storage, alerts and verified restore drills |
+| Backup history | `backup_runs`, encrypted PostgreSQL backup to Azure Blob, manual isolated restore-test workflow | Partial | Enable secrets, configure blob lifecycle, add customer-hosting provider adapters and alerting |
 | Support tickets | `support_tickets`, public intake, ops APIs, notification fan-out | Partial | Assignment UI, threaded messages, SLA timers and outbound notifications |
 | CMS/theme management | `site_pages`, `site_settings`, ops APIs, escaped structured-block renderer | Partial | Full block editor, preview/publish workflow and all-page theme application |
 | Security and audit | Helmet, rate limits, parameterized SQL, audit logs in some mutations | Partial | CSRF/origin checks, complete audit coverage, dependency scanning, penetration review |
-| Azure deployment | isolated CI workflow only | Not deployed | Green CI, environment/secret setup, staging deployment, browser smoke test, rollback plan |
+| Azure deployment | isolated CI plus manual staging workflow guarded to `-staging` apps | Not deployed | Configure Azure OIDC/secrets and staging app, green CI, browser smoke test, rollback plan |
 
 ## Hard release gates
 - Do not modify `main` or the existing Azure deployment workflow as part of this rebuild pass.
