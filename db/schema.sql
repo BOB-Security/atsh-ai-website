@@ -505,3 +505,6 @@ CREATE TABLE IF NOT EXISTS ai_agent_usage_events (
 );
 CREATE INDEX IF NOT EXISTS idx_agent_usage_month ON ai_agent_usage_events(agent_id,created_at DESC);
 
+
+-- db/009_bilingual_service_features.sql
+ALTER TABLE service_plans ADD COLUMN IF NOT EXISTS features_en jsonb NOT NULL DEFAULT '[]'::jsonb;
