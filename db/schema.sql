@@ -353,3 +353,155 @@ CREATE INDEX IF NOT EXISTS idx_backup_runs_org_created ON backup_runs(organizati
 CREATE INDEX IF NOT EXISTS idx_conversations_org_status ON conversations(organization_id, status, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_tickets_org_status ON support_tickets(organization_id, status, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_audit_org_created ON audit_logs(organization_id, created_at DESC);
+
+
+-- Applied in migrations 002 through 008; included here for full-schema reference.
+
+-- db/002_auth_and_content.sql
+CREATE TABLE IF NOT EXISTS auth_sessions (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  token_hash text NOT NULL UNIQUE,
+  expires_at timestamptz NOT NULL,
+  last_seen_at timestamptz NOT NULL DEFAULT now(),
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_auth_sessions_expiry ON auth_sessions(expires_at);
+CREATE TABLE IF NOT EXISTS site_settings (
+  organization_id uuid PRIMARY KEY REFERENCES organizations(id) ON DELETE CASCADE,
+  settings jsonb NOT NULL DEFAULT '{}'::jsonb,
+  updated_by uuid REFERENCES users(id) ON DELETE SET NULL,
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS site_pages (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  organization_id uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  slug text NOT NULL,
+  title_ar text NOT NULL,
+  title_en text NOT NULL DEFAULT '',
+  body_ar jsonb NOT NULL DEFAULT '[]'::jsonb,
+  body_en jsonb NOT NULL DEFAULT '[]'::jsonb,
+  visible boolean NOT NULL DEFAULT true,
+  sort_order integer NOT NULL DEFAULT 0,
+  updated_by uuid REFERENCES users(id) ON DELETE SET NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (organization_id, slug)
+);
+CREATE TABLE IF NOT EXISTS project_approvals (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  approval_type text NOT NULL CHECK (approval_type IN ('scope','quote','preview','final_release')),
+  status text NOT NULL CHECK (status IN ('requested','approved','rejected','withdrawn')),
+  approver_name text NOT NULL,
+  approver_email text NOT NULL,
+  evidence_ref text,
+  note text NOT NULL DEFAULT '',
+  approved_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_project_approvals_project ON project_approvals(project_id, created_at DESC);
+
+
+-- db/003_knowledge_and_integrations.sql
+CREATE TABLE IF NOT EXISTS knowledge_articles (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  organization_id uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  title_ar text NOT NULL,
+  title_en text NOT NULL DEFAULT '',
+  body_ar text NOT NULL,
+  body_en text NOT NULL DEFAULT '',
+  status text NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','approved','archived')),
+  source_ref text,
+  updated_by uuid REFERENCES users(id) ON DELETE SET NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_knowledge_articles_org_status ON knowledge_articles(organization_id,status,updated_at DESC);
+CREATE TABLE IF NOT EXISTS integration_connections (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  organization_id uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  customer_id uuid REFERENCES customers(id) ON DELETE CASCADE,
+  name text NOT NULL,
+  provider text NOT NULL,
+  status text NOT NULL DEFAULT 'unconfigured' CHECK (status IN ('unconfigured','configured','active','paused','error','revoked')),
+  secret_ref text,
+  config jsonb NOT NULL DEFAULT '{}'::jsonb,
+  last_checked_at timestamptz,
+  last_error text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_integrations_org_status ON integration_connections(organization_id,status);
+
+
+-- db/004_team_invitations.sql
+CREATE TABLE IF NOT EXISTS team_invitations (
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+ organization_id uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+ email text NOT NULL,
+ full_name text NOT NULL,
+ role_id uuid NOT NULL REFERENCES roles(id) ON DELETE RESTRICT,
+ token_hash text NOT NULL UNIQUE,
+ expires_at timestamptz NOT NULL,
+ accepted_at timestamptz,
+ created_by uuid REFERENCES users(id) ON DELETE SET NULL,
+ created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_team_invites_org_email ON team_invitations(organization_id,email);
+CREATE INDEX IF NOT EXISTS idx_team_invites_expiry ON team_invitations(expires_at);
+
+
+-- db/005_explicit_client_approvals.sql
+ALTER TABLE project_approvals ADD COLUMN IF NOT EXISTS approval_token_hash text UNIQUE;
+ALTER TABLE project_approvals ADD COLUMN IF NOT EXISTS token_expires_at timestamptz;
+CREATE INDEX IF NOT EXISTS idx_project_approvals_token_expiry ON project_approvals(token_expires_at) WHERE approval_token_hash IS NOT NULL;
+
+
+-- db/006_quote_approval_tokens.sql
+ALTER TABLE quotes ADD COLUMN IF NOT EXISTS response_token_hash text UNIQUE;
+ALTER TABLE quotes ADD COLUMN IF NOT EXISTS response_token_expires_at timestamptz;
+CREATE INDEX IF NOT EXISTS idx_quotes_response_token ON quotes(response_token_expires_at) WHERE response_token_hash IS NOT NULL;
+
+
+-- db/007_assistant_sessions.sql
+CREATE TABLE IF NOT EXISTS assistant_sessions (
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+ organization_id uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+ conversation_id uuid NOT NULL UNIQUE REFERENCES conversations(id) ON DELETE CASCADE,
+ token_hash text NOT NULL UNIQUE,
+ expires_at timestamptz NOT NULL,
+ created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_assistant_sessions_expiry ON assistant_sessions(expires_at);
+
+
+-- db/008_customer_agent_runtime.sql
+ALTER TABLE ai_agents ADD COLUMN IF NOT EXISTS monthly_token_limit bigint CHECK (monthly_token_limit >= 0);
+ALTER TABLE ai_agents ADD COLUMN IF NOT EXISTS usage_tokens bigint NOT NULL DEFAULT 0 CHECK (usage_tokens >= 0);
+CREATE TABLE IF NOT EXISTS agent_knowledge_documents (
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+ agent_id uuid NOT NULL REFERENCES ai_agents(id) ON DELETE CASCADE,
+ title text NOT NULL,
+ body text NOT NULL,
+ status text NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','approved','archived')),
+ source_ref text,
+ updated_by uuid REFERENCES users(id) ON DELETE SET NULL,
+ created_at timestamptz NOT NULL DEFAULT now(),
+ updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_agent_knowledge_status ON agent_knowledge_documents(agent_id,status,updated_at DESC);
+CREATE TABLE IF NOT EXISTS ai_agent_usage_events (
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+ agent_id uuid NOT NULL REFERENCES ai_agents(id) ON DELETE CASCADE,
+ conversation_id uuid REFERENCES conversations(id) ON DELETE SET NULL,
+ model text NOT NULL,
+ prompt_tokens integer NOT NULL DEFAULT 0 CHECK (prompt_tokens >= 0),
+ completion_tokens integer NOT NULL DEFAULT 0 CHECK (completion_tokens >= 0),
+ total_tokens integer NOT NULL DEFAULT 0 CHECK (total_tokens >= 0),
+ cost_minor bigint CHECK (cost_minor >= 0),
+ status text NOT NULL CHECK (status IN ('succeeded','failed','limited')),
+ created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_agent_usage_month ON ai_agent_usage_events(agent_id,created_at DESC);
+
