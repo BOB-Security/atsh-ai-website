@@ -42,6 +42,9 @@ The daily encrypted PostgreSQL backup workflow remains disabled until these repo
 
 A restore test is deliberately manual because it copies production database data into the target. Configure `RESTORE_TEST_DATABASE_URL` to a dedicated, disposable, isolated and empty database, then run the `ATSH AI isolated backup restore test` workflow and explicitly confirm the target. The script refuses a non-empty target and records `restore_tested` only after `pg_restore` and table-count checks succeed. Never point it at production.
 
+## Staging deployment
+The manual workflow `ATSH AI v2 staging deploy` only runs from `rebuild/atsh-ai-from-scratch` and refuses app names that do not end in `-staging`. It deploys only to an already-created staging App Service and requires GitHub secrets `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`, `STAGING_DATABASE_URL`, `STAGING_OWNER_EMAIL`, `STAGING_OWNER_NAME`, and `STAGING_OWNER_PASSWORD`. The staging App Service must already contain the settings `DATABASE_URL`, `PUBLIC_BASE_URL`, `RESEND_API_KEY`, `EMAIL_FROM`, `AI_API_KEY`, and `AI_MODEL`. Configure and verify these values in GitHub/Azure secret settings; never paste secret values into chat or commit them to source. The workflow migrates and bootstraps the staging database, runs tests, deploys, and checks `/ready`. It does not switch production traffic.
+
 ## Health checks
 - `GET /health`: process liveness only.
 - `GET /ready`: checks organization configuration and PostgreSQL connectivity.
