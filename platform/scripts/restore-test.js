@@ -24,7 +24,7 @@ async function decrypt(file,out,key){const h=await fs.promises.open(file,'r');co
   tempDir=await fs.promises.mkdtemp(path.join(os.tmpdir(),'atsh-restore-test-'));const enc=path.join(tempDir,'backup.atshbak'),raw=path.join(tempDir,'database.dump');await blob.downloadToFile(enc);await decrypt(enc,raw,key);
   targetPool=new Pool({connectionString:targetUrl,ssl:(new URL(targetUrl).searchParams.get('sslmode')==='disable'?false:{rejectUnauthorized:true}),max:1});
   const existing=await targetPool.query("SELECT count(*)::int n FROM pg_tables WHERE schemaname NOT IN ('pg_catalog','information_schema')");if(existing.rows[0].n>0)throw new Error('Restore target is not empty; refusing to overwrite data.');
-  const pgEnv={...process.env,...parsePgEnv(targetUrl)};await run('pg_restore',['--no-owner','--no-acl','--exit-on-error','--dbname','postgresql://'+encodeURIComponent(pgEnv.PGUSER)+':'+encodeURIComponent(pgEnv.PGPASSWORD)+'@'+pgEnv.PGHOST+':'+pgEnv.PGPORT+'/'+encodeURIComponent(pgEnv.PGDATABASE)],pgEnv);
+  const pgEnv={...process.env,...parsePgEnv(targetUrl)};await run('pg_restore',['--no-owner','--no-acl','--exit-on-error'],pgEnv);
   const check=await targetPool.query("SELECT (SELECT count(*) FROM organizations)::int organizations,(SELECT count(*) FROM customers)::int customers,(SELECT count(*) FROM projects)::int projects");
   if(!check.rows[0]||check.rows[0].organizations<1)throw new Error('Restore validation failed: organization table is empty.');
   await sourcePool.query("UPDATE backup_runs SET status='restore_tested',restore_tested_at=now(),error_summary=NULL WHERE id=$1",[backup.id]);
