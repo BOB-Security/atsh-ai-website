@@ -40,3 +40,14 @@ test('customer portal supports profile/password management and request history',
 test('AI pre-release evaluation set covers 30 bilingual safety and quality cases',()=>{const data=JSON.parse(fs.readFileSync(path.join(__dirname,'ai-evaluation-cases.json'),'utf8'));assert.ok(data.cases.length>=30);assert.ok(data.cases.some(x=>x.locale==='ar-EG'));assert.ok(data.cases.some(x=>x.locale==='en'));for(const item of data.cases){assert.ok(item.prompt&&item.expected&&item.category,item.id+' missing evaluation fields');}});
 
 test('admin console receives effective permissions and hides unauthorized modules',()=>{const auth=fs.readFileSync(path.join(root,'platform/src/auth.js'),'utf8');const admin=fs.readFileSync(path.join(root,'platform/src/routes/admin.js'),'utf8');const ui=fs.readFileSync(path.join(root,'platform/public/admin.js'),'utf8');assert.match(auth,/permissions:user\.permission_sets\.flat\(\)/);assert.match(admin,/permissions:req\.permissionSets/);assert.match(ui,/const rules=\{/);assert.match(ui,/applyPanelPermissions\(name\)/);});
+
+test('admin password recovery uses expiring hashed one-time tokens and revokes sessions',()=>{
+ const admin=fs.readFileSync(path.join(root,'platform/src/routes/admin.js'),'utf8');
+ const migration=fs.readFileSync(path.join(root,'db/017_password_reset_tokens.sql'),'utf8');
+ assert.match(admin,/auth\/password-reset\/request/);
+ assert.match(admin,/auth\/password-reset\/confirm/);
+ assert.match(admin,/createHash\('sha256'\)/);
+ assert.match(admin,/DELETE FROM auth_sessions WHERE user_id=\$1/);
+ assert.match(migration,/token_hash text NOT NULL UNIQUE/);
+ assert.match(migration,/expires_at timestamptz NOT NULL/);
+});
