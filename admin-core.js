@@ -23,6 +23,59 @@ const rolePermissions = {
 let queue = Promise.resolve();
 const attempts = new Map();
 
+function defaultPricing() {
+  return {
+    currency: 'EGP',
+    notice: 'الأسعار التقديرية قابلة للمراجعة حسب نطاق المشروع، ولا يُعد الطلب عقدًا ملزمًا.',
+    categories: [
+      { id: 'website', name: 'تصميم المواقع', active: true, plans: [
+        { id: 'starter', name: 'انطلاقة', description: 'موقع تعريفي للشركات الصغيرة', setup: 8500, monthly: 0, annual: 0, features: ['حتى 5 صفحات','تصميم متجاوب','نموذج تواصل','تهيئة SEO أساسية'], popular: false },
+        { id: 'business', name: 'أعمال', description: 'حضور رقمي احترافي قابل للتوسع', setup: 16000, monthly: 0, annual: 0, features: ['حتى 10 صفحات','إدارة محتوى','ربط التحليلات','تهيئة SEO محسّنة'], popular: true },
+        { id: 'growth', name: 'نمو', description: 'موقع متقدم وتكاملات مخصصة', setup: 28000, monthly: 0, annual: 0, features: ['حتى 20 صفحة','تكاملات API','نماذج متقدمة','دعم إطلاق'], popular: false }
+      ]},
+      { id: 'hosting', name: 'الاستضافة', active: true, plans: [
+        { id: 'hosting-basic', name: 'استضافة أساسية', description: 'للمواقع التعريفية', setup: 0, monthly: 250, annual: 2700, features: ['SSL','نسخ احتياطي دوري','مراقبة التوفر'], popular: false },
+        { id: 'hosting-pro', name: 'استضافة احترافية', description: 'للمواقع النشطة', setup: 0, monthly: 550, annual: 5940, features: ['موارد أعلى','نسخ احتياطي متكرر','أولوية الدعم'], popular: true }
+      ]},
+      { id: 'care', name: 'الصيانة والدعم', active: true, plans: [
+        { id: 'care-monthly', name: 'رعاية شهرية', description: 'تحديثات ومتابعة فنية', setup: 0, monthly: 900, annual: 9720, features: ['تحديثات دورية','متابعة الأعطال','تقرير شهري'], popular: false }
+      ]}
+    ],
+    addons: [
+      { id: 'domain', name: 'تسجيل دومين', description: 'حسب الامتداد والتجديد', setup: 700, monthly: 0, annual: 700, active: true },
+      { id: 'business-email', name: 'بريد أعمال', description: 'لكل صندوق بريد سنويًا', setup: 0, monthly: 0, annual: 1200, active: true },
+      { id: 'backup', name: 'نسخ احتياطي موسّع', description: 'نسخ احتياطي واستعادة', setup: 0, monthly: 150, annual: 1620, active: true },
+      { id: 'ai-assistant', name: 'مساعد ذكاء اصطناعي', description: 'التكامل والاستخدام يحددان السعر النهائي', setup: 5000, monthly: 1200, annual: 12960, active: true }
+    ],
+    updatedAt: new Date().toISOString()
+  };
+}
+function cleanPricing(data) {
+  if (!data || !Array.isArray(data.categories) || !Array.isArray(data.addons)) throw new Error('صيغة التسعير غير صالحة.');
+  const money = v => Number.isFinite(Number(v)) && Number(v) >= 0 && Number(v) <= 100000000 ? Math.round(Number(v)) : null;
+  const text = (v, n=120) => clean(v,n);
+  const ids = new Set();
+  const categories = data.categories.slice(0,30).map(c => {
+    const id=text(c.id,60); if(!id || ids.has(id)) throw new Error('معرّفات فئات التسعير يجب أن تكون فريدة.'); ids.add(id);
+    if(!Array.isArray(c.plans)) throw new Error('كل فئة يجب أن تحتوي على قائمة باقات.');
+    const planIds=new Set();
+    const plans=c.plans.slice(0,50).map(p=>{
+      const pid=text(p.id,60); if(!pid||planIds.has(pid)) throw new Error('معرّفات الباقات يجب أن تكون فريدة داخل الفئة.'); planIds.add(pid);
+      const setup=money(p.setup), monthly=money(p.monthly), annual=money(p.annual);
+      if(setup===null||monthly===null||annual===null) throw new Error('الأسعار يجب أن تكون أرقامًا غير سالبة.');
+      return {id:pid,name:text(p.name),description:text(p.description,300),setup,monthly,annual,features:Array.isArray(p.features)?p.features.slice(0,20).map(v=>text(v,200)).filter(Boolean):[],popular:p.popular===true};
+    });
+    return {id,name:text(c.name),active:c.active!==false,plans};
+  });
+  const addonIds=new Set();
+  const addons=data.addons.slice(0,100).map(a=>{
+    const id=text(a.id,60); if(!id||addonIds.has(id)) throw new Error('معرّفات الإضافات يجب أن تكون فريدة.'); addonIds.add(id);
+    const setup=money(a.setup),monthly=money(a.monthly),annual=money(a.annual);
+    if(setup===null||monthly===null||annual===null) throw new Error('أسعار الإضافات يجب أن تكون أرقامًا غير سالبة.');
+    return {id,name:text(a.name),description:text(a.description,300),setup,monthly,annual,active:a.active!==false};
+  });
+  return {currency:'EGP',notice:text(data.notice,500),categories,addons,updatedAt:new Date().toISOString()};
+}
 function now() { return Date.now(); }
 function hash(value) { return crypto.createHash('sha256').update(value).digest('hex'); }
 function safeEqual(a, b) {
@@ -35,7 +88,7 @@ function validEmail(value) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) && 
 function defaultStore() {
   return {
     version: 1, owner: null, users: [], sessions: [], challenges: [], invitations: [],
-    tasks: [], audit: [], content: { version: 1, theme: { primary: '#d9bd79', background: '#0a0b10', surface: '#151722', text: '#f4f3ef', muted: '#aeb0bb' }, pages: [], blocks: [] }
+    tasks: [], quotes: [], pricing: null, audit: [], content: { version: 1, theme: { primary: '#36c6bd', accent: '#a99aff', background: '#0b1020', surface: '#182338', text: '#f4f7fb', muted: '#aab7ca', cardBorder: '#334155', fontAr: 'IBM Plex Sans Arabic', cardRadius: '18px' }, pages: [], blocks: [] }
   };
 }
 async function readStore() {
@@ -43,10 +96,10 @@ async function readStore() {
   try {
     const data = JSON.parse(await fs.promises.readFile(DB_FILE, 'utf8'));
     const base = defaultStore();
-    return { ...base, ...data, content: { ...base.content, ...(data.content || {}) } };
+    return { ...base, ...data, pricing: data.pricing || defaultPricing(), quotes: Array.isArray(data.quotes) ? data.quotes : [], content: { ...base.content, ...(data.content || {}) } };
   } catch (e) {
     if (e.code !== 'ENOENT') throw e;
-    return defaultStore();
+    const fresh = defaultStore(); fresh.pricing = defaultPricing(); return fresh;
   }
 }
 async function writeStore(store) {
@@ -174,6 +227,25 @@ function safeDetail(value, depth = 0) {
 
 async function handler(req, res, url) {
   const p = url.pathname;
+  if (req.method === 'GET' && p === '/api/pricing') {
+    const store = await readStore();
+    return json(res, 200, { pricing: store.pricing || defaultPricing() });
+  }
+  if (req.method === 'POST' && p === '/api/quotes') {
+    let data; try { data = await readBody(req, 64 * 1024); } catch (e) { return json(res, e.status || 400, { error: 'بيانات الطلب غير صالحة.' }); }
+    const store = await readStore(), pricing = store.pricing || defaultPricing();
+    const category = pricing.categories.find(c => c.active && c.id === clean(data.categoryId,60));
+    const plan = category?.plans.find(v => v.id === clean(data.planId,60));
+    if (!category || !plan) return json(res, 400, { error: 'الباقة المختارة غير متاحة.' });
+    const addonIds = Array.isArray(data.addonIds) ? [...new Set(data.addonIds.map(v=>clean(v,60)))].slice(0,30) : [];
+    const addons = addonIds.map(id => pricing.addons.find(a => a.active && a.id === id)).filter(Boolean);
+    if (addons.length !== addonIds.length) return json(res, 400, { error: 'تتضمن الإضافات اختيارًا غير متاح.' });
+    const name=clean(data.name,120), email=clean(data.email,254), phone=clean(data.phone,40), notes=clean(data.notes,2000);
+    if(!name || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) return json(res,400,{error:'الاسم والبريد الإلكتروني الصحيح مطلوبان.'});
+    const quote = { id: crypto.randomUUID(), reference: 'ATS-'+crypto.randomBytes(4).toString('hex').toUpperCase(), createdAt:new Date().toISOString(), status:'new', customer:{name,email,phone}, category:{id:category.id,name:category.name}, plan:{id:plan.id,name:plan.name,setup:plan.setup,monthly:plan.monthly,annual:plan.annual}, addons:addons.map(a=>({id:a.id,name:a.name,setup:a.setup,monthly:a.monthly,annual:a.annual})), notes, totals:{setup:plan.setup+addons.reduce((n,a)=>n+a.setup,0),monthly:plan.monthly+addons.reduce((n,a)=>n+a.monthly,0),annual:plan.annual+addons.reduce((n,a)=>n+a.annual,0)}, pricingUpdatedAt:pricing.updatedAt };
+    await transact(s=>{s.quotes.unshift(quote);s.quotes=s.quotes.slice(0,2000);});
+    return json(res,201,{ok:true,reference:quote.reference,quote:{reference:quote.reference,totals:quote.totals}});
+  }
   if (req.method === 'GET' && p === '/api/site-content') {
     const store = await readStore();
     return json(res, 200, store.content);
@@ -289,6 +361,24 @@ async function handler(req, res, url) {
   const actor = auth.user;
   let store = await readStore();
 
+  if (p === '/api/admin/pricing' && req.method === 'GET') {
+    if (!hasPermission(actor, 'settings.manage')) return json(res,403,{error:'ليس لديك صلاحية إدارة التسعير.'});
+    return json(res,200,{pricing:store.pricing || defaultPricing(),quotes:store.quotes.slice(0,200)});
+  }
+  if (p === '/api/admin/pricing' && req.method === 'PUT') {
+    if (!hasPermission(actor, 'settings.manage')) return json(res,403,{error:'ليس لديك صلاحية إدارة التسعير.'});
+    let data; try { data=await readBody(req,512*1024); } catch(e) { return json(res,e.status||400,{error:'بيانات التسعير غير صالحة.'}); }
+    let pricing; try { pricing=cleanPricing(data.pricing); } catch(e) { return json(res,400,{error:e.message||'صيغة التسعير غير صالحة.'}); }
+    await transact(s=>{s.pricing=pricing;audit(s,actor,'pricing.update','pricing',{categories:pricing.categories.length,addons:pricing.addons.length});});
+    return json(res,200,{ok:true,updatedAt:pricing.updatedAt});
+  }
+  if (p.startsWith('/api/admin/quotes/') && req.method === 'PATCH') {
+    if (!hasPermission(actor, 'inquiries.read')) return json(res,403,{error:'ليس لديك صلاحية متابعة الطلبات.'});
+    const id=p.split('/').pop(); let data; try {data=await readBody(req);} catch(e){return json(res,e.status||400,{error:'بيانات غير صالحة.'});}
+    const statuses=['new','contacted','quoted','won','lost'];
+    const result=await transact(s=>{const q=s.quotes.find(v=>v.id===id);if(!q)return {error:'الطلب غير موجود.'};if(!statuses.includes(data.status))return {error:'حالة الطلب غير صالحة.'};q.status=data.status;q.updatedAt=new Date().toISOString();audit(s,actor,'quote.status',q.reference,{status:q.status});return {ok:true,quote:q};});
+    return result.error?json(res,400,{error:result.error}):json(res,200,result);
+  }
   if (p === '/api/admin/content' && req.method === 'GET') {
     if (!hasPermission(actor, 'content.read')) return json(res, 403, { error: 'ليس لديك صلاحية قراءة المحتوى.' });
     return json(res, 200, store.content);
@@ -298,9 +388,11 @@ async function handler(req, res, url) {
     let data; try { data = await readBody(req, 512 * 1024); } catch (e) { return json(res, e.status || 400, { error: 'بيانات غير صالحة.' }); }
     if (!data || !Array.isArray(data.pages) || !Array.isArray(data.blocks) || typeof data.theme !== 'object') return json(res, 400, { error: 'صيغة المحتوى غير صالحة.' });
     const content = safeDetail(data);
-    for (const key of ['primary','background','surface','text','muted']) {
+    for (const key of ['primary','accent','background','surface','text','muted','cardBorder']) {
       if (content.theme?.[key] && !/^#[0-9a-fA-F]{6}$/.test(content.theme[key])) return json(res, 400, { error: 'الألوان يجب أن تكون بصيغة HEX سداسية.' });
     }
+    if (content.theme?.fontAr && !['IBM Plex Sans Arabic','Cairo','Tajawal','Noto Sans Arabic'].includes(content.theme.fontAr)) return json(res, 400, { error: 'الخط المحدد غير مسموح.' });
+    if (content.theme?.cardRadius && !['12px','18px','24px'].includes(content.theme.cardRadius)) return json(res, 400, { error: 'استدارة البطاقة غير مسموحة.' });
     content.pages = content.pages.slice(0, 100).map(page => ({ id: clean(page.id, 80) || slug(page.title), title: clean(page.title, 160), path: '/' + slug(page.path || page.title), visible: page.visible !== false, language: page.language === 'en' ? 'en' : 'ar' }));
     content.blocks = content.blocks.slice(0, 300).map(block => ({ id: clean(block.id, 80) || crypto.randomUUID(), pageId: clean(block.pageId, 80) || 'home', type: ['text','card','image','heading'].includes(block.type) ? block.type : 'text', title: clean(block.title, 200), body: clean(block.body, 5000), image: /^\/media\/[a-f0-9-]{36}\.(png|jpg|jpeg|webp|gif)$/.test(block.image || '') ? block.image : '', color: /^#[0-9a-fA-F]{6}$/.test(block.color || '') ? block.color : '', visible: block.visible !== false }));
     content.version = (store.content.version || 0) + 1;

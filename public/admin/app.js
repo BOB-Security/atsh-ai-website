@@ -49,6 +49,7 @@
     $$('.admin-tabs button').forEach(x => x.classList.toggle('is-active', x === b));
     $$('.admin-panel').forEach(x => x.hidden = x.id !== 'panel-' + b.dataset.panel);
     if (b.dataset.panel === 'audit') loadAudit();
+    if (b.dataset.panel === 'pricing') loadPricing();
   }));
   function flash(text, bad = false) { message(dashMessage, text, bad); }
   function normalizePath(s) { return String(s || '').trim().toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9\u0600-\u06ff]+/g, '-').replace(/^-|-$/g, '').slice(0, 80); }
@@ -57,7 +58,8 @@
     try {
       state.content = await api('/api/admin/content');
       const theme = state.content.theme || {};
-      $$('[data-theme]').forEach(i => i.value = /^#[0-9a-f]{6}$/i.test(theme[i.dataset.theme] || '') ? theme[i.dataset.theme] : '#d9bd79');
+      $('[data-theme]').forEach(i => i.value = /^#[0-9a-f]{6}$/i.test(theme[i.dataset.theme] || '') ? theme[i.dataset.theme] : (i.dataset.theme === 'primary' ? '#36c6bd' : i.dataset.theme === 'accent' ? '#a99aff' : i.dataset.theme === 'background' ? '#0b1020' : i.dataset.theme === 'surface' ? '#182338' : i.dataset.theme === 'text' ? '#f4f7fb' : i.dataset.theme === 'muted' ? '#aab7ca' : '#334155'));
+      $('[data-theme-select]').forEach(i => i.value = theme[i.dataset.themeSelect] || (i.dataset.themeSelect === 'fontAr' ? 'IBM Plex Sans Arabic' : '18px'));
       renderPages(); renderBlocks();
     } catch (e) { flash(e.message, true); }
   }
@@ -102,7 +104,8 @@
     state.content.pages.push({ id: crypto.randomUUID(), title, path: '/' + path, visible: $('#page-visible').checked, language: 'ar' });
     $('#page-title').value = ''; $('#page-path').value = ''; renderPages(); flash('أُضيفت الصفحة إلى مسودة المحتوى. اضغط حفظ التغييرات لنشرها.');
   });
-  $$('[data-theme]').forEach(input => input.addEventListener('input', () => { state.content.theme ||= {}; state.content.theme[input.dataset.theme] = input.value; }));
+  $('[data-theme]').forEach(input => input.addEventListener('input', () => { state.content.theme ||= {}; state.content.theme[input.dataset.theme] = input.value; }));
+  $('[data-theme-select]').forEach(input => input.addEventListener('change', () => { state.content.theme ||= {}; state.content.theme[input.dataset.themeSelect] = input.value; }));
   $('#block-image-file').addEventListener('change', async e => {
     const file = e.target.files?.[0]; state.image = '';
     if (!file) { $('#image-preview').hidden = true; return; }
@@ -183,5 +186,30 @@
     catch(e){flash(e.message,true);}
   }
   $('#refresh-audit').addEventListener('click',loadAudit);
+  async function loadPricing() {
+    try {
+      const d = await api('/api/admin/pricing');
+      $('#pricing-json').value = JSON.stringify(d.pricing, null, 2);
+      $('#pricing-updated').textContent = 'آخر تحديث: ' + (d.pricing.updatedAt || 'غير محدد') + ' · العملة: جنيه مصري';
+      const list = $('#quotes-list'); list.replaceChildren();
+      if (!d.quotes.length) list.append(el('p','لا توجد طلبات تسعير بعد.','admin-help'));
+      d.quotes.forEach(q => {
+        const row=el('div',undefined,'admin-table-row');
+        const info=el('div'); info.append(el('strong',q.reference+' · '+q.customer.name),el('small',q.category.name+' / '+q.plan.name+' · '+q.customer.email+' · تأسيس '+q.totals.setup.toLocaleString('ar-EG')+' ج.م · شهري '+q.totals.monthly.toLocaleString('ar-EG')+' ج.م'));
+        const select=el('select'); [['new','جديد'],['contacted','تم التواصل'],['quoted','تم إرسال عرض'],['won','تم البيع'],['lost','مغلق/مفقود']].forEach(([v,t])=>{const o=el('option',t);o.value=v;o.selected=q.status===v;select.append(o);});
+        select.addEventListener('change',async()=>{try{await api('/api/admin/quotes/'+encodeURIComponent(q.id),{method:'PATCH',body:JSON.stringify({status:select.value})});flash('تم تحديث حالة الطلب.');}catch(e){flash(e.message,true);}});
+        row.append(info,select); list.append(row);
+      });
+    } catch(e) { flash(e.message,true); }
+  }
+  $('#save-pricing').addEventListener('click',async()=>{
+    try {
+      const pricing=JSON.parse($('#pricing-json').value);
+      const d=await api('/api/admin/pricing',{method:'PUT',body:JSON.stringify({pricing})});
+      $('#pricing-updated').textContent='تم الحفظ: '+d.updatedAt;
+      flash('تم حفظ كتالوج التسعير.'); await loadPricing();
+    } catch(e) { flash(e instanceof SyntaxError?'صيغة JSON غير صحيحة.':e.message,true); }
+  });
+  $('#refresh-quotes').addEventListener('click',loadPricing);
   refreshMe();
 })();

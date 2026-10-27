@@ -49,23 +49,43 @@
       <div class="admin-dashboard-heading"><div><p class="eyebrow">مساحة العمل</p><h1>لوحة التحكم <span>atsh-ai</span></h1><p id="dashboard-summary">إدارة الموقع والفريق والمهمات.</p></div><button id="logout-button" class="button button-quiet" type="button">تسجيل الخروج</button></div>
       <nav class="admin-tabs" aria-label="أقسام لوحة التحكم">
         <button type="button" data-panel="content" class="is-active">محرر الموقع</button>
+        <button type="button" data-panel="pricing">الباقات والتسعير</button>
         <button type="button" data-panel="team">الفريق والصلاحيات</button>
         <button type="button" data-panel="tasks">المهام</button>
         <button type="button" data-panel="audit">سجل النشاط</button>
       </nav>
 
+
+      <section class="admin-panel" id="panel-pricing" hidden>
+        <div class="admin-section-head"><div><h2>كتالوج الباقات والتسعير</h2><p>تحكم في الباقات والإضافات والأسعار التأسيسية والشهرية والسنوية. الأسعار الحالية افتراضية استرشادية وتحتاج اعتمادك قبل البيع.</p></div><button id="save-pricing" class="button button-primary" type="button">حفظ كتالوج الأسعار</button></div>
+        <article class="admin-card">
+          <label for="pricing-json">بيانات التسعير (JSON)</label>
+          <textarea id="pricing-json" rows="22" spellcheck="false" dir="ltr" style="width:100%;font-family:monospace;font-size:13px"></textarea>
+          <p class="admin-help">يحتوي الكتالوج على categories (الفئات والباقات) وaddons (الإضافات). كل سعر بالجنيه المصري. راجع الأسعار واعتمدها تجاريًا قبل البيع.</p>
+          <p id="pricing-updated" class="admin-help"></p>
+        </article>
+        <div class="admin-section-head"><div><h2>طلبات عروض الأسعار</h2><p>الطلبات المسجلة من أداة التسعير، مع نسخة الأسعار التي عُرضت وقت الطلب.</p></div><button id="refresh-quotes" class="button button-quiet" type="button">تحديث الطلبات</button></div>
+        <div id="quotes-list" class="admin-table-wrap"></div>
+      </section>
       <section class="admin-panel" id="panel-content">
         <div class="admin-section-head"><div><h2>محرر الموقع المرئي</h2><p>أنشئ صفحات وفقرات وبطاقات، وعدّل النصوص والصور والألوان. المحتوى الجديد يظهر في منطقة المحتوى المضافة للموقع.</p></div><button id="save-content" class="button button-primary" type="button">حفظ التغييرات</button></div>
         <div class="admin-editor-grid">
           <article class="admin-card">
             <h3>ألوان الهوية</h3><p class="admin-help">اختر أي درجة لونية أو أدخل قيمة HEX سداسية.</p>
             <div class="admin-colors">
-              <label>اللون الأساسي <input type="color" data-theme="primary" value="#d9bd79"></label>
-              <label>الخلفية <input type="color" data-theme="background" value="#0a0b10"></label>
-              <label>خلفية البطاقات <input type="color" data-theme="surface" value="#151722"></label>
-              <label>النص <input type="color" data-theme="text" value="#f4f3ef"></label>
-              <label>النص الثانوي <input type="color" data-theme="muted" value="#aeb0bb"></label>
+              <label>اللون الأساسي <input type="color" data-theme="primary" value="#36c6bd"></label>
+              <label>لون التمييز <input type="color" data-theme="accent" value="#a99aff"></label>
+              <label>الخلفية <input type="color" data-theme="background" value="#0b1020"></label>
+              <label>خلفية البطاقات <input type="color" data-theme="surface" value="#182338"></label>
+              <label>حدود البطاقات <input type="color" data-theme="cardBorder" value="#334155"></label>
+              <label>النص <input type="color" data-theme="text" value="#f4f7fb"></label>
+              <label>النص الثانوي <input type="color" data-theme="muted" value="#aab7ca"></label>
             </div>
+            <div class="admin-two-col admin-theme-options">
+              <div><label for="theme-font-ar">خط الواجهة العربية</label><select id="theme-font-ar" data-theme-select="fontAr"><option value="IBM Plex Sans Arabic">IBM Plex Sans Arabic</option><option value="Cairo">Cairo</option><option value="Tajawal">Tajawal</option><option value="Noto Sans Arabic">Noto Sans Arabic</option></select></div>
+              <div><label for="theme-card-radius">استدارة الكروت</label><select id="theme-card-radius" data-theme-select="cardRadius"><option value="12px">محدودة — 12px</option><option value="18px">متوسطة — 18px</option><option value="24px">كبيرة — 24px</option></select></div>
+            </div>
+            <p class="admin-help">التغييرات تحفظ ضمن إعدادات الموقع وتُطبق على الصفحات التي تستخدم متغيرات التصميم المشتركة.</p>
           </article>
           <article class="admin-card">
             <h3>إضافة صفحة</h3>
