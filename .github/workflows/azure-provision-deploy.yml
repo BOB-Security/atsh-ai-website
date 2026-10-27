@@ -71,7 +71,7 @@ jobs:
       - name: Package platform for Azure App Service
         working-directory: platform
         run: |
-          zip -r ../atsh-ai-platform.zip . -x 'node_modules/*' '.data/*' '*.log' 'atsh-ai-platform.zip'
+          zip -r ../atsh-ai-platform.zip . -x '.data/*' '*.log' 'atsh-ai-platform.zip'
       - uses: actions/upload-artifact@v4
         with:
           name: atsh-ai-platform
