@@ -1,209 +1,144 @@
-name: Azure App Service — provision and deploy
+name: Deploy ATSH AI Platform to Azure
 
 on:
   push:
     branches: [main]
     paths:
-      - 'infra/azure/main.bicep'
+      - 'platform/**'
+      - 'db/**'
       - '.github/workflows/azure-provision-deploy.yml'
-      - 'server.js'
-      - 'admin-core.js'
-      - 'package.json'
-      - 'package-lock.json'
-      - 'public/**'
-      - 'scripts/**'
   workflow_dispatch:
-    inputs:
-      resource_group:
-        description: Existing Azure Resource Group to use (do not create a duplicate app in a different group)
-        required: false
-        type: string
-      app_name:
-        description: Globally unique Azure Web App name; reuse only if it belongs to this resource group
-        required: true
-        type: string
-        default: atsh-ai-website
-      location:
-        description: Azure region
-        required: true
-        type: choice
-        options:
-          - uaenorth
-          - uaecentral
-          - northeurope
-          - westeurope
-        default: uaenorth
-      plan_sku:
-        description: Paid App Service plan SKU; B1 is the default for custom-domain readiness
-        required: true
-        type: choice
-        options:
-          - B1
-          - B2
-          - B3
-        default: B1
 
 permissions:
   contents: read
   id-token: write
 
 concurrency:
-  group: atsh-ai-azure-provision-v3
-  cancel-in-progress: true
+  group: atsh-ai-production-deploy
+  cancel-in-progress: false
 
 jobs:
   verify:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: platform
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '24.x'
-      - name: Install and verify
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: platform/package-lock.json
+      - name: Verify required production configuration exists
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DEFAULT_ORGANIZATION_ID: ${{ secrets.DEFAULT_ORGANIZATION_ID }}
+          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+          OWNER_EMAIL: ${{ secrets.OWNER_EMAIL }}
+          OWNER_PASSWORD: ${{ secrets.OWNER_PASSWORD }}
         run: |
-          npm ci
-          npm run build
-          npm test
-      - name: Prepare deployment package
+          set -euo pipefail
+          for key in DATABASE_URL DEFAULT_ORGANIZATION_ID SESSION_SECRET OWNER_EMAIL OWNER_PASSWORD; do
+            if [ -z "${!key:-}" ]; then
+              echo "::error::Missing GitHub Actions secret: $key. Deployment stopped before touching Azure."
+              exit 1
+            fi
+          done
+          if [ "${#SESSION_SECRET}" -lt 32 ]; then
+            echo "::error::SESSION_SECRET must be at least 32 characters."
+            exit 1
+          fi
+          if [ "${#OWNER_PASSWORD}" -lt 14 ]; then
+            echo "::error::OWNER_PASSWORD must be at least 14 characters."
+            exit 1
+          fi
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
+      - name: Run database migrations
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          PGSSL: require
+        run: npm run db:migrate
+      - name: Bootstrap owner and organization
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          PGSSL: require
+          DEFAULT_ORGANIZATION_SLUG: atsh-ai
+          OWNER_EMAIL: ${{ secrets.OWNER_EMAIL }}
+          OWNER_NAME: ${{ secrets.OWNER_NAME }}
+          OWNER_PASSWORD: ${{ secrets.OWNER_PASSWORD }}
+        run: npm run db:bootstrap
+      - name: Package platform and database schema
+        working-directory: .
         run: |
-          zip -r atsh-ai-app.zip package.json server.js admin-core.js public scripts
+          zip -r atsh-ai-platform.zip platform db -x 'platform/node_modules/*' 'platform/.data/*' '*.log'
       - uses: actions/upload-artifact@v4
         with:
-          name: atsh-ai-app
-          path: atsh-ai-app.zip
+          name: atsh-ai-platform
+          path: atsh-ai-platform.zip
           if-no-files-found: error
 
-  provision-and-deploy:
+  deploy:
     runs-on: ubuntu-latest
     needs: verify
     steps:
-      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
-          name: atsh-ai-app
+          name: atsh-ai-platform
       - name: Azure login (OIDC)
         uses: azure/login@v2
         with:
           client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_1DF03D06E1D444CCA0654B27E8C75231 }}
           tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_5EF8FCB25D80477A8D0F2FCEE63A981A }}
           subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_A4D19EA9941D4136AF1DD6E315BFA1E2 }}
-      - name: Resolve existing app or create a new App Service plan
-        id: resolve
-        env:
-          RG_INPUT: ${{ inputs.resource_group || '' }}
-          APP: ${{ inputs.app_name || 'atsh-ai-website' }}
-          LOCATION_INPUT: ${{ inputs.location || 'uaenorth' }}
-          SKU_INPUT: ${{ inputs.plan_sku || 'B1' }}
-        shell: bash
+      - name: Confirm existing production app
+        id: app
         run: |
           set -euo pipefail
-          az account show --query '{subscription:id,name:name,tenant:tenantId}' -o table
-          NEEDS_PROVISION=true
-          EXISTING_RG=$(az webapp list --query "[?name=='$APP'].resourceGroup | [0]" -o tsv)
-          if [ -n "$EXISTING_RG" ] && [ "$EXISTING_RG" != "None" ]; then
-            if [ -n "$RG_INPUT" ] && [ "$RG_INPUT" != "$EXISTING_RG" ]; then
-              echo "The app exists in resource group '$EXISTING_RG', not '$RG_INPUT'. Refusing to create a duplicate." >&2
-              exit 1
-            fi
-            RG="$EXISTING_RG"
-            LOCATION=$(az webapp show --resource-group "$RG" --name "$APP" --query location -o tsv)
-            SERVER_FARM_ID=$(az webapp show --resource-group "$RG" --name "$APP" --query serverFarmId -o tsv)
-            if [ -z "$SERVER_FARM_ID" ] || [ "$SERVER_FARM_ID" = "None" ]; then
-              echo "Could not resolve the App Service plan ID from the existing web app." >&2
-              exit 1
-            fi
-            NEEDS_PROVISION=false
-            echo "Found existing app '$APP' in '$RG'. Reusing it directly without ARM resource-group deployment permissions."
-          else
-            if [ -z "$RG_INPUT" ]; then
-              RG="atsh-ai-rg"
-              az group create --name "$RG" --location "$LOCATION_INPUT" --output table
-            else
-              RG="$RG_INPUT"
-              az group show --name "$RG" --query '{name:name,location:location}' -o table
-            fi
-            LOCATION="$LOCATION_INPUT"
-            PLAN="${APP}-plan"
-            az appservice plan create --name "$PLAN" --resource-group "$RG" --location "$LOCATION" --sku "$SKU_INPUT" --is-linux --output none
-            SERVER_FARM_ID=$(az appservice plan show --name "$PLAN" --resource-group "$RG" --query id -o tsv)
-            echo "Created a new Linux App Service plan '$PLAN' in '$RG'."
+          APP='atsh-ai-website'
+          RG=$(az webapp list --query "[?name=='$APP'].resourceGroup | [0]" -o tsv)
+          if [ -z "$RG" ] || [ "$RG" = "None" ]; then
+            echo "::error::Existing Azure app atsh-ai-website was not found; refusing to create a replacement automatically."
+            exit 1
           fi
+          HOST=$(az webapp show --resource-group "$RG" --name "$APP" --query defaultHostName -o tsv)
           echo "resource_group=$RG" >> "$GITHUB_OUTPUT"
-          echo "location=$LOCATION" >> "$GITHUB_OUTPUT"
-          echo "server_farm_id=$SERVER_FARM_ID" >> "$GITHUB_OUTPUT"
-          echo "needs_provision=$NEEDS_PROVISION" >> "$GITHUB_OUTPUT"
-      - name: Validate Bicep
-        if: steps.resolve.outputs.needs_provision == 'true'
-        run: az bicep build --file infra/azure/main.bicep
-      - name: Provision or update App Service
-        if: steps.resolve.outputs.needs_provision == 'true'
+          echo "host=$HOST" >> "$GITHUB_OUTPUT"
+      - name: Configure platform runtime
         env:
-          RG: ${{ steps.resolve.outputs.resource_group }}
-          APP: ${{ inputs.app_name || 'atsh-ai-website' }}
-          LOCATION: ${{ steps.resolve.outputs.location }}
-          SERVER_FARM_ID: ${{ steps.resolve.outputs.server_farm_id }}
-        run: |
-          az deployment group create \
-            --resource-group "$RG" \
-            --name "atsh-ai-site-${GITHUB_RUN_ID}" \
-            --template-file infra/azure/main.bicep \
-            --parameters appName="$APP" location="$LOCATION" serverFarmId="$SERVER_FARM_ID" \
-            --query 'properties.outputs' -o json > deployment-outputs.json
-          cat deployment-outputs.json
-      - name: Set runtime settings without replacing existing app settings
-        env:
-          RG: ${{ steps.resolve.outputs.resource_group }}
-          APP: ${{ inputs.app_name || 'atsh-ai-website' }}
-          ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+          RG: ${{ steps.app.outputs.resource_group }}
+          APP: atsh-ai-website
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DEFAULT_ORGANIZATION_ID: ${{ secrets.DEFAULT_ORGANIZATION_ID }}
+          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+          PUBLIC_BASE_URL: ${{ secrets.PUBLIC_BASE_URL }}
+          OWNER_EMAIL: ${{ secrets.OWNER_EMAIL }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+          AI_API_KEY: ${{ secrets.AI_API_KEY }}
+          AI_MODEL: ${{ secrets.AI_MODEL }}
         run: |
           set -euo pipefail
-          HOST=$(az webapp show --resource-group "$RG" --name "$APP" --query defaultHostName -o tsv)
-          if [ -z "$HOST" ] || [ "$HOST" = "None" ]; then
-            echo "Could not resolve Azure's assigned default hostname." >&2
-            exit 1
-          fi
-          az webapp config appsettings set \
-            --resource-group "$RG" \
-            --name "$APP" \
-            --settings NODE_ENV=production DATA_DIR=/home/data PUBLIC_BASE_URL="https://${HOST}" WEBSITE_NODE_DEFAULT_VERSION='~24' WEBSITE_RUN_FROM_PACKAGE=1 SCM_DO_BUILD_DURING_DEPLOYMENT=false \
-            --output none
-          if [ -n "$ADMIN_EMAIL" ] && [ -n "$RESEND_API_KEY" ]; then
-            # Resend's onboarding sender is for initial testing only; a verified domain sender
-            # can be supplied later through the EMAIL_FROM repository secret.
-            if [ -z "$EMAIL_FROM" ]; then EMAIL_FROM="onboarding@resend.dev"; fi
-            az webapp config appsettings set --resource-group "$RG" --name "$APP" --settings ADMIN_EMAIL="$ADMIN_EMAIL" RESEND_API_KEY="$RESEND_API_KEY" EMAIL_FROM="$EMAIL_FROM" --output none
-            echo "Owner email activation settings were applied without printing secret values."
-          else
-            echo "::warning::Owner/staff email activation is not configured. Add ADMIN_EMAIL and RESEND_API_KEY as GitHub Actions secrets, then redeploy."
-          fi
-      - name: Deploy website package
+          az webapp config appsettings set --resource-group "$RG" --name "$APP" --settings             NODE_ENV=production WEBSITE_NODE_DEFAULT_VERSION='~22' SCM_DO_BUILD_DURING_DEPLOYMENT=true             DATABASE_URL="$DATABASE_URL" DEFAULT_ORGANIZATION_ID="$DEFAULT_ORGANIZATION_ID"             SESSION_SECRET="$SESSION_SECRET" PUBLIC_BASE_URL="${PUBLIC_BASE_URL:-https://${{ steps.app.outputs.host }}}"             DEFAULT_ORGANIZATION_SLUG=atsh-ai PGSSL=require             OWNER_EMAIL="$OWNER_EMAIL" OWNER_NAME="${{ secrets.OWNER_NAME }}" OWNER_PASSWORD="${{ secrets.OWNER_PASSWORD }}"             RESEND_API_KEY="${RESEND_API_KEY:-}" EMAIL_FROM="${EMAIL_FROM:-}" AI_API_KEY="${AI_API_KEY:-}" AI_MODEL="${AI_MODEL:-}"             --output none
+      - name: Deploy new platform
         uses: azure/webapps-deploy@v3
         with:
-          app-name: ${{ inputs.app_name || 'atsh-ai-website' }}
-          package: atsh-ai-app.zip
-      - name: Verify live health endpoint
+          app-name: atsh-ai-website
+          package: atsh-ai-platform.zip
+      - name: Verify live health and readiness
         env:
-          RG: ${{ steps.resolve.outputs.resource_group }}
-          APP: ${{ inputs.app_name || 'atsh-ai-website' }}
+          HOST: ${{ steps.app.outputs.host }}
         run: |
-          HOST=$(az webapp show --resource-group "$RG" --name "$APP" --query defaultHostName -o tsv)
-          if [ -z "$HOST" ] || [ "$HOST" = "None" ]; then
-            echo "Could not resolve Azure's assigned default hostname." >&2
-            exit 1
-          fi
-          URL="https://${HOST}/health"
-          for attempt in $(seq 1 12); do
-            CODE=$(curl --silent --show-error --output /tmp/health.json --write-out '%{http_code}' "$URL" || true)
-            if [ "$CODE" = "200" ] && grep -q '"ok":true' /tmp/health.json; then
-              echo "Health check passed: $URL"
-              cat /tmp/health.json
-              exit 0
-            fi
-            echo "Waiting for App Service startup (attempt $attempt, HTTP $CODE)"
+          set -euo pipefail
+          for i in $(seq 1 18); do
+            code=$(curl -sS -o /tmp/health.json -w '%{http_code}' "https://$HOST/health" || true)
+            if [ "$code" = "200" ] && grep -q '"ok":true' /tmp/health.json; then break; fi
             sleep 10
           done
-          echo "Live health check failed. Do not proceed to domain binding."
-          cat /tmp/health.json || true
-          exit 1
+          if [ "${code:-}" != "200" ]; then cat /tmp/health.json || true; echo "::error::Health check failed."; exit 1; fi
+          ready=$(curl -sS -o /tmp/ready.json -w '%{http_code}' "https://$HOST/ready" || true)
+          if [ "$ready" != "200" ]; then cat /tmp/ready.json || true; echo "::error::Readiness check failed; platform is not ready."; exit 1; fi
+          cat /tmp/health.json
+          cat /tmp/ready.json
