@@ -142,6 +142,12 @@ jobs:
             echo "::error::Azure App Service is not Running. Check the app/subscription status in Azure Portal."
             exit 1
           fi
+      - name: Enable App Service runtime diagnostics
+        env:
+          RG: ${{ steps.app.outputs.resource_group }}
+        run: |
+          set -euo pipefail
+          az webapp log config --resource-group "$RG" --name atsh-ai-website --application-logging filesystem --web-server-logging filesystem --detailed-error-messages true --failed-request-tracing true --output none || true
       - name: Deploy new platform
         uses: azure/webapps-deploy@v3
         with:
@@ -157,7 +163,22 @@ jobs:
             if [ "$code" = "200" ] && grep -q '"ok":true' /tmp/health.json; then break; fi
             sleep 10
           done
-          if [ "${code:-}" != "200" ]; then cat /tmp/health.json || true; echo "::error::Health check failed."; exit 1; fi
+          if [ "${code:-}" != "200" ]; then
+            cat /tmp/health.json || true
+            echo "::group::Azure app state and configuration"
+            az webapp show --resource-group "$RG" --name atsh-ai-website --query "{state:state,enabled:enabled,availabilityState:availabilityState,hostNames:hostNames}" -o json || true
+            az webapp config appsettings list --resource-group "$RG" --name atsh-ai-website --query "[?name=='WEBSITE_NODE_DEFAULT_VERSION' || name=='SCM_DO_BUILD_DURING_DEPLOYMENT' || name=='WEBSITE_RUN_FROM_PACKAGE' || name=='PORT' || name=='NODE_ENV']" -o table || true
+            echo "::endgroup::"
+            echo "::group::Azure runtime logs"
+            az webapp log download --resource-group "$RG" --name atsh-ai-website --log-file /tmp/azure-app-logs.zip || true
+            if [ -f /tmp/azure-app-logs.zip ]; then
+              unzip -oq /tmp/azure-app-logs.zip -d /tmp/azure-app-logs || true
+              find /tmp/azure-app-logs -type f -maxdepth 6 -print -exec tail -n 80 {} \; 2>/dev/null || true
+            fi
+            echo "::endgroup::"
+            echo "::error::Health check failed after deployment; inspect Azure runtime logs above."
+            exit 1
+          fi
           ready=$(curl -sS -o /tmp/ready.json -w '%{http_code}' "https://$HOST/ready" || true)
           if [ "$ready" != "200" ]; then cat /tmp/ready.json || true; echo "::error::Readiness check failed; platform is not ready."; exit 1; fi
           cat /tmp/health.json
