@@ -156,6 +156,7 @@ jobs:
       - name: Verify live health and readiness
         env:
           HOST: ${{ steps.app.outputs.host }}
+          RG: ${{ steps.app.outputs.resource_group }}
         run: |
           set -euo pipefail
           for i in $(seq 1 18); do
