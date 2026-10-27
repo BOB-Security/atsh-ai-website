@@ -29,7 +29,7 @@ async function bindSiteContent(){
   return [...container.querySelectorAll('[data-block]')].map(el=>{const type=el.querySelector('[data-type]').value,text=el.querySelector('[data-text]').value,src=el.querySelector('[data-src]').value.trim(),alt=el.querySelector('[data-alt]').value.trim(),href=el.querySelector('[data-href]').value.trim(),items=el.querySelector('[data-items]').value.split('\n').map(x=>x.trim()).filter(Boolean),background=el.querySelector('[data-bg]').value,color=el.querySelector('[data-fg]').value,align=el.querySelector('[data-align]').value;return {type,text,src,alt,href,items,background,color,align};});
  }
  function addBlock(container,lang,block={}){
-  const holder=document.createElement('div');holder.innerHTML=blockEditor([block],lang);const newBlock=holder.querySelector('[data-block]');container.append(newBlock);renumber(container);
+  const holder=document.createElement('div');holder.innerHTML=blockEditor([block],lang);const newBlock=holder.querySelector('[data-block]');container.append(newBlock);newBlock.querySelector('[data-remove]').addEventListener('click',()=>{newBlock.remove();renumber(container);});newBlock.querySelector('[data-up]').addEventListener('click',()=>{if(newBlock.previousElementSibling)container.insertBefore(newBlock,newBlock.previousElementSibling);renumber(container);});newBlock.querySelector('[data-down]').addEventListener('click',()=>{if(newBlock.nextElementSibling)container.insertBefore(newBlock.nextElementSibling,newBlock);renumber(container);});renumber(container);
  }
  function renumber(container){container.querySelectorAll('[data-block]').forEach((b,i)=>{const h=b.querySelector('.block-tools strong');if(h)h.textContent='عنصر '+(i+1);});}
  try{
