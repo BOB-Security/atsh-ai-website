@@ -25,7 +25,7 @@ app.use(helmet({ contentSecurityPolicy: { directives: {
   connectSrc: ["'self'"], upgradeInsecureRequests: config.production ? [] : null
 }}}));
 app.use(compression());
-app.use(express.json({ limit: '64kb', strict: true }));
+app.use(express.json({ limit: '1mb', strict: true }));
 app.use(cookieParser());
 app.use((req, res, next) => {
   if (['POST','PUT','PATCH','DELETE'].includes(req.method) && req.get('origin')) { try { if (new URL(req.get('origin')).host !== req.get('host')) return res.status(403).json({error:'طلب من مصدر غير مسموح.'}); } catch { return res.status(403).json({error:'مصدر الطلب غير صالح.'}); } }
@@ -63,15 +63,14 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/ops', opsRoutes);
 app.use('/api/team', teamRoutes);
 app.use('/api/portal', portalRoutes);
-app.use(express.static(path.join(__dirname,'public'), { index: 'index.html', fallthrough: true }));
 app.get('/portal',(_req,res)=>res.redirect(302,'/portal.html'));
 app.get('/login',(_req,res)=>res.redirect(302,'/portal.html'));
 app.get('/build',(_req,res)=>res.redirect(302,'/project-builder.html'));
 app.get('/contact',(_req,res)=>res.redirect(302,'/project-builder.html'));
 app.get('/how-it-works',(_req,res)=>res.redirect(302,'/process.html'));
-app.get('/:slug', async (req,res,next) => {
+app.get(['/', '/:slug'], async (req,res,next) => {
   try {
-    const slug=String(req.params.slug||'').replace(/\.html$/,'');
+    const slug=req.path==='/'?'home':String(req.params.slug||'').replace(/\.html$/,'');
     if (!/^[a-z0-9-]{2,80}$/.test(slug)) return next();
     if (!app.locals.organizationId) return next();
     const {getPool}=require('./src/db');
@@ -80,10 +79,24 @@ app.get('/:slug', async (req,res,next) => {
     const locale=req.acceptsLanguages('en')&&!req.acceptsLanguages('ar')?'en':'ar';
     const title=locale==='en'?page.title_en:page.title_ar, blocks=locale==='en'?page.body_en:page.body_ar;
     const esc=v=>String(v==null?'':v).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
-    const body=(Array.isArray(blocks)?blocks:[]).map(b=>{const text=esc(b.text||b.content||'');if(b.type==='heading')return '<h2>'+text+'</h2>';if(b.type==='list'&&Array.isArray(b.items))return '<ul>'+b.items.map(i=>'<li>'+esc(i)+'</li>').join('')+'</ul>';if(b.type==='link'){const href=String(b.href||'');if(!href.startsWith('/')&&!/^https:\/\//i.test(href))return '<p>'+text+'</p>';return '<p><a href="'+esc(href)+'">'+text+'</a></p>';}return '<p>'+text+'</p>';}).join('');
-    res.status(200).type('html').send('<!doctype html><html lang="'+locale+'" dir="'+(locale==='ar'?'rtl':'ltr')+'"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+esc(title)+' — ATSH AI</title><link rel="stylesheet" href="/styles.css"></head><body><header class="header"><a class="brand" href="/">atsh<span>·</span>ai</a><a class="button primary" href="/project-builder.html">ابدأ مشروعك</a></header><main class="wrap section"><p class="eyebrow">ATSH AI</p><h1>'+esc(title)+'</h1>'+body+'</main><footer class="footer"><div class="wrap"><a href="/">ATSH AI</a></div></footer></body></html>');
+    const allBlocks=Array.isArray(blocks)?blocks:[], pageStyle=allBlocks.find(b=>b&&b.type==='__pageStyle')||{};
+    const color=v=>/^#[0-9a-f]{6}$/i.test(v||'')?v:null;
+    const safeHref=v=>{const href=String(v||'').trim();return href.startsWith('/')||/^https:\/\//i.test(href)?href:null;};
+    const body=allBlocks.filter(b=>b&&b.type!=='__pageStyle').map(b=>{
+      const text=esc(b.text||b.content||b.title||''),bg=b.type==='card'?color(b.background):null,fg=color(b.color),style=(bg?'background:'+bg+';':'')+(fg?'color:'+fg+';':'')+(['left','center','right'].includes(b.align)?'text-align:'+b.align+';':'');
+      if(b.type==='heading')return '<h2 style="'+style+'">'+text+'</h2>';
+      if(b.type==='image'){const src=String(b.src||b.image||'').trim();if(!src||(!src.startsWith('/')&&!/^https:\/\//i.test(src)&&!/^data:image\/(png|jpeg|webp);base64,/i.test(src)))return '';return '<figure class="cms-image" style="'+style+'"><img src="'+esc(src)+'" alt="'+esc(b.alt||'')+'" loading="lazy" style="max-width:100%;height:auto;border-radius:12px"><figcaption>'+esc(b.alt||'')+'</figcaption></figure>';}
+      if(b.type==='card'){const src=String(b.src||b.image||'').trim(),img=src&&(src.startsWith('/')||/^https:\/\//i.test(src)||/^data:image\/(png|jpeg|webp);base64,/i.test(src))?'<img src="'+esc(src)+'" alt="'+esc(b.alt||'')+'" loading="lazy" style="width:100%;height:auto;border-radius:10px;margin-bottom:12px">':'';const columns=[1,2,3,4].includes(Number(b.columns))?Number(b.columns):1;return '<article class="cms-card" style="'+style+'display:inline-block;vertical-align:top;width:calc(100% / '+columns+' - 16px);margin:8px">'+img+'<h3>'+text+'</h3></article>';}
+      if(b.type==='list'&&Array.isArray(b.items))return '<ul style="'+style+'">'+b.items.map(i=>'<li>'+esc(i)+'</li>').join('')+'</ul>';
+      if(b.type==='link'){const href=safeHref(b.href);return href?'<p style="'+style+'"><a class="button primary" href="'+esc(href)+'">'+text+'</a></p>':'<p style="'+style+'">'+text+'</p>';}
+      return '<p style="'+style+'">'+text+'</p>';
+    }).join('');
+    const pageBg=color(pageStyle.background),pageSurface=color(pageStyle.surface),pageText=color(pageStyle.color);
+    const pageCss='body{'+(pageBg?'background:'+pageBg+';':'')+(pageText?'color:'+pageText+';':'')+'}.cms-card{padding:24px;margin:16px 0;border:1px solid var(--line);border-radius:var(--radius);background:'+(pageSurface||'var(--panel)')+'}.cms-image{margin:24px 0}';
+    res.status(200).type('html').send('<!doctype html><html lang="'+locale+'" dir="'+(locale==='ar'?'rtl':'ltr')+'"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+esc(title)+' — ATSH AI</title><link rel="stylesheet" href="/styles.css"><style>'+pageCss+'</style></head><body><header class="header"><a class="brand" href="/">atsh<span>·</span>ai</a><a class="button primary" href="/project-builder.html">ابدأ مشروعك</a></header><main class="wrap section"><p class="eyebrow">ATSH AI</p><h1>'+esc(title)+'</h1>'+body+'</main><footer class="footer"><div class="wrap"><a href="/">ATSH AI</a></div></footer></body></html>');
   } catch(err) { next(err); }
 });
+app.use(express.static(path.join(__dirname,'public'), { index: 'index.html', fallthrough: true }));
 app.use((req,res) => {
   if (req.path.startsWith('/api/')) return res.status(404).json({error:'المسار غير موجود.'});
   res.status(404).sendFile(path.join(__dirname,'public','404.html'), err => { if (err && !res.headersSent) res.status(404).send('Not found'); });
