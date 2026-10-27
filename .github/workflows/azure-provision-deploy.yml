@@ -120,6 +120,7 @@ jobs:
         run: |
           set -euo pipefail
           az webapp config appsettings set --resource-group "$RG" --name "$APP" --settings             NODE_ENV=production WEBSITE_NODE_DEFAULT_VERSION='~22' SCM_DO_BUILD_DURING_DEPLOYMENT=true             DATABASE_URL="$DATABASE_URL" DEFAULT_ORGANIZATION_ID="$DEFAULT_ORGANIZATION_ID"             SESSION_SECRET="$SESSION_SECRET" PUBLIC_BASE_URL="${PUBLIC_BASE_URL:-https://${{ steps.app.outputs.host }}}"             DEFAULT_ORGANIZATION_SLUG=atsh-ai PGSSL=require             OWNER_EMAIL="$OWNER_EMAIL" OWNER_NAME="${{ secrets.OWNER_NAME }}" OWNER_PASSWORD="${{ secrets.OWNER_PASSWORD }}"             RESEND_API_KEY="${RESEND_API_KEY:-}" EMAIL_FROM="${EMAIL_FROM:-}" AI_API_KEY="${AI_API_KEY:-}" AI_MODEL="${AI_MODEL:-}"             --output none
+          az webapp config set --resource-group "$RG" --name "$APP" --startup-file "npm start" --output none
       - name: Deploy new platform
         uses: azure/webapps-deploy@v3
         with:
