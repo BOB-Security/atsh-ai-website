@@ -68,10 +68,10 @@ jobs:
           OWNER_NAME: ${{ secrets.OWNER_NAME }}
           OWNER_PASSWORD: ${{ secrets.OWNER_PASSWORD }}
         run: npm run db:bootstrap
-      - name: Package platform and database schema
-        working-directory: .
+      - name: Package platform for Azure App Service
+        working-directory: platform
         run: |
-          zip -r atsh-ai-platform.zip platform db -x 'platform/node_modules/*' 'platform/.data/*' '*.log'
+          zip -r ../atsh-ai-platform.zip . -x 'node_modules/*' '.data/*' '*.log' 'atsh-ai-platform.zip'
       - uses: actions/upload-artifact@v4
         with:
           name: atsh-ai-platform
