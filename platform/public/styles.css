@@ -10,3 +10,11 @@ html[dir="ltr"] body{font-family:Manrope,"IBM Plex Sans Arabic",sans-serif}html[
 
 /* ATSH AI brand asset integration */
 .brand-logo{display:inline-flex;align-items:center;line-height:1}.brand-logo img{display:block;width:clamp(145px,17vw,230px);height:auto;max-height:58px;object-fit:contain}.footer .brand-logo img{width:200px;max-height:54px}@media(max-width:700px){.brand-logo img{width:145px;max-height:42px}}
+
+/* ATSH AI photographic hero background */
+.hero.hero-background{position:relative;isolation:isolate;width:100%;max-width:none;min-height:620px;padding:clamp(64px,8vw,110px) max(20px,calc((100vw - var(--max))/2));background-image:linear-gradient(90deg,rgba(5,9,16,.88) 0%,rgba(5,9,16,.67) 48%,rgba(5,9,16,.28) 100%),url('/images/atsh-hero.jpg');background-size:cover;background-position:center 48%;border-bottom:1px solid #ffffff18;}
+.hero.hero-background:before{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(0deg,rgba(5,9,16,.48),transparent 45%,rgba(5,9,16,.15));}
+.hero.hero-background .hero-copy{max-width:650px;text-shadow:0 2px 18px rgba(0,0,0,.55)}
+.hero.hero-background .lead,.hero.hero-background .promise{color:#f0f3f7}
+.hero.hero-background .hero-art{background:radial-gradient(ellipse at center,rgba(8,14,22,.12),transparent 70%);border-radius:24px}
+@media(max-width:760px){.hero.hero-background{grid-template-columns:1fr;gap:20px;min-height:unset;padding:64px 20px 48px;background-image:linear-gradient(180deg,rgba(5,9,16,.48),rgba(5,9,16,.82) 52%,rgba(5,9,16,.9)),url('/images/atsh-hero.jpg');background-position:center,center;background-size:cover,auto 100%;}.hero.hero-background .hero-art{min-height:230px}.hero.hero-background h1{font-size:clamp(38px,10vw,56px);letter-spacing:-1px}.hero.hero-background .lead{font-size:16px}}
