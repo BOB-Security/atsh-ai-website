@@ -2,3 +2,50 @@
 .admin-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:15px}.admin-form label{display:grid;gap:5px}.admin-form label.inline{display:flex;align-items:center;gap:9px}.admin-form label.inline input{width:18px}.admin-form button{justify-self:start}.admin-form p{grid-column:1/-1}@media(max-width:650px){.admin-form{grid-template-columns:1fr}}
 
 .visual-blocks{display:grid;gap:12px;margin:10px 0}.visual-block{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--bg)}.visual-block label{display:grid;gap:5px}.block-tools{grid-column:1/-1;display:flex;align-items:center;gap:8px}.block-tools strong{margin-inline-end:auto}.block-tools button{border:1px solid var(--line);background:var(--panel);color:var(--text);border-radius:8px;padding:5px 10px;cursor:pointer}.block-editor-wrap{grid-column:1/-1;min-width:0}.page-editor{margin-block:16px}.page-edit-form>label,.page-edit-form>.block-editor-wrap{align-self:start}.page-edit-form>button{margin-top:8px}.visual-block textarea{min-height:62px}@media(max-width:650px){.visual-block{grid-template-columns:1fr}.block-tools{grid-column:1}.admin-form>.block-editor-wrap{grid-column:1}}
+
+
+/* ATSH AI central console refresh — responsive, accessible, RTL-first */
+:root{--admin-sidebar:252px}
+body:has(#console:not([hidden])){background:radial-gradient(ellipse at 85% 0%,color-mix(in srgb,var(--primary) 9%,transparent),transparent 38%),var(--bg)}
+#console:not([hidden]){display:grid;grid-template-columns:minmax(0,1fr) var(--admin-sidebar);grid-template-rows:auto auto 1fr;column-gap:22px;align-items:start;direction:rtl}
+#console .console-head{grid-column:1/-1;grid-row:1;padding:24px 26px;margin:0 0 4px;border:1px solid var(--line);border-radius:20px;background:linear-gradient(135deg,color-mix(in srgb,var(--panel) 94%,var(--primary)),var(--panel));box-shadow:0 14px 40px #00000012}
+#console .console-head h1{font-size:clamp(1.7rem,3vw,2.5rem);letter-spacing:-.035em;margin:.15em 0}
+#console .console-head .eyebrow{letter-spacing:.13em;font-size:.76rem}
+#console .tabs{grid-column:2;grid-row:2/span 30;position:sticky;top:16px;display:flex;flex-direction:column;flex-wrap:nowrap;gap:6px;margin:0;padding:12px;border:1px solid var(--line);border-radius:18px;background:color-mix(in srgb,var(--panel) 96%,transparent);box-shadow:0 12px 32px #00000012;max-height:calc(100vh - 32px);overflow:auto}
+#console .tabs button{width:100%;display:flex;align-items:center;justify-content:flex-start;gap:10px;text-align:right;border:1px solid transparent;border-radius:11px;padding:11px 13px;background:transparent;color:var(--muted);font:inherit;transition:background .18s,border-color .18s,color .18s;white-space:normal}
+#console .tabs button:before{content:"";width:7px;height:7px;flex:0 0 7px;border-radius:50%;background:currentColor;opacity:.55}
+#console .tabs button:hover{background:color-mix(in srgb,var(--primary) 9%,var(--panel));color:var(--text);border-color:var(--line)}
+#console .tabs button.active{background:color-mix(in srgb,var(--primary) 15%,var(--panel));color:var(--primary);border-color:color-mix(in srgb,var(--primary) 35%,var(--line));font-weight:700}
+#console .tabs button.active:before{opacity:1;box-shadow:0 0 0 4px color-mix(in srgb,var(--primary) 15%,transparent)}
+#console-status{grid-column:1;grid-row:2;margin:0 0 12px;padding:10px 14px;border-radius:10px;background:color-mix(in srgb,var(--panel) 70%,transparent)}
+#console [id^="panel-"]{grid-column:1;min-width:0;grid-row:auto}
+#console [id^="panel-"]>section,#console [id^="panel-"]>.data-card{margin-bottom:16px}
+#console .metric,#console .data-card{border-radius:16px;box-shadow:0 8px 24px #0000000a}
+#console .metric{min-height:112px;display:flex;flex-direction:column;justify-content:space-between;gap:8px}
+#console .metric strong{font-size:clamp(1.7rem,3vw,2.35rem);line-height:1.1}
+#console .data-card h2{font-size:1.25rem;margin-bottom:8px}
+#console .data-list{grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));align-items:stretch}
+#console .data-card button,#console .admin-form button{min-height:40px}
+#console button:focus-visible,#console input:focus-visible,#console select:focus-visible,#console textarea:focus-visible{outline:3px solid color-mix(in srgb,var(--primary) 75%,white);outline-offset:2px}
+#console input,#console select,#console textarea{max-width:100%;min-width:0;border-radius:10px}
+#console textarea{line-height:1.7}
+#console .status-chip{margin-inline-start:4px}
+@media(max-width:900px){
+ #console:not([hidden]){grid-template-columns:minmax(0,1fr) 210px;gap:14px}
+ #console .console-head{padding:18px}
+ #console .tabs{padding:8px}
+ #console .tabs button{padding:10px;font-size:.92rem}
+}
+@media(max-width:650px){
+ #console:not([hidden]){display:flex;flex-direction:column;gap:12px}
+ #console .console-head{width:100%;padding:16px;border-radius:14px}
+ #console .console-head h1{font-size:1.7rem}
+ #console .tabs{position:static;width:100%;max-height:none;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-flow:row;gap:6px;margin:0}
+ #console .tabs button{font-size:.84rem;padding:9px 8px;justify-content:flex-start}
+ #console-status{width:100%;margin:0}
+ #console [id^="panel-"]{width:100%}
+ #console .metrics{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+ #console .metric,#console .data-card{padding:14px}
+ #console .visual-block{padding:12px}
+}
+@media(prefers-reduced-motion:reduce){#console *{transition:none!important;scroll-behavior:auto!important}}
