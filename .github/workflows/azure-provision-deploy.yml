@@ -104,6 +104,12 @@ jobs:
           HOST=$(az webapp show --resource-group "$RG" --name "$APP" --query defaultHostName -o tsv)
           echo "resource_group=$RG" >> "$GITHUB_OUTPUT"
           echo "host=$HOST" >> "$GITHUB_OUTPUT"
+      - name: Allow authenticated App Service deployment
+        env:
+          RG: ${{ steps.app.outputs.resource_group }}
+        run: |
+          set -euo pipefail
+          az resource update --resource-group "$RG" --name scm --namespace Microsoft.Web --resource-type basicPublishingCredentialsPolicies --parent sites/atsh-ai-website --set properties.allow=true --output none
       - name: Configure platform runtime
         env:
           RG: ${{ steps.app.outputs.resource_group }}
