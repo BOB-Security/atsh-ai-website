@@ -22,6 +22,7 @@ function loadConfig(env = process.env) {
     aiBaseUrl: env.AI_BASE_URL || 'https://api.openai.com/v1',
     aiApiKey: env.AI_API_KEY || '',
     aiModel: env.AI_MODEL || '',
+    mfaEncryptionKey: env.MFA_ENCRYPTION_KEY || '',
     defaultOrganizationSlug: env.DEFAULT_ORGANIZATION_SLUG || 'atsh-ai',
     required
   };
