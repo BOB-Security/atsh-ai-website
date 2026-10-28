@@ -142,3 +142,21 @@ test('quote email uses currency-specific minor-unit formatting and refuses expir
 test('admin quote expiry comparison uses the browser local calendar date rather than UTC date',()=>{const ui=fs.readFileSync(path.join(root,'platform/public/admin.js'),'utf8');assert.match(ui,/const localDateKey=\(\)=>\{const d=new Date\(\);return d\.getFullYear\(\)/);assert.doesNotMatch(ui,/valid_until\)\.slice\(0,10\)<new Date\(\)\.toISOString\(\)\.slice\(0,10\)/);});
 
 test('MFA uses encrypted TOTP secrets, recovery hashes and anti-replay login challenges',()=>{const mfa=fs.readFileSync(path.join(root,'platform/src/mfa.js'),'utf8');const auth=fs.readFileSync(path.join(root,'platform/src/auth.js'),'utf8');const admin=fs.readFileSync(path.join(root,'platform/src/mfa-routes.js'),'utf8');const migration=fs.readFileSync(path.join(root,'db/018_privileged_mfa.sql'),'utf8');assert.match(mfa,/aes-256-gcm/);assert.match(mfa,/MFA_ENCRYPTION_KEY/);assert.match(mfa,/last_totp_step/);assert.match(mfa,/expires_at/);assert.match(auth,/mfaRequired:true/);assert.match(admin,/auth\/mfa\/verify/);assert.match(admin,/auth\/mfa\/enable/);assert.match(migration,/CREATE TABLE IF NOT EXISTS user_mfa/);assert.match(migration,/CREATE TABLE IF NOT EXISTS user_mfa_recovery_codes/);});
+
+test('MFA cryptography matches a standard TOTP vector, rejects replay, and encrypts secrets',()=>{
+ const previous=process.env.MFA_ENCRYPTION_KEY;
+ process.env.MFA_ENCRYPTION_KEY=''.padStart(64,'a');
+ try {
+  const mfa=require('../src/mfa');
+  const secret='GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ';
+  assert.equal(mfa.verifyTotp(secret,'287082',59000,-1),1);
+  assert.equal(mfa.verifyTotp(secret,'287082',59000,1),null);
+  const ciphertext=mfa.encryptSecret(secret);
+  assert.notEqual(ciphertext,secret);
+  assert.equal(mfa.decryptSecret(ciphertext),secret);
+  assert.notEqual(mfa.hashRecovery('ABCDEF0123456789'),'ABCDEF0123456789');
+  assert.equal(mfa.hashRecovery('ABCDEF0123456789'),mfa.hashRecovery('abcdef0123456789'));
+ } finally {
+  if(previous===undefined)delete process.env.MFA_ENCRYPTION_KEY;else process.env.MFA_ENCRYPTION_KEY=previous;
+ }
+});
