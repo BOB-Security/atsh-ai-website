@@ -182,6 +182,22 @@ test('privileged accounts receive enrollment-only sessions until MFA is enabled'
 
 
 
+test('MFA rotation requires password re-verification, consumes a factor, revokes sessions and challenges, and audits rotation',()=>{
+ const routes=fs.readFileSync(path.join(root,'platform/src/mfa-routes.js'),'utf8');
+ const auth=fs.readFileSync(path.join(root,'platform/src/auth.js'),'utf8');
+ const server=fs.readFileSync(path.join(root,'platform/server.js'),'utf8');
+ assert.match(routes,/router\.post\('\/auth\/mfa\/rotate'/);
+ assert.match(routes,/verifyPassword\(input\.password,user\.rows\[0\]\.password_hash\)/);
+ assert.match(routes,/FOR UPDATE/);
+ assert.match(routes,/DELETE FROM user_mfa_recovery_codes WHERE user_id=\$1/);
+ assert.match(routes,/DELETE FROM auth_mfa_challenges WHERE user_id=\$1/);
+ assert.match(routes,/DELETE FROM auth_sessions WHERE user_id=\$1 AND token_hash<>\$2/);
+ assert.match(routes,/mfa_enrollment_only=true/);
+ assert.match(routes,/auth\.mfa_rotated/);
+ assert.match(auth,/status\|setup\|enable\|rotate/);
+ assert.match(server,/app\.use\('\/api\/admin\/auth\/mfa\/rotate', loginLimiter\)/);
+});
+
 test('MFA challenge verification serializes challenge and authenticator rows in one transaction',()=>{const mfa=fs.readFileSync(path.join(root,'platform/src/mfa.js'),'utf8');assert.match(mfa,/BEGIN/);assert.match(mfa,/FOR UPDATE OF c,m/);assert.match(mfa,/DELETE FROM auth_mfa_challenges WHERE token_hash=\$1/);assert.match(mfa,/ROLLBACK/);});
 
 test('MFA setup cannot replace an unexpired pending secret and enable must match the verified secret',()=>{const routes=fs.readFileSync(path.join(root,'platform/src/mfa-routes.js'),'utf8');assert.match(routes,/user_mfa\.pending_expires_at IS NULL OR user_mfa\.pending_expires_at<=now\(\)/);assert.match(routes,/secret_ciphertext=\$3/);assert.match(routes,/r\.rows\[0\]\.secret_ciphertext/);});
