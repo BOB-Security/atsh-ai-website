@@ -79,3 +79,12 @@ test('knowledge article lifecycle is editable only through permission-protected 
  assert.ok(ui.includes('knowledge-edit-form'));
  assert.ok(ui.includes("api('/api/ops/knowledge/'+f.dataset.articleId"));
 });
+
+test('admin customer cards support editing customer profile fields through scoped customer update API',()=>{
+ const ui=fs.readFileSync(path.join(root,'platform/public/admin.js'),'utf8');
+ const routes=fs.readFileSync(path.join(root,'platform/src/routes/admin.js'),'utf8');
+ assert.ok(ui.includes('customer-profile-form'));
+ assert.ok(ui.includes("api('/customers/'+f.dataset.customerId"));
+ assert.ok(routes.includes("router.patch('/customers/:id',requirePermission('customers.manage')"));
+ assert.ok(routes.includes('display_name=COALESCE($3,display_name)'));
+});
