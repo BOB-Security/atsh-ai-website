@@ -149,3 +149,5 @@ test('MFA migration/routes include encrypted secrets, replay tracking and hashed
 test('MFA enrollment route policy covers all privileged roles rather than only the Owner role',()=>{const routes=fs.readFileSync(path.join(root,'platform/src/routes/admin.js'),'utf8');assert.match(routes,/privilegedUser\(\{\.\.\.req\.user,permissions:req\.permissionSets\|\|\[\]\}\)/);assert.doesNotMatch(routes,/includes\('Owner'\)\)return res\.status\(403\)\.json\(\{error:'إعداد المصادقة الثنائية متاح/);});
 
 test('MFA enrollment-only sessions are denied by auth middleware outside MFA routes',()=>{const auth=fs.readFileSync(path.join(root,'platform/src/auth.js'),'utf8');assert.match(auth,/user\.mfa_enrollment_required && !req\.path\.startsWith\('\/auth\/mfa\/'\)/);});
+
+test('MFA login challenge uses an accessible inline form instead of a browser prompt',()=>{const ui=fs.readFileSync(path.join(root,'platform/public/admin.js'),'utf8');const html=fs.readFileSync(path.join(root,'platform/public/admin/index.html'),'utf8');assert.doesNotMatch(ui,/prompt\(/);assert.match(ui,/mfa-login-form/);assert.match(html,/id="mfa-login-form"/);assert.match(html,/aria-live="polite"/);});
