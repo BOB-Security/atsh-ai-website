@@ -9,7 +9,7 @@ This matrix maps the reference specification to the isolated implementation trac
 | Multi-step project configurator | `project-builder.html`, `builder.js`, `POST /api/public/project-inquiries` | Implemented baseline | Accessibility, field coverage, real browser E2E, spam tests, email/notification workflow |
 | Reference number and stored request | `leads`, `customers`, transactional intake | Partial | Customer duplicate policy, notification delivery, admin E2E |
 | Central database | `db/001..005_*.sql`, `platform/src/db.js` | Schema and runner implemented | Apply to real PostgreSQL, migration test, backup/restore test, connection policy |
-| Admin authentication | `platform/src/auth.js`, opaque DB sessions, rate-limited login, TOTP MFA, encrypted MFA secrets, single-use recovery codes, and restricted enrollment-only sessions for privileged accounts | Partial — release blocker | Configure `MFA_ENCRYPTION_KEY` in deployment; apply migrations 018–019; run privileged-policy and enrollment E2E; complete MFA recovery/rotation lifecycle, concurrent challenge tests, migration/upgrade tests and backup/restore acceptance |
+| Admin authentication | `platform/src/auth.js`, opaque DB sessions, rate-limited login, TOTP MFA, encrypted MFA secrets, single-use recovery codes, and restricted enrollment-only sessions for privileged accounts | Partial — release blocker | Configure `MFA_ENCRYPTION_KEY` in deployment; apply migrations 018–020; run privileged-policy and enrollment E2E; complete MFA recovery/rotation lifecycle, concurrent challenge tests, migration/upgrade tests and backup/restore acceptance |
 | Team roles/invitations | `platform/src/routes/team.js`, bootstrap role seeds | Partial | Invite email integration test, role matrix test, UI actions for all cases |
 | Leads/customers/projects/tasks | `platform/src/routes/admin.js` | Partial | CRUD completion, filtering/pagination, field-level validation, workflow tests |
 | Quotes and immutable snapshot | `quotes`, `quote_items`, public estimate page, email issue and one-time response token | Partial — admin status/expiry display and currency-aware minor-unit formatting implemented | Browser acceptance, customer-facing quote rendering/PDF, payment workflow, currency/rounding integration tests and email-provider E2E remain required |
@@ -42,7 +42,7 @@ This matrix maps the reference specification to the isolated implementation trac
 
 ## Current MFA hardening validation checkpoint
 - PR #43 is a draft targeting `main` so the pull-request validation workflow can run against the combined diff. A passing run must be associated with the exact PR head commit; earlier green runs on PR #40 or `security/mfa-on-rebuild` are not substitutes.
-- Until that exact-head run completes, migration and test execution evidence is pending. No staging deployment, merge, or production release is authorized by this status note.
+- CI passed on exact PR head `fae8310d5fe3564e1daa94ed94468499adbefbec` in run `40745203293`: build, PostgreSQL migrations, bootstrap, and `npm test` all succeeded. This validates the CI workflow only; it does not replace browser E2E, race/concurrency tests, recovery acceptance, or staging/restore checks. No staging deployment, merge, or production release is authorized by this status note.
 
 
 ### MFA pending enrollment expiry hardening
@@ -50,3 +50,6 @@ This matrix maps the reference specification to the isolated implementation trac
 - MFA setup sets a 10-minute expiry; enabling requires an unexpired pending secret, and successful enable clears the expiry.
 - Static regression coverage added. This does not replace database-backed concurrency or browser acceptance tests.
 - Release gates remain open until the CI run for the exact PR head passes and recovery, rate-limit, replay/concurrency, browser E2E, staging migration and restore checks are evidenced.
+
+
+- Follow-up after CI pass: regression migration inventory now includes `020_mfa_pending_expiry.sql`. CI must rerun on the resulting latest PR head; do not reuse the earlier green run as proof for this later commit.
