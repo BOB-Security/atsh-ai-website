@@ -64,7 +64,7 @@ async function requireAuth(req,res,next) {
        FROM auth_sessions s JOIN users u ON u.id=s.user_id
        LEFT JOIN user_roles ur ON ur.user_id=u.id LEFT JOIN roles r ON r.id=ur.role_id
        WHERE s.token_hash=$1 AND s.expires_at>now() AND u.status='active'
-       GROUP BY u.id LIMIT 1`,[digest(token)]);
+       GROUP BY u.id,s.mfa_enrollment_only LIMIT 1`,[digest(token)]);
     if(!rows[0]) {res.clearCookie(COOKIE,{path:'/'});return res.status(401).json({error:'انتهت الجلسة. سجل الدخول مجددًا.'});}
     if(rows[0].organization_id!==req.app.locals.organizationId) return res.status(403).json({error:'لا توجد صلاحية للوصول.'});
     req.user=rows[0]; req.permissionSets=rows[0].permission_sets.flat();
