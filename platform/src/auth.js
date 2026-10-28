@@ -33,39 +33,58 @@ function setCookie(res, token, production) {
 }
 async function login(req,res,next) {
   try {
-    const email = String(req.body.email || '').trim().toLowerCase();
-    const password = String(req.body.password || '');
-    if (!email || password.length < 1 || password.length > 256) return res.status(400).json({error:'بيانات الدخول غير صحيحة.'});
-    const org = req.app.locals.organizationId;
-    const { rows } = await getPool().query(
-      `SELECT u.id,u.email,u.full_name,u.password_hash,u.status,
-        COALESCE(jsonb_agg(DISTINCT r.name) FILTER (WHERE r.name IS NOT NULL),'[]'::jsonb) AS roles,
-        COALESCE(jsonb_agg(DISTINCT r.permissions) FILTER (WHERE r.name IS NOT NULL),'[]'::jsonb) AS permission_sets
+    const email=String(req.body.email||'').trim().toLowerCase();
+    const password=String(req.body.password||'');
+    if(!email||password.length<1||password.length>256)return res.status(400).json({error:'بيانات الدخول غير صحيحة.'});
+    const org=req.app.locals.organizationId;
+    const {rows}=await getPool().query(
+      `SELECT u.id,u.email,u.full_name,u.password_hash,u.status,u.mfa_enabled,u.mfa_secret_enc,u.mfa_last_counter,
+        COALESCE(jsonb_agg(DISTINCT r.name) FILTER(WHERE r.name IS NOT NULL),'[]'::jsonb) AS roles,
+        COALESCE(jsonb_agg(DISTINCT r.permissions) FILTER(WHERE r.name IS NOT NULL),'[]'::jsonb) AS permission_sets
        FROM users u LEFT JOIN user_roles ur ON ur.user_id=u.id LEFT JOIN roles r ON r.id=ur.role_id
        WHERE u.organization_id=$1 AND lower(u.email)=lower($2) GROUP BY u.id LIMIT 1`,[org,email]);
     const user=rows[0];
-    if (!user || user.status!=='active' || !await verifyPassword(password,user.password_hash)) return res.status(401).json({error:'البريد الإلكتروني أو كلمة المرور غير صحيحة.'});
+    if(!user||user.status!=='active'||!await verifyPassword(password,user.password_hash))return res.status(401).json({error:'البريد الإلكتروني أو كلمة المرور غير صحيحة.'});
+    const isPrivileged=privilegedUser({...user,permissions:user.permission_sets.flat()});
+    if(isPrivileged&&!user.mfa_enabled){
+      // Do not issue privileged sessions while MFA has not been enrolled.
+      const token=crypto.randomBytes(32).toString('base64url');
+      const expires=new Date(Date.now()+SESSION_MS);
+      await getPool().query('INSERT INTO auth_sessions(user_id,token_hash,expires_at,mfa_verified_at) VALUES($1,$2,$3,NULL)',[user.id,digest(token),expires]);
+      setCookie(res,token,req.app.locals.config.production);
+      return res.json({ok:true,requiresMfaEnrollment:true,user:{id:user.id,email:user.email,name:user.full_name,roles:user.roles,permissions:user.permission_sets.flat()}});
+    }
     if(user.mfa_enabled){
       const mfaCode=String(req.body.mfaCode||''),recoveryCode=String(req.body.recoveryCode||'');
       if(!mfaCode&&!recoveryCode)return res.status(200).json({ok:false,requiresMfa:true,message:'أدخل رمز المصادقة الثنائية.'});
       if(mfaCode){
-        let secret;try{secret=decryptSecret(user.mfa_secret_enc,req.app.locals.config.mfaEncryptionKey);}catch{return res.status(503).json({error:'المصادقة الثنائية غير متاحة بسبب إعداد أمني.'});}
-        const counter=verifyTotp(secret,mfaCode);if(counter===null)return res.status(401).json({error:'رمز المصادقة غير صحيح أو انتهت صلاحيته.'});
-        const client=await getPool().connect();try{await client.query('BEGIN');const changed=await client.query('UPDATE users SET mfa_last_counter=$2 WHERE id=$1 AND COALESCE(mfa_last_counter,-1)<$2 RETURNING id',[user.id,counter]);if(!changed.rowCount){await client.query('ROLLBACK');return res.status(401).json({error:'تم استخدام هذا الرمز من قبل. انتظر الرمز التالي.'});}await client.query('COMMIT');}catch(e){await client.query('ROLLBACK').catch(()=>{});throw e;}finally{client.release();}
+        let secret;
+        try{secret=decryptSecret(user.mfa_secret_enc,req.app.locals.config.mfaEncryptionKey);}
+        catch{return res.status(503).json({error:'المصادقة الثنائية غير متاحة بسبب إعداد أمني.'});}
+        const counter=verifyTotp(secret,mfaCode);
+        if(counter===null)return res.status(401).json({error:'رمز المصادقة غير صحيح أو انتهت صلاحيته.'});
+        const client=await getPool().connect();
+        try{
+          await client.query('BEGIN');
+          const changed=await client.query('UPDATE users SET mfa_last_counter=$2 WHERE id=$1 AND COALESCE(mfa_last_counter,-1)<$2 RETURNING id',[user.id,counter]);
+          if(!changed.rowCount){await client.query('ROLLBACK');return res.status(401).json({error:'تم استخدام هذا الرمز من قبل. انتظر الرمز التالي.'});}
+          await client.query('COMMIT');
+        }catch(e){await client.query('ROLLBACK').catch(()=>{});throw e;}
+        finally{client.release();}
       }else{
         const used=await getPool().query('DELETE FROM user_mfa_recovery_codes WHERE user_id=$1 AND code_hash=$2 RETURNING id',[user.id,hashRecoveryCode(recoveryCode)]);
         if(!used.rowCount)return res.status(401).json({error:'رمز الاسترداد غير صالح أو سبق استخدامه.'});
         await getPool().query("INSERT INTO audit_logs(organization_id,actor_user_id,action,entity_type,entity_id,details) VALUES($1,$2,'auth.mfa.recovery_login','user',$2,'{}'::jsonb)",[org,user.id]);
       }
     }
-    const token=crypto.randomBytes(32).toString('base64url');
-    const expires=new Date(Date.now()+SESSION_MS);
+    const token=crypto.randomBytes(32).toString('base64url'),expires=new Date(Date.now()+SESSION_MS);
     await getPool().query('INSERT INTO auth_sessions(user_id,token_hash,expires_at,mfa_verified_at) VALUES($1,$2,$3,$4)',[user.id,digest(token),expires,user.mfa_enabled?new Date():null]);
     await getPool().query('UPDATE users SET last_login_at=now() WHERE id=$1',[user.id]);
     setCookie(res,token,req.app.locals.config.production);
     res.json({ok:true,user:{id:user.id,email:user.email,name:user.full_name,roles:user.roles,permissions:user.permission_sets.flat()}});
-  } catch(err){next(err);}
+  }catch(err){next(err);}
 }
+
 async function requireAuth(req,res,next) {
   try {
     const token=req.cookies?.[COOKIE];
