@@ -182,6 +182,15 @@ test('privileged accounts receive enrollment-only sessions until MFA is enabled'
 
 
 
+test('MFA rotation UI exposes the protected flow and hides admin modules during re-enrollment',()=>{
+ const ui=fs.readFileSync(path.join(root,'platform/public/admin.js'),'utf8');
+ const html=fs.readFileSync(path.join(root,'platform/public/admin/index.html'),'utf8');
+ assert.ok(html.includes('id="mfa-rotate-form"'));
+ assert.ok(ui.includes("api('/auth/mfa/rotate'"));
+ assert.ok(ui.includes('currentUser.mfaEnrollmentRequired=true'));
+ assert.ok(ui.includes("document.querySelector('.tabs').hidden=true"));
+});
+
 test('MFA rotation requires password re-verification, consumes a factor, revokes sessions and challenges, and audits rotation',()=>{
  const routes=fs.readFileSync(path.join(root,'platform/src/mfa-routes.js'),'utf8');
  const auth=fs.readFileSync(path.join(root,'platform/src/auth.js'),'utf8');
