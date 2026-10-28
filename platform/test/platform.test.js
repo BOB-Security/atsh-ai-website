@@ -51,3 +51,14 @@ test('admin password recovery uses expiring hashed one-time tokens and revokes s
  assert.match(migration,/token_hash text NOT NULL UNIQUE/);
  assert.match(migration,/expires_at timestamptz NOT NULL/);
 });
+
+test('admin team panel supports member status management and owner-only role assignment UI',()=>{
+ const ui=fs.readFileSync(path.join(root,'platform/public/admin.js'),'utf8');
+ const routes=fs.readFileSync(path.join(root,'platform/src/routes/team.js'),'utf8');
+ assert.match(ui,/data-team-status/);
+ assert.match(ui,/data-team-save-roles/);
+ assert.match(ui,/api\('\/api\/team\/'\)/);
+ assert.match(routes,/router\.patch\('\/:id\/status'/);
+ assert.match(routes,/router\.patch\('\/:id\/roles'/);
+ assert.match(routes,/تعديل أدوار الفريق متاح لمالك النظام فقط/);
+});
