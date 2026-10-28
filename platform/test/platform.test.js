@@ -136,3 +136,5 @@ test('catalog admin UI exposes permission-protected activate/deactivate controls
  assert.match(ui,/\['addons','الإضافات','\/catalog\/addons'\]/);
  for(const type of ['categories','plans','addons'])assert.match(routes,new RegExp("router\\.patch\\('\\/catalog\\/"+type+"\\/:id',requirePermission\\('catalog\\.manage'\\)"));
 });
+
+test('admin quote expiry comparison uses the browser local calendar date rather than UTC date',()=>{const ui=fs.readFileSync(path.join(root,'platform/public/admin.js'),'utf8');assert.match(ui,/const localDateKey=\(\)=>\{const d=new Date\(\);return d\.getFullYear\(\)/);assert.doesNotMatch(ui,/valid_until\)\.slice\(0,10\)<new Date\(\)\.toISOString\(\)\.slice\(0,10\)/);});
