@@ -13,6 +13,7 @@ function loadConfig(env = process.env) {
     port: Number(env.PORT || 8080),
     databaseUrl: env.DATABASE_URL || '',
     sessionSecret: env.SESSION_SECRET || '',
+    mfaEncryptionKey: env.MFA_ENCRYPTION_KEY || '',
     publicBaseUrl: env.PUBLIC_BASE_URL || '',
     corsOrigins: (env.CORS_ORIGINS || '').split(',').map(v => v.trim()).filter(Boolean),
     ownerEmail: env.OWNER_EMAIL || '',

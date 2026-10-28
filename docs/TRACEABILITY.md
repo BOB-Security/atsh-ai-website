@@ -9,7 +9,7 @@ This matrix maps the reference specification to the isolated implementation trac
 | Multi-step project configurator | `project-builder.html`, `builder.js`, `POST /api/public/project-inquiries` | Implemented baseline | Accessibility, field coverage, real browser E2E, spam tests, email/notification workflow |
 | Reference number and stored request | `leads`, `customers`, transactional intake | Partial | Customer duplicate policy, notification delivery, admin E2E |
 | Central database | `db/001..005_*.sql`, `platform/src/db.js` | Schema and runner implemented | Apply to real PostgreSQL, migration test, backup/restore test, connection policy |
-| Admin authentication | `platform/src/auth.js`, opaque DB sessions, rate-limited login, owner-controlled roles | Partial — release blocker | Implement MFA for privileged users, password recovery, session revocation UI, rate-limit tests and secure deployment settings |
+| Admin authentication | `platform/src/auth.js`, opaque DB sessions, rate-limited login, TOTP MFA, encrypted MFA secrets, single-use recovery codes, and restricted enrollment-only sessions for privileged accounts | Partial — release blocker | Configure `MFA_ENCRYPTION_KEY` in deployment; apply migrations 018–020; run privileged-policy and enrollment E2E; complete MFA recovery/rotation lifecycle, concurrent challenge tests, migration/upgrade tests and backup/restore acceptance |
 | Team roles/invitations | `platform/src/routes/team.js`, bootstrap role seeds | Partial | Invite email integration test, role matrix test, UI actions for all cases |
 | Leads/customers/projects/tasks | `platform/src/routes/admin.js` | Partial | CRUD completion, filtering/pagination, field-level validation, workflow tests |
 | Quotes and immutable snapshot | `quotes`, `quote_items`, public estimate page, email issue and one-time response token | Partial — admin status/expiry display and currency-aware minor-unit formatting implemented | Browser acceptance, customer-facing quote rendering/PDF, payment workflow, currency/rounding integration tests and email-provider E2E remain required |
@@ -29,3 +29,55 @@ This matrix maps the reference specification to the isolated implementation trac
 - Do not publish example prices or placeholder legal copy as approved commercial policy.
 - Do not claim backup success unless an actual provider operation succeeded; do not claim recoverability until a restore test is recorded.
 - Do not deploy a client project until a valid final-release approval token has been consumed and the approval record is present.
+
+
+## MFA implementation status
+- TOTP enrollment and verification are implemented on the isolated MFA branch; secrets use AES-256-GCM with a dedicated 32-byte hexadecimal `MFA_ENCRYPTION_KEY` environment variable.
+- Recovery codes are generated once and stored as hashes; successful TOTP steps are tracked to prevent replay.
+- This implementation is not production-ready until CI, migration, staging secret configuration, browser tests and recovery-path acceptance pass.
+
+- Privileged MFA enforcement hardening is in isolated branch `security/mfa-enforcement-hardening`: Owner and roles with defined sensitive permissions are directed to a 15-minute enrollment-only session; normal API access is blocked until successful MFA enrollment promotes that session.
+- Static regression assertions were added for the policy and migration. They have not yet been executed in CI or against a live PostgreSQL/browser environment in this work session; do not treat them as acceptance evidence.
+- Recovery/rotation lifecycle, race-condition verification, real PostgreSQL migration/upgrade tests, browser E2E, and backup/restore remain unresolved release gates.
+
+## Current MFA hardening validation checkpoint
+- PR #43 is a draft targeting `main` so the pull-request validation workflow can run against the combined diff. A passing run must be associated with the exact PR head commit; earlier green runs on PR #40 or `security/mfa-on-rebuild` are not substitutes.
+- CI passed on exact PR head `fae8310d5fe3564e1daa94ed94468499adbefbec` in run `40745203293`: build, PostgreSQL migrations, bootstrap, and `npm test` all succeeded. This validates the CI workflow only; it does not replace browser E2E, race/concurrency tests, recovery acceptance, or staging/restore checks. No staging deployment, merge, or production release is authorized by this status note.
+
+
+### MFA pending enrollment expiry hardening
+- Added migration `020_mfa_pending_expiry.sql` for a nullable expiry timestamp on pending MFA enrollment records.
+- MFA setup sets a 10-minute expiry; enabling requires an unexpired pending secret, and successful enable clears the expiry.
+- Static regression coverage added. This does not replace database-backed concurrency or browser acceptance tests.
+- Release gates remain open until the CI run for the exact PR head passes and recovery, rate-limit, replay/concurrency, browser E2E, staging migration and restore checks are evidenced.
+
+
+- Follow-up after CI pass: regression migration inventory now includes `020_mfa_pending_expiry.sql`. CI must rerun on the resulting latest PR head; do not reuse the earlier green run as proof for this later commit.
+
+
+### MFA concurrency hardening follow-up
+- Setup requests no longer replace a non-expired pending secret; a conflicting request is rejected until the pending setup expires. Enable now binds the update to the exact encrypted secret that was verified, preventing stale-secret promotion if the row changes concurrently.
+- Login challenge verification now locks the challenge and MFA rows within one PostgreSQL transaction, increments attempts while locked, and consumes the challenge on success. Static regression assertions cover the intended transaction/locking shape.
+- Added a PostgreSQL-backed regression test that races two uses of the same MFA challenge/recovery code and expects exactly one successful login. The test uses the isolated CI database and skips when the bootstrap owner already has MFA configured.
+- This test and the latest changes still require a completed green CI run on the exact current PR head. One concurrency test does not cover every challenge expiry/attempt-limit or browser workflow; browser E2E, full recovery lifecycle, staging migration and backup/restore remain release gates.
+
+- The first PostgreSQL concurrency run exposed an audit INSERT parameter type mismatch (UUID reused for a text `entity_id`). Login and enrollment audit inserts now use separate typed parameters. The next CI run must confirm this correction before the integration test is considered passing.
+
+
+### MFA recovery and rotation endpoint (implementation, acceptance pending)
+- Added authenticated `POST /api/admin/auth/mfa/rotate`. It requires the current password plus either a valid non-replayed TOTP code or an unused recovery code.
+- The endpoint locks the active MFA row in a PostgreSQL transaction, consumes a recovery code when used, replaces the authenticator secret with a 10-minute pending setup, deletes remaining recovery codes and outstanding MFA challenges, revokes all other platform sessions, and limits the current session to MFA enrollment for 15 minutes.
+- The operation writes `auth.mfa_rotated` audit evidence with whether a recovery code was used, and the endpoint is rate-limited.
+- Static regression assertions were added. These are not yet evidence that concurrent recovery/rotation requests, password-reset races, browser UX, or full session revocation behavior pass against PostgreSQL. CI on the exact current PR head and dedicated integration/browser tests remain mandatory.
+- The rotation response returns a new TOTP setup secret/URI; the user must confirm it through the existing `/auth/mfa/enable` route within 10 minutes to complete rotation and receive a fresh recovery-code set. The prior recovery codes are invalidated immediately, so the user should complete setup before leaving the flow.
+
+- Added the admin console form and client handler for the rotation endpoint. During re-enrollment, the UI hides operational modules; successful confirmation returns through the existing MFA enable path. UI assertions were added, but a real browser E2E run is still required.
+
+
+## Verified CI evidence — 2026-10-28
+- Exact code commit tested: `5646ae37e005158e814dba8b02b5433a8e37b634` (the PR #43 head at the time of the run).
+- GitHub Actions run: [40748893428](https://github.com/BOB-Security/atsh-ai-website/actions/runs/40748893428), workflow `ATSH AI Platform Rebuild CI`, job `validate`.
+- Observed job steps succeeded: dependency installation, `npm run build`, `npm run db:migrate`, `npm run db:bootstrap`, and `npm test` against the workflow's disposable PostgreSQL 16 service.
+- Test summary from the job log: 43 tests, 43 passed, 0 failed, 0 skipped. The PostgreSQL concurrency test `PostgreSQL serializes concurrent MFA challenge use and permits only one recovery login` is explicitly reported as passing (not skipped).
+- Scope of evidence: this confirms the test suite and migration/bootstrap workflow ran successfully on that commit in CI. It does not prove browser E2E, an upgrade from a real existing database, production secret configuration, deployed HTTPS/cookie settings, a real Azure staging deployment, or a successful encrypted backup restore.
+- Current release decision remains **not production-approved** until the remaining acceptance gates above are completed and recorded. This entry supersedes earlier statements in this file that the latest code commit still needed its first CI pass; it does not close the remaining release gates.

@@ -4,6 +4,9 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const path=require('node:path');
 const {loadConfig}=require('../src/config');
+const {getPool}=require('../src/db');
+const crypto=require('node:crypto');
+const mfa=require('../src/mfa');
 const root=path.resolve(__dirname,'../..');
 test('config defaults to a non-production local environment',()=>{const c=loadConfig({});assert.equal(c.production,false);assert.equal(c.port,8080);assert.equal(c.defaultOrganizationSlug,'atsh-ai');});
 test('PostgreSQL schema includes core operational domains',()=>{const sql=fs.readFileSync(path.join(root,'db/schema.sql'),'utf8');for(const name of ['customers','leads','projects','project_stages','tasks','quotes','subscriptions','hosting_assets','backup_runs','ai_agents','knowledge_sources','conversations','messages','support_tickets','audit_logs','notifications','customer_portal_accounts','customer_portal_sessions','customer_project_updates','design_versions','project_change_requests'])assert.match(sql,new RegExp('CREATE TABLE IF NOT EXISTS '+name+'\\b'));});
@@ -13,7 +16,7 @@ test('public intake requires explicit consent and validates user data',()=>{cons
 test('admin quote list formats minor-unit prices using the currency exponent and exposes expiry/issue state',()=>{const ui=fs.readFileSync(path.join(root,'platform/public/admin.js'),'utf8');assert.match(ui,/new Intl\.NumberFormat/);assert.match(ui,/resolvedOptions\(\)\.maximumFractionDigits/);assert.match(ui,/Math\.pow\(10,digits\)/);assert.match(ui,/منتهي الصلاحية/);assert.match(ui,/صالح حتى:/);assert.match(ui,/data-issue-quote/);});
 test('quote and final-release approvals are token-based, not admin status toggles',()=>{const pub=fs.readFileSync(path.join(root,'platform/src/routes/public.js'),'utf8');const admin=fs.readFileSync(path.join(root,'platform/src/routes/admin.js'),'utf8');assert.match(pub,/router\.post\('\/quote-response'/);assert.match(pub,/approval_token_hash/);assert.match(admin,/router\.post\('\/quotes\/:id\/issue'/);assert.match(admin,/router\.post\('\/projects\/:id\/approvals'/);assert.match(admin,/لا يمكن بدء النشر أو التسليم النهائي دون موافقة نهائية صريحة مسجلة/);});
 test('AI assistant uses approved knowledge and refuses unconfigured operation',()=>{const ai=fs.readFileSync(path.join(root,'platform/src/routes/assistant.js'),'utf8');assert.match(ai,/status=\\'approved\\'/);assert.match(ai,/No relevant approved knowledge excerpt is available/);assert.match(ai,/cfg\.aiApiKey/);});
-test('migration sequence includes approval, quote and team token schemas',()=>{for(const f of ['001_initial_schema.sql','002_auth_and_content.sql','003_knowledge_and_integrations.sql','004_team_invitations.sql','005_explicit_client_approvals.sql','006_quote_approval_tokens.sql','007_assistant_sessions.sql','008_customer_agent_runtime.sql','009_bilingual_service_features.sql','010_support_ticket_threads.sql','011_project_preview_ready_status.sql','012_support_ticket_sla.sql','013_customer_portal.sql','014_ticket_message_visibility.sql','015_design_versioning.sql','016_project_change_requests.sql'])assert.ok(fs.existsSync(path.join(root,'db',f)),f+' missing');});
+test('migration sequence includes approval, quote and team token schemas',()=>{for(const f of ['001_initial_schema.sql','002_auth_and_content.sql','003_knowledge_and_integrations.sql','004_team_invitations.sql','005_explicit_client_approvals.sql','006_quote_approval_tokens.sql','007_assistant_sessions.sql','008_customer_agent_runtime.sql','009_bilingual_service_features.sql','010_support_ticket_threads.sql','011_project_preview_ready_status.sql','012_support_ticket_sla.sql','013_customer_portal.sql','014_ticket_message_visibility.sql','015_design_versioning.sql','016_project_change_requests.sql','017_password_reset_tokens.sql','018_privileged_mfa.sql','019_mfa_enrollment_sessions.sql','020_mfa_pending_expiry.sql'])assert.ok(fs.existsSync(path.join(root,'db',f)),f+' missing');});
 
 test('assistant continuity uses opaque scoped session tokens and human escalation',()=>{const ai=fs.readFileSync(path.join(root,'platform/src/routes/assistant.js'),'utf8');assert.match(ai,/assistant_sessions/);assert.match(ai,/escalationTicketReference/);assert.match(ai,/status='waiting_human'/);});
 
@@ -140,3 +143,133 @@ test('catalog admin UI exposes permission-protected activate/deactivate controls
 test('quote email uses currency-specific minor-unit formatting and refuses expired issuance',()=>{const admin=fs.readFileSync(path.join(root,'platform/src/routes/admin.js'),'utf8');assert.match(admin,/new Intl\.NumberFormat\('en-US',\{style:'currency',currency:code\}\)/);assert.match(admin,/Math\.pow\(10,digits\)/);assert.match(admin,/انتهت صلاحية العرض/);});
 
 test('admin quote expiry comparison uses the browser local calendar date rather than UTC date',()=>{const ui=fs.readFileSync(path.join(root,'platform/public/admin.js'),'utf8');assert.match(ui,/const localDateKey=\(\)=>\{const d=new Date\(\);return d\.getFullYear\(\)/);assert.doesNotMatch(ui,/valid_until\)\.slice\(0,10\)<new Date\(\)\.toISOString\(\)\.slice\(0,10\)/);});
+
+test('MFA uses encrypted TOTP secrets, recovery hashes and anti-replay login challenges',()=>{const mfa=fs.readFileSync(path.join(root,'platform/src/mfa.js'),'utf8');const auth=fs.readFileSync(path.join(root,'platform/src/auth.js'),'utf8');const admin=fs.readFileSync(path.join(root,'platform/src/mfa-routes.js'),'utf8');const migration=fs.readFileSync(path.join(root,'db/018_privileged_mfa.sql'),'utf8');assert.match(mfa,/aes-256-gcm/);assert.match(mfa,/MFA_ENCRYPTION_KEY/);assert.match(mfa,/last_totp_step/);assert.match(mfa,/expires_at/);assert.match(auth,/mfaRequired:true/);assert.match(admin,/auth\/mfa\/verify/);assert.match(admin,/auth\/mfa\/enable/);assert.match(migration,/CREATE TABLE IF NOT EXISTS user_mfa/);assert.match(migration,/CREATE TABLE IF NOT EXISTS user_mfa_recovery_codes/);});
+
+test('MFA cryptography matches a standard TOTP vector, rejects replay, and encrypts secrets',()=>{
+ const previous=process.env.MFA_ENCRYPTION_KEY;
+ process.env.MFA_ENCRYPTION_KEY=''.padStart(64,'a');
+ try {
+  const mfa=require('../src/mfa');
+  const secret='GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ';
+  assert.equal(mfa.verifyTotp(secret,'287082',59000,-1),1);
+  assert.equal(mfa.verifyTotp(secret,'287082',59000,1),null);
+  const ciphertext=mfa.encryptSecret(secret);
+  assert.notEqual(ciphertext,secret);
+  assert.equal(mfa.decryptSecret(ciphertext),secret);
+  assert.notEqual(mfa.hashRecovery('ABCDEF0123456789'),'ABCDEF0123456789');
+  assert.equal(mfa.hashRecovery('ABCDEF0123456789'),mfa.hashRecovery('abcdef0123456789'));
+ } finally {
+  if(previous===undefined)delete process.env.MFA_ENCRYPTION_KEY;else process.env.MFA_ENCRYPTION_KEY=previous;
+ }
+});
+
+test('privileged accounts receive enrollment-only sessions until MFA is enabled',()=>{
+ const auth=fs.readFileSync(path.join(root,'platform/src/auth.js'),'utf8');
+ const routes=fs.readFileSync(path.join(root,'platform/src/mfa-routes.js'),'utf8');
+ const ui=fs.readFileSync(path.join(root,'platform/public/admin.js'),'utf8');
+ const migration=fs.readFileSync(path.join(root,'db/019_mfa_enrollment_sessions.sql'),'utf8');
+ assert.match(auth,/function requiresMfa/);
+ assert.match(auth,/mfa_enrollment_only/);
+ assert.match(auth,/mfaEnrollmentRequired:enrollmentOnly/);
+ assert.match(auth,/يلزم إكمال إعداد التحقق بخطوتين/);
+ assert.match(auth,/MFA_SENSITIVE_PERMISSIONS/);
+ assert.match(routes,/mfa_enrollment_only=false/);
+ assert.match(ui,/mfaEnrollmentRequired/);
+ assert.match(ui,/أكمل إعداد التحقق بخطوتين/);
+ assert.match(migration,/ADD COLUMN IF NOT EXISTS mfa_enrollment_only boolean NOT NULL DEFAULT false/);
+});
+
+
+
+test('MFA rotation UI exposes the protected flow and hides admin modules during re-enrollment',()=>{
+ const ui=fs.readFileSync(path.join(root,'platform/public/admin.js'),'utf8');
+ const html=fs.readFileSync(path.join(root,'platform/public/admin/index.html'),'utf8');
+ assert.ok(html.includes('id="mfa-rotate-form"'));
+ assert.ok(ui.includes("api('/auth/mfa/rotate'"));
+ assert.ok(ui.includes('currentUser.mfaEnrollmentRequired=true'));
+ assert.ok(ui.includes("document.querySelector('.tabs').hidden=true"));
+});
+
+test('MFA rotation requires password re-verification, consumes a factor, revokes sessions and challenges, and audits rotation',()=>{
+ const routes=fs.readFileSync(path.join(root,'platform/src/mfa-routes.js'),'utf8');
+ const auth=fs.readFileSync(path.join(root,'platform/src/auth.js'),'utf8');
+ const server=fs.readFileSync(path.join(root,'platform/server.js'),'utf8');
+ assert.match(routes,/router\.post\('\/auth\/mfa\/rotate'/);
+ assert.match(routes,/verifyPassword\(input\.password,user\.rows\[0\]\.password_hash\)/);
+ assert.match(routes,/FOR UPDATE/);
+ assert.match(routes,/DELETE FROM user_mfa_recovery_codes WHERE user_id=\$1/);
+ assert.match(routes,/DELETE FROM auth_mfa_challenges WHERE user_id=\$1/);
+ assert.match(routes,/DELETE FROM auth_sessions WHERE user_id=\$1 AND token_hash<>\$2/);
+ assert.match(routes,/mfa_enrollment_only=true/);
+ assert.match(routes,/auth\.mfa_rotated/);
+ assert.match(auth,/status\|setup\|enable\|rotate/);
+ assert.match(server,/app\.use\('\/api\/admin\/auth\/mfa\/rotate', loginLimiter\)/);
+});
+
+test('MFA challenge verification serializes challenge and authenticator rows in one transaction',()=>{const mfa=fs.readFileSync(path.join(root,'platform/src/mfa.js'),'utf8');assert.match(mfa,/BEGIN/);assert.match(mfa,/FOR UPDATE OF c,m/);assert.match(mfa,/DELETE FROM auth_mfa_challenges WHERE token_hash=\$1/);assert.match(mfa,/ROLLBACK/);});
+
+test('MFA setup cannot replace an unexpired pending secret and enable must match the verified secret',()=>{const routes=fs.readFileSync(path.join(root,'platform/src/mfa-routes.js'),'utf8');assert.match(routes,/user_mfa\.pending_expires_at IS NULL OR user_mfa\.pending_expires_at<=now\(\)/);assert.match(routes,/secret_ciphertext=\$3/);assert.match(routes,/r\.rows\[0\]\.secret_ciphertext/);});
+
+test('MFA pending enrollment secrets expire and cannot be enabled after expiry',()=>{
+ const routes=fs.readFileSync(path.join(root,'platform/src/mfa-routes.js'),'utf8');
+ const migration=fs.readFileSync(path.join(root,'db/020_mfa_pending_expiry.sql'),'utf8');
+ assert.match(routes,/pending_expires_at=now\(\)\+interval '10 minutes'/);
+ assert.match(routes,/pending_expires_at>now\(\)/);
+ assert.match(routes,/pending_expires_at=NULL/);
+ assert.match(migration,/ADD COLUMN IF NOT EXISTS pending_expires_at timestamptz/);
+});
+
+
+test('PostgreSQL serializes concurrent MFA challenge use and permits only one recovery login',async t=>{
+ if(process.env.NODE_ENV!=='test'||!process.env.DATABASE_URL)return t.skip('requires isolated CI PostgreSQL test database');
+ const previousKey=process.env.MFA_ENCRYPTION_KEY;
+ process.env.MFA_ENCRYPTION_KEY=''.padStart(64,'a');
+ const db=getPool();
+ let userId,challengeHash,sessionHash,createdMfa=false;
+ const recovery='ABCDEF0123456789';
+ try{
+  const user=await db.query('SELECT id FROM users WHERE lower(email)=lower($1) LIMIT 1',[process.env.OWNER_EMAIL||'owner@test.local']);
+  if(!user.rows[0])return t.skip('bootstrap owner is not present');
+  userId=user.rows[0].id;
+  const existing=await db.query('SELECT 1 FROM user_mfa WHERE user_id=$1',[userId]);
+  if(existing.rowCount)return t.skip('bootstrap owner already has MFA configured');
+  await db.query('INSERT INTO user_mfa(user_id,secret_ciphertext,enabled,last_totp_step) VALUES($1,$2,true,-1)',[userId,mfa.encryptSecret('GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ')]);
+  createdMfa=true;
+  await db.query('INSERT INTO user_mfa_recovery_codes(user_id,code_hash) VALUES($1,$2)',[userId,mfa.hashRecovery(recovery)]);
+  const challenge=crypto.randomBytes(32).toString('base64url');
+  challengeHash=crypto.createHash('sha256').update(challenge).digest('hex');
+  await db.query('INSERT INTO auth_mfa_challenges(user_id,token_hash,expires_at) VALUES($1,$2,now()+interval \'5 minutes\')',[userId,challengeHash]);
+  const makeRequest=()=>({cookies:{[mfa.COOKIE]:challenge},body:{code:recovery},app:{locals:{config:{production:false}}}});
+  const makeResponse=()=>({cookies:{},cookie(name,value){this.cookies[name]=value;},clearCookie(){}});
+  const resA=makeResponse(),resB=makeResponse();
+  const outcomes=await Promise.all([
+   mfa.completeLogin(makeRequest(),resA),
+   mfa.completeLogin(makeRequest(),resB)
+  ]);
+  assert.deepEqual(outcomes.map(x=>x.status).sort(),[200,401]);
+  const successful=outcomes.find(x=>x.status===200);
+  assert.ok(successful.body.user.id===userId);
+  const issued=resA.cookies.atsh_platform_session||resB.cookies.atsh_platform_session;
+  assert.ok(issued);
+  sessionHash=crypto.createHash('sha256').update(issued).digest('hex');
+ }finally{
+  if(challengeHash)await db.query('DELETE FROM auth_mfa_challenges WHERE token_hash=$1',[challengeHash]).catch(()=>{});
+  if(createdMfa&&userId){
+   if(sessionHash)await db.query('DELETE FROM auth_sessions WHERE token_hash=$1',[sessionHash]).catch(()=>{});
+   await db.query('DELETE FROM user_mfa_recovery_codes WHERE user_id=$1',[userId]).catch(()=>{});
+   await db.query('DELETE FROM user_mfa WHERE user_id=$1',[userId]).catch(()=>{});
+   await db.query("DELETE FROM audit_logs WHERE actor_user_id=$1 AND action='auth.mfa_login'",[userId]).catch(()=>{});
+  }
+  if(previousKey===undefined)delete process.env.MFA_ENCRYPTION_KEY;else process.env.MFA_ENCRYPTION_KEY=previousKey;
+ }
+});
+
+
+test('staging deployment requires MFA encryption configuration and CI watches deployment/traceability changes',()=>{
+ const staging=fs.readFileSync(path.join(root,'.github/workflows/platform-staging-deploy.yml'),'utf8');
+ const ci=fs.readFileSync(path.join(root,'.github/workflows/rebuild-platform-ci.yml'),'utf8');
+ assert.match(staging,/for key in DATABASE_URL PUBLIC_BASE_URL RESEND_API_KEY EMAIL_FROM AI_API_KEY AI_MODEL MFA_ENCRYPTION_KEY/);
+ assert.match(ci,/\.github\/workflows\/platform-staging-deploy\.yml/);
+ assert.match(ci,/docs\/TRACEABILITY\.md/);
+});
