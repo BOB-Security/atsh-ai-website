@@ -179,6 +179,8 @@ test('privileged accounts receive enrollment-only sessions until MFA is enabled'
 
 
 
+test('MFA challenge verification serializes challenge and authenticator rows in one transaction',()=>{const mfa=fs.readFileSync(path.join(root,'platform/src/mfa.js'),'utf8');assert.match(mfa,/BEGIN/);assert.match(mfa,/FOR UPDATE OF c,m/);assert.match(mfa,/DELETE FROM auth_mfa_challenges WHERE token_hash=\$1/);assert.match(mfa,/ROLLBACK/);});
+
 test('MFA setup cannot replace an unexpired pending secret and enable must match the verified secret',()=>{const routes=fs.readFileSync(path.join(root,'platform/src/mfa-routes.js'),'utf8');assert.match(routes,/user_mfa\.pending_expires_at IS NULL OR user_mfa\.pending_expires_at<=now\(\)/);assert.match(routes,/secret_ciphertext=\$3/);assert.match(routes,/r\.rows\[0\]\.secret_ciphertext/);});
 
 test('MFA pending enrollment secrets expire and cannot be enabled after expiry',()=>{
