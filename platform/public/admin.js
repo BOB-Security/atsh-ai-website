@@ -90,7 +90,15 @@ function bindCatalog(d){
  const existing=t.querySelector('#catalog-existing');
  const renderExisting=()=>{
   const groups=[['categories','الفئات','/catalog/categories'],['plans','الباقات','/catalog/plans'],['addons','الإضافات','/catalog/addons']];
-  existing.innerHTML=groups.map(([key,label,path])=>'<h4>'+label+'</h4>'+((d[key]||[]).length?(d[key]||[]).map(x=>{const active=!!x.active;const name=x.name_ar||x.nameAr||x.slug;const price=key==='categories'?'':(' · '+esc(x.currency||'EGP')+' · تأسيس '+esc(x.setup_amount_minor??0)+' · شهري '+esc(x.monthly_amount_minor??0)+' · سنوي '+esc(x.annual_amount_minor??0));return '<article class="data-card"><strong>'+esc(name)+'</strong><p>'+esc(x.name_en||x.nameEn||x.slug)+' '+price+'</p><p>الحالة: '+(active?'منشور/مفعّل':'مسودة/متوقف')+'</p><button type="button" class="button '+(active?'ghost':'primary')+'" data-catalog-toggle data-path="'+path+'" data-id="'+esc(x.id)+'" data-active="'+String(active)+'">'+(active?'إيقاف النشر':'تفعيل')+'</button></article>';}).join('')):'<p class="muted">لا توجد سجلات.</p>').join('');
+  existing.innerHTML=groups.map(([key,label,path])=>{
+   const items=d[key]||[];
+   const cards=items.map(x=>{
+    const active=!!x.active,name=x.name_ar||x.nameAr||x.slug;
+    const price=key==='categories'?'':' · '+esc(x.currency||'EGP')+' · تأسيس '+esc(x.setup_amount_minor??0)+' · شهري '+esc(x.monthly_amount_minor??0)+' · سنوي '+esc(x.annual_amount_minor??0);
+    return '<article class="data-card"><strong>'+esc(name)+'</strong><p>'+esc(x.name_en||x.nameEn||x.slug)+price+'</p><p>الحالة: '+(active?'منشور/مفعّل':'مسودة/متوقف')+'</p><button type="button" class="button '+(active?'ghost':'primary')+'" data-catalog-toggle data-path="'+path+'" data-id="'+esc(x.id)+'" data-active="'+String(active)+'">'+(active?'إيقاف النشر':'تفعيل')+'</button></article>';
+   }).join('');
+   return '<h4>'+label+'</h4>'+(cards||'<p class="muted">لا توجد سجلات.</p>');
+  }).join('');
   existing.querySelectorAll('[data-catalog-toggle]').forEach(button=>button.addEventListener('click',async()=>{
    const active=button.dataset.active==='true';
    const noun=button.dataset.path.endsWith('categories')?'الفئة':button.dataset.path.endsWith('plans')?'الباقة':'الإضافة';
