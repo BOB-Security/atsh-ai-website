@@ -59,7 +59,7 @@ jobs:
           RESOURCE_GROUP: ${{ inputs.resource_group }}
         run: |
           settings=$(az webapp config appsettings list --name "$APP_NAME" --resource-group "$RESOURCE_GROUP" --query "[].name" -o tsv)
-          for key in DATABASE_URL PUBLIC_BASE_URL RESEND_API_KEY EMAIL_FROM AI_API_KEY AI_MODEL; do
+          for key in DATABASE_URL PUBLIC_BASE_URL RESEND_API_KEY EMAIL_FROM AI_API_KEY AI_MODEL MFA_ENCRYPTION_KEY; do
             echo "$settings" | grep -qx "$key" || { echo "Missing required App Service setting: $key"; exit 1; }
           done
       - name: Set non-secret runtime settings
