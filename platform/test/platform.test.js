@@ -264,3 +264,12 @@ test('PostgreSQL serializes concurrent MFA challenge use and permits only one re
   if(previousKey===undefined)delete process.env.MFA_ENCRYPTION_KEY;else process.env.MFA_ENCRYPTION_KEY=previousKey;
  }
 });
+
+
+test('staging deployment requires MFA encryption configuration and CI watches deployment/traceability changes',()=>{
+ const staging=fs.readFileSync(path.join(root,'.github/workflows/platform-staging-deploy.yml'),'utf8');
+ const ci=fs.readFileSync(path.join(root,'.github/workflows/rebuild-platform-ci.yml'),'utf8');
+ assert.match(staging,/for key in DATABASE_URL PUBLIC_BASE_URL RESEND_API_KEY EMAIL_FROM AI_API_KEY AI_MODEL MFA_ENCRYPTION_KEY/);
+ assert.match(ci,/\.github\/workflows\/platform-staging-deploy\.yml/);
+ assert.match(ci,/docs\/TRACEABILITY\.md/);
+});
