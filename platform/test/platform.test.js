@@ -13,7 +13,7 @@ test('public intake requires explicit consent and validates user data',()=>{cons
 test('admin quote list formats minor-unit prices using the currency exponent and exposes expiry/issue state',()=>{const ui=fs.readFileSync(path.join(root,'platform/public/admin.js'),'utf8');assert.match(ui,/new Intl\.NumberFormat/);assert.match(ui,/resolvedOptions\(\)\.maximumFractionDigits/);assert.match(ui,/Math\.pow\(10,digits\)/);assert.match(ui,/منتهي الصلاحية/);assert.match(ui,/صالح حتى:/);assert.match(ui,/data-issue-quote/);});
 test('quote and final-release approvals are token-based, not admin status toggles',()=>{const pub=fs.readFileSync(path.join(root,'platform/src/routes/public.js'),'utf8');const admin=fs.readFileSync(path.join(root,'platform/src/routes/admin.js'),'utf8');assert.match(pub,/router\.post\('\/quote-response'/);assert.match(pub,/approval_token_hash/);assert.match(admin,/router\.post\('\/quotes\/:id\/issue'/);assert.match(admin,/router\.post\('\/projects\/:id\/approvals'/);assert.match(admin,/لا يمكن بدء النشر أو التسليم النهائي دون موافقة نهائية صريحة مسجلة/);});
 test('AI assistant uses approved knowledge and refuses unconfigured operation',()=>{const ai=fs.readFileSync(path.join(root,'platform/src/routes/assistant.js'),'utf8');assert.match(ai,/status=\\'approved\\'/);assert.match(ai,/No relevant approved knowledge excerpt is available/);assert.match(ai,/cfg\.aiApiKey/);});
-test('migration sequence includes approval, quote and team token schemas',()=>{for(const f of ['001_initial_schema.sql','002_auth_and_content.sql','003_knowledge_and_integrations.sql','004_team_invitations.sql','005_explicit_client_approvals.sql','006_quote_approval_tokens.sql','007_assistant_sessions.sql','008_customer_agent_runtime.sql','009_bilingual_service_features.sql','010_support_ticket_threads.sql','011_project_preview_ready_status.sql','012_support_ticket_sla.sql','013_customer_portal.sql','014_ticket_message_visibility.sql','015_design_versioning.sql','016_project_change_requests.sql'])assert.ok(fs.existsSync(path.join(root,'db',f)),f+' missing');});
+test('migration sequence includes approval, quote and team token schemas',()=>{for(const f of ['001_initial_schema.sql','002_auth_and_content.sql','003_knowledge_and_integrations.sql','004_team_invitations.sql','005_explicit_client_approvals.sql','006_quote_approval_tokens.sql','007_assistant_sessions.sql','008_customer_agent_runtime.sql','009_bilingual_service_features.sql','010_support_ticket_threads.sql','011_project_preview_ready_status.sql','012_support_ticket_sla.sql','013_customer_portal.sql','014_ticket_message_visibility.sql','015_design_versioning.sql','016_project_change_requests.sql','017_password_reset_tokens.sql','018_privileged_mfa.sql','019_mfa_enrollment_sessions.sql'])assert.ok(fs.existsSync(path.join(root,'db',f)),f+' missing');});
 
 test('assistant continuity uses opaque scoped session tokens and human escalation',()=>{const ai=fs.readFileSync(path.join(root,'platform/src/routes/assistant.js'),'utf8');assert.match(ai,/assistant_sessions/);assert.match(ai,/escalationTicketReference/);assert.match(ai,/status='waiting_human'/);});
 
@@ -159,4 +159,20 @@ test('MFA cryptography matches a standard TOTP vector, rejects replay, and encry
  } finally {
   if(previous===undefined)delete process.env.MFA_ENCRYPTION_KEY;else process.env.MFA_ENCRYPTION_KEY=previous;
  }
+});
+
+test('privileged accounts receive enrollment-only sessions until MFA is enabled',()=>{
+ const auth=fs.readFileSync(path.join(root,'platform/src/auth.js'),'utf8');
+ const routes=fs.readFileSync(path.join(root,'platform/src/mfa-routes.js'),'utf8');
+ const ui=fs.readFileSync(path.join(root,'platform/public/admin.js'),'utf8');
+ const migration=fs.readFileSync(path.join(root,'db/019_mfa_enrollment_sessions.sql'),'utf8');
+ assert.match(auth,/function requiresMfa/);
+ assert.match(auth,/mfa_enrollment_only/);
+ assert.match(auth,/mfaEnrollmentRequired:enrollmentOnly/);
+ assert.match(auth,/يلزم إكمال إعداد التحقق بخطوتين/);
+ assert.match(auth,/MFA_SENSITIVE_PERMISSIONS/);
+ assert.match(routes,/mfa_enrollment_only=false/);
+ assert.match(ui,/mfaEnrollmentRequired/);
+ assert.match(ui,/أكمل إعداد التحقق بخطوتين/);
+ assert.match(migration,/ADD COLUMN IF NOT EXISTS mfa_enrollment_only boolean NOT NULL DEFAULT false/);
 });
