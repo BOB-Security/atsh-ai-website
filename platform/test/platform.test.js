@@ -62,3 +62,11 @@ test('admin team panel supports member status management and owner-only role ass
  assert.match(routes,/router\.patch\('\/:id\/roles'/);
  assert.match(routes,/تعديل أدوار الفريق متاح لمالك النظام فقط/);
 });
+
+test('admin support panel exposes ticket creation backed by the protected tickets API',()=>{
+ const ui=fs.readFileSync(path.join(root,'platform/public/admin.js'),'utf8');
+ const routes=fs.readFileSync(path.join(root,'platform/src/routes/ops.js'),'utf8');
+ assert.match(ui,/ticket-create-form/);
+ assert.match(ui,/api\('\/api\/ops\/tickets'/);
+ assert.match(routes,/router\.post\('\/tickets',requirePermission\('tickets\.manage'\)/);
+});
