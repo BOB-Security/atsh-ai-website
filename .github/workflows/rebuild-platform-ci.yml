@@ -13,6 +13,7 @@ on:
       - 'platform/**'
       - 'db/**'
       - '.github/workflows/rebuild-platform-ci.yml'
+      - 'docs/TRACEABILITY.md'
 permissions:
   contents: read
 jobs:
