@@ -35,9 +35,10 @@ jobs:
           SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
           OWNER_EMAIL: ${{ secrets.OWNER_EMAIL }}
           OWNER_PASSWORD: ${{ secrets.OWNER_PASSWORD }}
+          MFA_ENCRYPTION_KEY: ${{ secrets.MFA_ENCRYPTION_KEY }}
         run: |
           set -euo pipefail
-          for key in DATABASE_URL DEFAULT_ORGANIZATION_ID SESSION_SECRET OWNER_EMAIL OWNER_PASSWORD; do
+          for key in DATABASE_URL DEFAULT_ORGANIZATION_ID SESSION_SECRET OWNER_EMAIL OWNER_PASSWORD MFA_ENCRYPTION_KEY; do
             if [ -z "${!key:-}" ]; then
               echo "::error::Missing GitHub Actions secret: $key. Deployment stopped before touching Azure."
               exit 1
@@ -45,6 +46,10 @@ jobs:
           done
           if [ "${#SESSION_SECRET}" -lt 32 ]; then
             echo "::error::SESSION_SECRET must be at least 32 characters."
+            exit 1
+          fi
+          if ! [[ "$MFA_ENCRYPTION_KEY" =~ ^[a-fA-F0-9]{64}$ ]]; then
+            echo "::error::MFA_ENCRYPTION_KEY must be a 64-character hexadecimal key (32 bytes)."
             exit 1
           fi
           if [ "${#OWNER_PASSWORD}" -lt 14 ]; then
@@ -123,9 +128,10 @@ jobs:
           EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
           AI_API_KEY: ${{ secrets.AI_API_KEY }}
           AI_MODEL: ${{ secrets.AI_MODEL }}
+          MFA_ENCRYPTION_KEY: ${{ secrets.MFA_ENCRYPTION_KEY }}
         run: |
           set -euo pipefail
-          az webapp config appsettings set --resource-group "$RG" --name "$APP" --settings             NODE_ENV=production WEBSITE_NODE_DEFAULT_VERSION='~22' SCM_DO_BUILD_DURING_DEPLOYMENT=true ENABLE_ORYX_BUILD=true             DATABASE_URL="$DATABASE_URL" DEFAULT_ORGANIZATION_ID="$DEFAULT_ORGANIZATION_ID"             SESSION_SECRET="$SESSION_SECRET" PUBLIC_BASE_URL="${PUBLIC_BASE_URL:-https://${{ steps.app.outputs.host }}}"             DEFAULT_ORGANIZATION_SLUG=atsh-ai PGSSL=require             OWNER_EMAIL="$OWNER_EMAIL" OWNER_NAME="${{ secrets.OWNER_NAME }}" OWNER_PASSWORD="${{ secrets.OWNER_PASSWORD }}"             RESEND_API_KEY="${RESEND_API_KEY:-}" EMAIL_FROM="${EMAIL_FROM:-}" AI_API_KEY="${AI_API_KEY:-}" AI_MODEL="${AI_MODEL:-}"             --output none
+          az webapp config appsettings set --resource-group "$RG" --name "$APP" --settings             NODE_ENV=production WEBSITE_NODE_DEFAULT_VERSION='~22' SCM_DO_BUILD_DURING_DEPLOYMENT=true ENABLE_ORYX_BUILD=true             DATABASE_URL="$DATABASE_URL" DEFAULT_ORGANIZATION_ID="$DEFAULT_ORGANIZATION_ID"             SESSION_SECRET="$SESSION_SECRET" PUBLIC_BASE_URL="${PUBLIC_BASE_URL:-https://${{ steps.app.outputs.host }}}"             DEFAULT_ORGANIZATION_SLUG=atsh-ai PGSSL=require             OWNER_EMAIL="$OWNER_EMAIL" OWNER_NAME="${{ secrets.OWNER_NAME }}" OWNER_PASSWORD="${{ secrets.OWNER_PASSWORD }}"             RESEND_API_KEY="${RESEND_API_KEY:-}" EMAIL_FROM="${EMAIL_FROM:-}" AI_API_KEY="${AI_API_KEY:-}" AI_MODEL="${AI_MODEL:-}" MFA_ENCRYPTION_KEY="$MFA_ENCRYPTION_KEY"             --output none
           az webapp config set --resource-group "$RG" --name "$APP" --startup-file "npm start" --output none
       - name: Start existing App Service before deployment
         env:
