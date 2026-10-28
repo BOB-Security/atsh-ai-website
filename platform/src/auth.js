@@ -50,7 +50,7 @@ async function login(req,res,next) {
       // Do not issue privileged sessions while MFA has not been enrolled.
       const token=crypto.randomBytes(32).toString('base64url');
       const expires=new Date(Date.now()+SESSION_MS);
-      await getPool().query('INSERT INTO auth_sessions(user_id,token_hash,expires_at,mfa_verified_at) VALUES($1,$2,$3,NULL)',[user.id,digest(token),expires]);
+      await getPool().query('INSERT INTO auth_sessions(user_id,token_hash,expires_at,mfa_verified_at,mfa_enrollment_required) VALUES($1,$2,$3,NULL,true)',[user.id,digest(token),expires]);
       setCookie(res,token,req.app.locals.config.production);
       return res.json({ok:true,requiresMfaEnrollment:true,user:{id:user.id,email:user.email,name:user.full_name,roles:user.roles,permissions:user.permission_sets.flat()}});
     }
@@ -90,21 +90,27 @@ async function requireAuth(req,res,next) {
     const token=req.cookies?.[COOKIE];
     if(!token) return res.status(401).json({error:'يلزم تسجيل الدخول.'});
     const {rows}=await getPool().query(
-      `SELECT u.id,u.organization_id,u.email,u.full_name,u.status,u.mfa_enabled,s.mfa_verified_at,
+      `SELECT u.id,u.organization_id,u.email,u.full_name,u.status,u.mfa_enabled,s.mfa_verified_at,s.mfa_enrollment_required,
        COALESCE(jsonb_agg(DISTINCT r.name) FILTER (WHERE r.name IS NOT NULL),'[]'::jsonb) roles,
        COALESCE(jsonb_agg(DISTINCT r.permissions) FILTER (WHERE r.name IS NOT NULL),'[]'::jsonb) permission_sets
        FROM auth_sessions s JOIN users u ON u.id=s.user_id
        LEFT JOIN user_roles ur ON ur.user_id=u.id LEFT JOIN roles r ON r.id=ur.role_id
        WHERE s.token_hash=$1 AND s.expires_at>now() AND u.status='active'
-       GROUP BY u.id,s.mfa_verified_at LIMIT 1`,[digest(token)]);
-    if(!rows[0]) {res.clearCookie(COOKIE,{path:'/'});return res.status(401).json({error:'انتهت الجلسة. سجل الدخول مجددًا.'});}
-    if(rows[0].organization_id!==req.app.locals.organizationId) return res.status(403).json({error:'لا توجد صلاحية للوصول.'});
-    if(rows[0].mfa_enabled && privilegedUser({...rows[0],permissions:rows[0].permission_sets.flat()}) && !rows[0].mfa_verified_at) return res.status(401).json({error:'يلزم إكمال المصادقة الثنائية.'});
-    req.user=rows[0]; req.permissionSets=rows[0].permission_sets.flat();
+       GROUP BY u.id,s.mfa_verified_at,s.mfa_enrollment_required LIMIT 1`,[digest(token)]);
+    const user=rows[0];
+    if(!user) {res.clearCookie(COOKIE,{path:'/'});return res.status(401).json({error:'انتهت الجلسة. سجل الدخول مجددًا.'});}
+    if(user.organization_id!==req.app.locals.organizationId) return res.status(403).json({error:'لا توجد صلاحية للوصول.'});
+    const privileged=privilegedUser({...user,permissions:user.permission_sets.flat()});
+    if(privileged && !user.mfa_enabled && !user.mfa_enrollment_required) return res.status(403).json({error:'يجب تفعيل المصادقة الثنائية قبل استخدام الحساب الإداري.'});
+    if(privileged && user.mfa_enabled && !user.mfa_verified_at) return res.status(401).json({error:'يلزم إكمال المصادقة الثنائية.'});
+    req.user=user;
+    req.permissionSets=user.permission_sets.flat();
+    req.mfaEnrollmentOnly=Boolean(user.mfa_enrollment_required);
     await getPool().query('UPDATE auth_sessions SET last_seen_at=now() WHERE token_hash=$1',[digest(token)]);
     next();
   } catch(err){next(err);}
 }
+
 function requirePermission(permission) {
   return (req,res,next)=>{
     const sets=req.permissionSets||[];
