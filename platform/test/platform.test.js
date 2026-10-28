@@ -129,7 +129,7 @@ test('project builder captures explicit integration categories in both locales',
 test('catalog admin UI exposes permission-protected activate/deactivate controls for existing categories, plans, and add-ons',()=>{
  const ui=fs.readFileSync(path.join(root,'platform/public/admin.js'),'utf8');
  const routes=fs.readFileSync(path.join(root,'platform/src/routes/admin.js'),'utf8');
- assert.match(ui,/data-catalog-toggle/);
+ assert.match(ui,/data-catalog-toggle/);assert.match(ui,/data-catalog-edit/);assert.match(ui,/تعديل البيانات والسعر/);assert.match(ui,/catalog-edit-form/);
  assert.match(ui,/\['categories','الفئات','\/catalog\/categories'\]/);
  assert.match(ui,/\['plans','الباقات','\/catalog\/plans'\]/);
  assert.match(ui,/\['addons','الإضافات','\/catalog\/addons'\]/);
