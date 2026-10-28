@@ -102,6 +102,7 @@ async function requireAuth(req,res,next) {
     if(user.organization_id!==req.app.locals.organizationId) return res.status(403).json({error:'لا توجد صلاحية للوصول.'});
     const privileged=privilegedUser({...user,permissions:user.permission_sets.flat()});
     if(privileged && !user.mfa_enabled && !user.mfa_enrollment_required) return res.status(403).json({error:'يجب تفعيل المصادقة الثنائية قبل استخدام الحساب الإداري.'});
+    if(privileged && !user.mfa_enabled && user.mfa_enrollment_required && !req.path.startsWith('/auth/mfa/')) return res.status(403).json({error:'هذه الجلسة محدودة بإعداد المصادقة الثنائية. أكمل الإعداد أولًا.'});
     if(privileged && user.mfa_enabled && !user.mfa_verified_at) return res.status(401).json({error:'يلزم إكمال المصادقة الثنائية.'});
     req.user=user;
     req.permissionSets=user.permission_sets.flat();
