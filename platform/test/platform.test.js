@@ -201,7 +201,7 @@ test('PostgreSQL serializes concurrent MFA challenge use and permits only one re
  const previousKey=process.env.MFA_ENCRYPTION_KEY;
  process.env.MFA_ENCRYPTION_KEY=''.padStart(64,'a');
  const db=getPool();
- let userId,challengeHash,sessionHash;
+ let userId,challengeHash,sessionHash,createdMfa=false;
  const recovery='ABCDEF0123456789';
  try{
   const user=await db.query('SELECT id FROM users WHERE lower(email)=lower($1) LIMIT 1',[process.env.OWNER_EMAIL||'owner@test.local']);
@@ -210,6 +210,7 @@ test('PostgreSQL serializes concurrent MFA challenge use and permits only one re
   const existing=await db.query('SELECT 1 FROM user_mfa WHERE user_id=$1',[userId]);
   if(existing.rowCount)return t.skip('bootstrap owner already has MFA configured');
   await db.query('INSERT INTO user_mfa(user_id,secret_ciphertext,enabled,last_totp_step) VALUES($1,$2,true,-1)',[userId,mfa.encryptSecret('GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ')]);
+  createdMfa=true;
   await db.query('INSERT INTO user_mfa_recovery_codes(user_id,code_hash) VALUES($1,$2)',[userId,mfa.hashRecovery(recovery)]);
   const challenge=crypto.randomBytes(32).toString('base64url');
   challengeHash=crypto.createHash('sha256').update(challenge).digest('hex');
@@ -229,7 +230,7 @@ test('PostgreSQL serializes concurrent MFA challenge use and permits only one re
   sessionHash=crypto.createHash('sha256').update(issued).digest('hex');
  }finally{
   if(challengeHash)await db.query('DELETE FROM auth_mfa_challenges WHERE token_hash=$1',[challengeHash]).catch(()=>{});
-  if(userId){
+  if(createdMfa&&userId){
    if(sessionHash)await db.query('DELETE FROM auth_sessions WHERE token_hash=$1',[sessionHash]).catch(()=>{});
    await db.query('DELETE FROM user_mfa_recovery_codes WHERE user_id=$1',[userId]).catch(()=>{});
    await db.query('DELETE FROM user_mfa WHERE user_id=$1',[userId]).catch(()=>{});
