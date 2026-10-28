@@ -4,6 +4,9 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const path=require('node:path');
 const {loadConfig}=require('../src/config');
+const {getPool}=require('../src/db');
+const crypto=require('node:crypto');
+const mfa=require('../src/mfa');
 const root=path.resolve(__dirname,'../..');
 test('config defaults to a non-production local environment',()=>{const c=loadConfig({});assert.equal(c.production,false);assert.equal(c.port,8080);assert.equal(c.defaultOrganizationSlug,'atsh-ai');});
 test('PostgreSQL schema includes core operational domains',()=>{const sql=fs.readFileSync(path.join(root,'db/schema.sql'),'utf8');for(const name of ['customers','leads','projects','project_stages','tasks','quotes','subscriptions','hosting_assets','backup_runs','ai_agents','knowledge_sources','conversations','messages','support_tickets','audit_logs','notifications','customer_portal_accounts','customer_portal_sessions','customer_project_updates','design_versions','project_change_requests'])assert.match(sql,new RegExp('CREATE TABLE IF NOT EXISTS '+name+'\\b'));});
@@ -190,4 +193,48 @@ test('MFA pending enrollment secrets expire and cannot be enabled after expiry',
  assert.match(routes,/pending_expires_at>now\(\)/);
  assert.match(routes,/pending_expires_at=NULL/);
  assert.match(migration,/ADD COLUMN IF NOT EXISTS pending_expires_at timestamptz/);
+});
+
+
+test('PostgreSQL serializes concurrent MFA challenge use and permits only one recovery login',async t=>{
+ if(process.env.NODE_ENV!=='test'||!process.env.DATABASE_URL)return t.skip('requires isolated CI PostgreSQL test database');
+ const previousKey=process.env.MFA_ENCRYPTION_KEY;
+ process.env.MFA_ENCRYPTION_KEY=''.padStart(64,'a');
+ const db=getPool();
+ let userId,challengeHash,sessionHash;
+ const recovery='ABCDEF0123456789';
+ try{
+  const user=await db.query('SELECT id FROM users WHERE lower(email)=lower($1) LIMIT 1',[process.env.OWNER_EMAIL||'owner@test.local']);
+  if(!user.rows[0])return t.skip('bootstrap owner is not present');
+  userId=user.rows[0].id;
+  const existing=await db.query('SELECT 1 FROM user_mfa WHERE user_id=$1',[userId]);
+  if(existing.rowCount)return t.skip('bootstrap owner already has MFA configured');
+  await db.query('INSERT INTO user_mfa(user_id,secret_ciphertext,enabled,last_totp_step) VALUES($1,$2,true,-1)',[userId,mfa.encryptSecret('GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ')]);
+  await db.query('INSERT INTO user_mfa_recovery_codes(user_id,code_hash) VALUES($1,$2)',[userId,mfa.hashRecovery(recovery)]);
+  const challenge=crypto.randomBytes(32).toString('base64url');
+  challengeHash=crypto.createHash('sha256').update(challenge).digest('hex');
+  await db.query('INSERT INTO auth_mfa_challenges(user_id,token_hash,expires_at) VALUES($1,$2,now()+interval \'5 minutes\')',[userId,challengeHash]);
+  const makeRequest=()=>({cookies:{[mfa.COOKIE]:challenge},body:{code:recovery},app:{locals:{config:{production:false}}}});
+  const makeResponse=()=>({cookies:{},cookie(name,value){this.cookies[name]=value;},clearCookie(){}});
+  const resA=makeResponse(),resB=makeResponse();
+  const outcomes=await Promise.all([
+   mfa.completeLogin(makeRequest(),resA),
+   mfa.completeLogin(makeRequest(),resB)
+  ]);
+  assert.deepEqual(outcomes.map(x=>x.status).sort(),[200,401]);
+  const successful=outcomes.find(x=>x.status===200);
+  assert.ok(successful.body.user.id===userId);
+  const issued=resA.cookies.atsh_platform_session||resB.cookies.atsh_platform_session;
+  assert.ok(issued);
+  sessionHash=crypto.createHash('sha256').update(issued).digest('hex');
+ }finally{
+  if(challengeHash)await db.query('DELETE FROM auth_mfa_challenges WHERE token_hash=$1',[challengeHash]).catch(()=>{});
+  if(userId){
+   if(sessionHash)await db.query('DELETE FROM auth_sessions WHERE token_hash=$1',[sessionHash]).catch(()=>{});
+   await db.query('DELETE FROM user_mfa_recovery_codes WHERE user_id=$1',[userId]).catch(()=>{});
+   await db.query('DELETE FROM user_mfa WHERE user_id=$1',[userId]).catch(()=>{});
+   await db.query("DELETE FROM audit_logs WHERE actor_user_id=$1 AND action='auth.mfa_login'",[userId]).catch(()=>{});
+  }
+  if(previousKey===undefined)delete process.env.MFA_ENCRYPTION_KEY;else process.env.MFA_ENCRYPTION_KEY=previousKey;
+ }
 });
