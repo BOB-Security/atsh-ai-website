@@ -68,7 +68,7 @@ async function requireAuth(req,res,next) {
     if(!rows[0]) {res.clearCookie(COOKIE,{path:'/'});return res.status(401).json({error:'انتهت الجلسة. سجل الدخول مجددًا.'});}
     if(rows[0].organization_id!==req.app.locals.organizationId) return res.status(403).json({error:'لا توجد صلاحية للوصول.'});
     req.user=rows[0]; req.permissionSets=rows[0].permission_sets.flat();
-    if (rows[0].mfa_enrollment_only && !/^\/api\/admin\/auth\/mfa\/(?:status|setup|enable)$/.test(req.originalUrl.split('?')[0])) {
+    if (rows[0].mfa_enrollment_only && !/^\/api\/admin\/auth\/mfa\/(?:status|setup|enable|rotate)$/.test(req.originalUrl.split('?')[0])) {
       return res.status(403).json({error:'يلزم إكمال إعداد التحقق بخطوتين قبل الوصول إلى لوحة الإدارة.'});
     }
     await getPool().query('UPDATE auth_sessions SET last_seen_at=now() WHERE token_hash=$1',[digest(token)]);
