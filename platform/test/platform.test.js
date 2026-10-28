@@ -125,3 +125,13 @@ test('project builder captures explicit integration categories in both locales',
  assert.ok(arJs.includes('integrationTypes:values(\'integrationTypes\')'));
  assert.ok(enJs.includes('integrationTypes:values(\'integrationTypes\')'));
 });
+
+test('catalog admin UI exposes permission-protected activate/deactivate controls for existing categories, plans, and add-ons',()=>{
+ const ui=fs.readFileSync(path.join(root,'platform/public/admin.js'),'utf8');
+ const routes=fs.readFileSync(path.join(root,'platform/src/routes/admin.js'),'utf8');
+ assert.match(ui,/data-catalog-toggle/);
+ assert.match(ui,/\['categories','الفئات','\/catalog\/categories'\]/);
+ assert.match(ui,/\['plans','الباقات','\/catalog\/plans'\]/);
+ assert.match(ui,/\['addons','الإضافات','\/catalog\/addons'\]/);
+ for(const type of ['categories','plans','addons'])assert.match(routes,new RegExp("router\\.patch\\('\\/catalog\\/"+type+"\\/:id',requirePermission\\('catalog\\.manage'\\)"));
+});
