@@ -55,6 +55,7 @@ app.use('/api/public/pricing/estimate', intakeLimiter);
 app.use('/api/public/support-tickets', intakeLimiter);
 app.use('/api/public/track', intakeLimiter);
 app.use('/api/admin/auth/login', loginLimiter);
+app.use('/api/admin/auth/mfa', rateLimit({ windowMs: 15 * 60 * 1000, limit: 8, standardHeaders: 'draft-8', legacyHeaders: false }));
 app.use('/api/admin/auth/password-reset/request', loginLimiter);
 app.use('/api/admin/auth/password-reset/confirm', loginLimiter);
 app.use('/api/portal/login', loginLimiter);
