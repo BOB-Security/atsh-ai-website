@@ -40,3 +40,21 @@ test('customer portal supports profile/password management and request history',
 test('AI pre-release evaluation set covers 30 bilingual safety and quality cases',()=>{const data=JSON.parse(fs.readFileSync(path.join(__dirname,'ai-evaluation-cases.json'),'utf8'));assert.ok(data.cases.length>=30);assert.ok(data.cases.some(x=>x.locale==='ar-EG'));assert.ok(data.cases.some(x=>x.locale==='en'));for(const item of data.cases){assert.ok(item.prompt&&item.expected&&item.category,item.id+' missing evaluation fields');}});
 
 test('admin console receives effective permissions and hides unauthorized modules',()=>{const auth=fs.readFileSync(path.join(root,'platform/src/auth.js'),'utf8');const admin=fs.readFileSync(path.join(root,'platform/src/routes/admin.js'),'utf8');const ui=fs.readFileSync(path.join(root,'platform/public/admin.js'),'utf8');assert.match(auth,/permissions:user\.permission_sets\.flat\(\)/);assert.match(admin,/permissions:req\.permissionSets/);assert.match(ui,/const rules=\{/);assert.match(ui,/applyPanelPermissions\(name\)/);});
+
+test('MFA port wires encryption, migrations, enrollment-only sessions and sign-in challenges',()=>{
+ const config=fs.readFileSync(path.join(root,'platform/src/config.js'),'utf8');
+ const auth=fs.readFileSync(path.join(root,'platform/src/auth.js'),'utf8');
+ const server=fs.readFileSync(path.join(root,'platform/server.js'),'utf8');
+ const mfa=fs.readFileSync(path.join(root,'platform/src/mfa.js'),'utf8');
+ const routes=fs.readFileSync(path.join(root,'platform/src/mfa-routes.js'),'utf8');
+ const deploy=fs.readFileSync(path.join(root,'.github/workflows/platform-staging-deploy.yml'),'utf8');
+ for(const file of ['018_privileged_mfa.sql','019_mfa_enrollment_sessions.sql','020_mfa_pending_expiry.sql']) assert.ok(fs.existsSync(path.join(root,'db',file)),file+' missing');
+ assert.match(config,/MFA_ENCRYPTION_KEY/);
+ assert.match(auth,/mfa_enrollment_only/);
+ assert.match(auth,/requiresMfa/);
+ assert.match(auth,/verifyMfaLogin/);
+ assert.match(server,/app\.use\('\/api\/admin', mfaRoutes\)/);
+ assert.match(mfa,/aes-256-gcm/);
+ assert.match(routes,/auth\/mfa\/verify/);
+ assert.match(deploy,/MFA_ENCRYPTION_KEY/);
+});
