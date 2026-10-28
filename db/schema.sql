@@ -643,3 +643,7 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_enabled boolean NOT NULL DEFAULT 
 ALTER TABLE auth_sessions ADD COLUMN IF NOT EXISTS mfa_verified_at timestamptz;
 CREATE TABLE IF NOT EXISTS user_mfa_recovery_codes(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,code_hash text NOT NULL,created_at timestamptz NOT NULL DEFAULT now(),UNIQUE(user_id,code_hash));
 CREATE INDEX IF NOT EXISTS idx_user_mfa_recovery_codes_user ON user_mfa_recovery_codes(user_id);
+
+-- MFA enrollment-only sessions (db/018 follow-up)
+
+ALTER TABLE auth_sessions ADD COLUMN IF NOT EXISTS mfa_enrollment_required boolean NOT NULL DEFAULT false;
