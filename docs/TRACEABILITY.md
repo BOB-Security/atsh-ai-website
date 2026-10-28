@@ -60,3 +60,5 @@ This matrix maps the reference specification to the isolated implementation trac
 - Login challenge verification now locks the challenge and MFA rows within one PostgreSQL transaction, increments attempts while locked, and consumes the challenge on success. Static regression assertions cover the intended transaction/locking shape.
 - Added a PostgreSQL-backed regression test that races two uses of the same MFA challenge/recovery code and expects exactly one successful login. The test uses the isolated CI database and skips when the bootstrap owner already has MFA configured.
 - This test and the latest changes still require a completed green CI run on the exact current PR head. One concurrency test does not cover every challenge expiry/attempt-limit or browser workflow; browser E2E, full recovery lifecycle, staging migration and backup/restore remain release gates.
+
+- The first PostgreSQL concurrency run exposed an audit INSERT parameter type mismatch (UUID reused for a text `entity_id`). Login and enrollment audit inserts now use separate typed parameters. The next CI run must confirm this correction before the integration test is considered passing.
