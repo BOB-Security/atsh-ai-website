@@ -72,7 +72,8 @@ app.get('/contact',(_req,res)=>res.redirect(302,'/project-builder.html'));
 app.get('/how-it-works',(_req,res)=>res.redirect(302,'/process.html'));
 app.get(['/', '/:slug'], async (req,res,next) => {
   try {
-    const slug=req.path==='/'?'home':String(req.params.slug||'').replace(/\.html$/,'');
+    if (req.path === '/') return next();
+    const slug=String(req.params.slug||'').replace(/\.html$/,'');
     if (!/^[a-z0-9-]{2,80}$/.test(slug)) return next();
     if (!app.locals.organizationId) return next();
     const {getPool}=require('./src/db');
