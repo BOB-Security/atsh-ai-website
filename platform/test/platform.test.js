@@ -176,3 +176,13 @@ test('privileged accounts receive enrollment-only sessions until MFA is enabled'
  assert.match(ui,/أكمل إعداد التحقق بخطوتين/);
  assert.match(migration,/ADD COLUMN IF NOT EXISTS mfa_enrollment_only boolean NOT NULL DEFAULT false/);
 });
+
+
+test('MFA pending enrollment secrets expire and cannot be enabled after expiry',()=>{
+ const routes=fs.readFileSync(path.join(root,'platform/src/mfa-routes.js'),'utf8');
+ const migration=fs.readFileSync(path.join(root,'db/020_mfa_pending_expiry.sql'),'utf8');
+ assert.match(routes,/pending_expires_at=now\(\)\+interval '10 minutes'/);
+ assert.match(routes,/pending_expires_at>now\(\)/);
+ assert.match(routes,/pending_expires_at=NULL/);
+ assert.match(migration,/ADD COLUMN IF NOT EXISTS pending_expires_at timestamptz/);
+});
