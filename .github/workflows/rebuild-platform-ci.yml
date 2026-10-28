@@ -1,7 +1,7 @@
 name: ATSH AI Platform Rebuild CI
 on:
   push:
-    branches: [rebuild/atsh-ai-from-scratch]
+    branches: [rebuild/atsh-ai-from-scratch, release/port-mfa-to-rebuild]
     paths:
       - 'platform/**'
       - 'db/**'
