@@ -111,3 +111,17 @@ test('project builder captures expanded scope details in Arabic and English and 
   assert.ok(enJs.includes(field+':val(\''+field+'\')'), 'English submission missing '+field);
  }
 });
+
+
+test('project builder captures explicit integration categories in both locales',()=>{
+ const ar=fs.readFileSync(path.join(root,'platform/public/project-builder.html'),'utf8');
+ const en=fs.readFileSync(path.join(root,'platform/public/project-builder-en.html'),'utf8');
+ const arJs=fs.readFileSync(path.join(root,'platform/public/builder.js'),'utf8');
+ const enJs=fs.readFileSync(path.join(root,'platform/public/builder-en.js'),'utf8');
+ for(const value of ['email','crm','erp','whatsapp','payments','calendar','analytics','database-api']){
+  assert.match(ar,new RegExp('name="integrationTypes" value="'+value+'"'));
+  assert.match(en,new RegExp('name="integrationTypes" value="'+value+'"'));
+ }
+ assert.ok(arJs.includes('integrationTypes:values(\'integrationTypes\')'));
+ assert.ok(enJs.includes('integrationTypes:values(\'integrationTypes\')'));
+});
