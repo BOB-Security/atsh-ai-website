@@ -53,3 +53,9 @@ This matrix maps the reference specification to the isolated implementation trac
 
 
 - Follow-up after CI pass: regression migration inventory now includes `020_mfa_pending_expiry.sql`. CI must rerun on the resulting latest PR head; do not reuse the earlier green run as proof for this later commit.
+
+
+### MFA concurrency hardening follow-up
+- Setup requests no longer replace a non-expired pending secret; a conflicting request is rejected until the pending setup expires. Enable now binds the update to the exact encrypted secret that was verified, preventing stale-secret promotion if the row changes concurrently.
+- Login challenge verification now locks the challenge and MFA rows within one PostgreSQL transaction, increments attempts while locked, and consumes the challenge on success. Static regression assertions cover the intended transaction/locking shape.
+- These changes have not yet passed CI at the current head. Static tests are not proof of database race behavior; parallel PostgreSQL integration tests and browser E2E remain required.
