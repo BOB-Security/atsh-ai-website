@@ -40,3 +40,25 @@ test('customer portal supports profile/password management and request history',
 test('AI pre-release evaluation set covers 30 bilingual safety and quality cases',()=>{const data=JSON.parse(fs.readFileSync(path.join(__dirname,'ai-evaluation-cases.json'),'utf8'));assert.ok(data.cases.length>=30);assert.ok(data.cases.some(x=>x.locale==='ar-EG'));assert.ok(data.cases.some(x=>x.locale==='en'));for(const item of data.cases){assert.ok(item.prompt&&item.expected&&item.category,item.id+' missing evaluation fields');}});
 
 test('admin console receives effective permissions and hides unauthorized modules',()=>{const auth=fs.readFileSync(path.join(root,'platform/src/auth.js'),'utf8');const admin=fs.readFileSync(path.join(root,'platform/src/routes/admin.js'),'utf8');const ui=fs.readFileSync(path.join(root,'platform/public/admin.js'),'utf8');assert.match(auth,/permissions:user\.permission_sets\.flat\(\)/);assert.match(admin,/permissions:req\.permissionSets/);assert.match(ui,/const rules=\{/);assert.match(ui,/applyPanelPermissions\(name\)/);});
+
+test('MFA TOTP primitives validate codes, prevent replay, and encrypt secrets',()=>{
+  const mfa=require('../src/mfa');
+  const secret=mfa.generateSecret();
+  assert.match(secret,/^[A-Z2-7]+$/);
+  const step=Math.floor(Date.now()/30000);
+  const code=(function(){const crypto=require('node:crypto');const alphabet='ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';let bits=0,value=0,out=[];for(const ch of secret){value=(value<<5)|alphabet.indexOf(ch);bits+=5;if(bits>=8){out.push((value>>>(bits-8))&255);bits-=8;}}const counter=Buffer.alloc(8);counter.writeBigUInt64BE(BigInt(step));const digest=crypto.createHmac('sha1',Buffer.from(out)).update(counter).digest();const offset=digest[digest.length-1]&15;return String((digest.readUInt32BE(offset)&0x7fffffff)%1000000).padStart(6,'0');})();
+  assert.equal(mfa.verifyTotp(secret,code,step*30000),step);
+  assert.equal(mfa.verifyTotp(secret,code,step*30000,step),null);
+  const previous=process.env.MFA_ENCRYPTION_KEY;
+  process.env.MFA_ENCRYPTION_KEY='a'.repeat(64);
+  try {const encrypted=mfa.encryptSecret(secret);assert.notEqual(encrypted,secret);assert.equal(mfa.decryptSecret(encrypted),secret);} finally {if(previous===undefined)delete process.env.MFA_ENCRYPTION_KEY;else process.env.MFA_ENCRYPTION_KEY=previous;}
+  const recovery=mfa.recoveryCodes();assert.equal(recovery.length,10);assert.equal(new Set(recovery).size,10);assert.match(mfa.hashRecovery(recovery[0]),/^[a-f0-9]{64}$/);
+});
+test('MFA routes and migration are part of the rebuild release candidate',()=>{
+  const server=fs.readFileSync(path.join(root,'platform/server.js'),'utf8');
+  const auth=fs.readFileSync(path.join(root,'platform/src/auth.js'),'utf8');
+  const migration=fs.readFileSync(path.join(root,'db/017_privileged_mfa.sql'),'utf8');
+  assert.match(server,/mfaRoutes/);assert.match(server,/api\/admin\/auth\/mfa\/verify/);
+  assert.match(auth,/mfaRequired:true/);assert.match(auth,/verifyMfaLogin/);
+  assert.match(migration,/user_mfa_recovery_codes/);assert.match(migration,/auth_mfa_challenges/);
+});
