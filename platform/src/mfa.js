@@ -15,5 +15,51 @@ function recoveryCodes(){return Array.from({length:10},()=>crypto.randomBytes(8)
 function hashRecovery(code){return crypto.createHash('sha256').update(String(code||'').replace(/[^a-f0-9]/gi,'').toUpperCase()).digest('hex');}
 function setChallengeCookie(res,token,production){res.cookie(COOKIE,token,{httpOnly:true,secure:production,sameSite:'strict',path:'/api/admin/auth/mfa',maxAge:300000});}
 async function beginLoginChallenge(userId,req,res){const token=crypto.randomBytes(32).toString('base64url');await getPool().query('DELETE FROM auth_mfa_challenges WHERE expires_at<=now() OR attempts>=5');await getPool().query('INSERT INTO auth_mfa_challenges(user_id,token_hash,expires_at) VALUES($1,$2,$3)',[userId,crypto.createHash('sha256').update(token).digest('hex'),new Date(Date.now()+300000)]);setChallengeCookie(res,token,req.app.locals.config.production);}
-async function completeLogin(req,res){const token=req.cookies?.[COOKIE];if(!token)return {status:401,body:{error:'جلسة التحقق الثنائي غير موجودة أو انتهت.'}};const db=getPool(),hash=crypto.createHash('sha256').update(token).digest('hex');const q=await db.query('SELECT c.user_id,c.attempts,m.secret_ciphertext,m.last_totp_step FROM auth_mfa_challenges c JOIN user_mfa m ON m.user_id=c.user_id WHERE c.token_hash=$1 AND c.expires_at>now() AND c.attempts<5 AND m.enabled=true',[hash]);if(!q.rows[0])return {status:401,body:{error:'جلسة التحقق الثنائي غير صالحة أو انتهت.'}};const u=q.rows[0],raw=String(req.body.code||'').trim(),secret=decryptSecret(u.secret_ciphertext),step=verifyTotp(secret,raw,Date.now(),Number(u.last_totp_step)),client=await db.connect();try{await client.query('BEGIN');const bump=await client.query('UPDATE auth_mfa_challenges SET attempts=attempts+1 WHERE token_hash=$1 AND attempts<5 AND expires_at>now() RETURNING user_id',[hash]);if(!bump.rowCount){await client.query('ROLLBACK');return {status:401,body:{error:'تم رفض رمز التحقق.'}};}let accepted=false;if(step!==null){const used=await client.query('UPDATE user_mfa SET last_totp_step=$2,updated_at=now() WHERE user_id=$1 AND last_totp_step<$2 AND enabled=true',[u.user_id,step]);accepted=used.rowCount===1;}else if(/^[a-f0-9]{16}$/i.test(raw)){const codeHash=hashRecovery(raw),used=await client.query('DELETE FROM user_mfa_recovery_codes WHERE user_id=$1 AND code_hash=$2 RETURNING id',[u.user_id,codeHash]);accepted=used.rowCount===1;}if(!accepted){await client.query('COMMIT');return {status:401,body:{error:'رمز التحقق غير صحيح أو سبق استخدامه.'}};}const session=crypto.randomBytes(32).toString('base64url');await client.query('INSERT INTO auth_sessions(user_id,token_hash,expires_at) VALUES($1,$2,$3)',[u.user_id,crypto.createHash('sha256').update(session).digest('hex'),new Date(Date.now()+8*60*60*1000)]);await client.query('DELETE FROM auth_mfa_challenges WHERE token_hash=$1',[hash]);await client.query("INSERT INTO audit_logs(organization_id,actor_user_id,action,entity_type,entity_id,details) SELECT organization_id,$2,'auth.mfa_login','user',$2,'{}'::jsonb FROM users WHERE id=$2",[u.user_id]);await client.query('COMMIT');res.cookie('atsh_platform_session',session,{httpOnly:true,secure:req.app.locals.config.production,sameSite:'strict',path:'/',maxAge:8*60*60*1000});res.clearCookie(COOKIE,{httpOnly:true,secure:req.app.locals.config.production,sameSite:'strict',path:'/api/admin/auth/mfa'});const usr=await db.query("SELECT u.id,u.email,u.full_name,COALESCE(jsonb_agg(DISTINCT r.name) FILTER (WHERE r.name IS NOT NULL),'[]'::jsonb) roles,COALESCE(jsonb_agg(DISTINCT r.permissions) FILTER (WHERE r.name IS NOT NULL),'[]'::jsonb) permission_sets FROM users u LEFT JOIN user_roles ur ON ur.user_id=u.id LEFT JOIN roles r ON r.id=ur.role_id WHERE u.id=$1 GROUP BY u.id",[u.user_id]);const row=usr.rows[0];return {status:200,body:{ok:true,user:{id:row.id,email:row.email,name:row.full_name,roles:row.roles,permissions:row.permission_sets.flat()}}};}catch(e){await client.query('ROLLBACK').catch(()=>{});throw e;}finally{client.release();}}
+async function completeLogin(req,res){
+  const token=req.cookies?.[COOKIE];
+  if(!token)return {status:401,body:{error:'جلسة التحقق الثنائي غير موجودة أو انتهت.'}};
+  const db=getPool(),hash=crypto.createHash('sha256').update(token).digest('hex'),client=await db.connect();
+  let session=null,userId=null;
+  try{
+    await client.query('BEGIN');
+    const q=await client.query(
+      'SELECT c.user_id,c.attempts,m.secret_ciphertext,m.last_totp_step FROM auth_mfa_challenges c JOIN user_mfa m ON m.user_id=c.user_id WHERE c.token_hash=$1 AND c.expires_at>now() AND c.attempts<5 AND m.enabled=true FOR UPDATE OF c,m',
+      [hash]
+    );
+    if(!q.rows[0]){
+      await client.query('ROLLBACK');
+      return {status:401,body:{error:'جلسة التحقق الثنائي غير صالحة أو انتهت.'}};
+    }
+    const u=q.rows[0],raw=String(req.body.code||'').trim();
+    const secret=decryptSecret(u.secret_ciphertext);
+    const step=verifyTotp(secret,raw,Date.now(),Number(u.last_totp_step));
+    await client.query('UPDATE auth_mfa_challenges SET attempts=attempts+1 WHERE token_hash=$1',[hash]);
+    let accepted=false;
+    if(step!==null){
+      const used=await client.query('UPDATE user_mfa SET last_totp_step=$2,updated_at=now() WHERE user_id=$1 AND last_totp_step<$2 AND enabled=true',[u.user_id,step]);
+      accepted=used.rowCount===1;
+    }else if(/^[a-f0-9]{16}$/i.test(raw)){
+      const codeHash=hashRecovery(raw);
+      const used=await client.query('DELETE FROM user_mfa_recovery_codes WHERE user_id=$1 AND code_hash=$2 RETURNING id',[u.user_id,codeHash]);
+      accepted=used.rowCount===1;
+    }
+    if(!accepted){
+      await client.query('COMMIT');
+      return {status:401,body:{error:'رمز التحقق غير صحيح أو سبق استخدامه.'}};
+    }
+    session=crypto.randomBytes(32).toString('base64url');userId=u.user_id;
+    await client.query('INSERT INTO auth_sessions(user_id,token_hash,expires_at) VALUES($1,$2,$3)',[userId,crypto.createHash('sha256').update(session).digest('hex'),new Date(Date.now()+8*60*60*1000)]);
+    await client.query('DELETE FROM auth_mfa_challenges WHERE token_hash=$1',[hash]);
+    await client.query("INSERT INTO audit_logs(organization_id,actor_user_id,action,entity_type,entity_id,details) SELECT organization_id,$2,'auth.mfa_login','user',$2,'{}'::jsonb FROM users WHERE id=$2",[userId]);
+    await client.query('COMMIT');
+  }catch(e){
+    await client.query('ROLLBACK').catch(()=>{});
+    throw e;
+  }finally{client.release();}
+  res.cookie('atsh_platform_session',session,{httpOnly:true,secure:req.app.locals.config.production,sameSite:'strict',path:'/',maxAge:8*60*60*1000});
+  res.clearCookie(COOKIE,{httpOnly:true,secure:req.app.locals.config.production,sameSite:'strict',path:'/api/admin/auth/mfa'});
+  const usr=await db.query("SELECT u.id,u.email,u.full_name,COALESCE(jsonb_agg(DISTINCT r.name) FILTER (WHERE r.name IS NOT NULL),'[]'::jsonb) roles,COALESCE(jsonb_agg(DISTINCT r.permissions) FILTER (WHERE r.name IS NOT NULL),'[]'::jsonb) permission_sets FROM users u LEFT JOIN user_roles ur ON ur.user_id=u.id LEFT JOIN roles r ON r.id=ur.role_id WHERE u.id=$1 GROUP BY u.id",[userId]);
+  const row=usr.rows[0];
+  return {status:200,body:{ok:true,user:{id:row.id,email:row.email,name:row.full_name,roles:row.roles,permissions:row.permission_sets.flat()}}};
+}
 module.exports={encryptSecret,decryptSecret,generateSecret,verifyTotp,recoveryCodes,hashRecovery,beginLoginChallenge,completeLogin,COOKIE};
