@@ -43,3 +43,10 @@ This matrix maps the reference specification to the isolated implementation trac
 ## Current MFA hardening validation checkpoint
 - PR #43 is a draft targeting `main` so the pull-request validation workflow can run against the combined diff. A passing run must be associated with the exact PR head commit; earlier green runs on PR #40 or `security/mfa-on-rebuild` are not substitutes.
 - Until that exact-head run completes, migration and test execution evidence is pending. No staging deployment, merge, or production release is authorized by this status note.
+
+
+### MFA pending enrollment expiry hardening
+- Added migration `020_mfa_pending_expiry.sql` for a nullable expiry timestamp on pending MFA enrollment records.
+- MFA setup sets a 10-minute expiry; enabling requires an unexpired pending secret, and successful enable clears the expiry.
+- Static regression coverage added. This does not replace database-backed concurrency or browser acceptance tests.
+- Release gates remain open until the CI run for the exact PR head passes and recovery, rate-limit, replay/concurrency, browser E2E, staging migration and restore checks are evidenced.
