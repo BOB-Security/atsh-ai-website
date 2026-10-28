@@ -39,3 +39,7 @@ This matrix maps the reference specification to the isolated implementation trac
 - Privileged MFA enforcement hardening is in isolated branch `security/mfa-enforcement-hardening`: Owner and roles with defined sensitive permissions are directed to a 15-minute enrollment-only session; normal API access is blocked until successful MFA enrollment promotes that session.
 - Static regression assertions were added for the policy and migration. They have not yet been executed in CI or against a live PostgreSQL/browser environment in this work session; do not treat them as acceptance evidence.
 - Recovery/rotation lifecycle, race-condition verification, real PostgreSQL migration/upgrade tests, browser E2E, and backup/restore remain unresolved release gates.
+
+## Current MFA hardening validation checkpoint
+- PR #43 is a draft targeting `main` so the pull-request validation workflow can run against the combined diff. A passing run must be associated with the exact PR head commit; earlier green runs on PR #40 or `security/mfa-on-rebuild` are not substitutes.
+- Until that exact-head run completes, migration and test execution evidence is pending. No staging deployment, merge, or production release is authorized by this status note.
