@@ -36,7 +36,7 @@ async function login(req,res,next) {
        WHERE u.organization_id=$1 AND lower(u.email)=lower($2) GROUP BY u.id LIMIT 1`,[org,email]);
     const user=rows[0];
     if (!user || user.status!=='active' || !await verifyPassword(password,user.password_hash)) return res.status(401).json({error:'البريد الإلكتروني أو كلمة المرور غير صحيحة.'});
-    const enabledMfa=await getPool().query('SELECT enabled FROM user_mfa WHERE user_id=$1 AND enabled=true',[user.id]);
+    let enabledMfa={rowCount:0};try{enabledMfa=await getPool().query('SELECT enabled FROM user_mfa WHERE user_id=$1 AND enabled=true',[user.id]);}catch(mfaError){if(mfaError.code!=='42P01')throw mfaError;}
     if(enabledMfa.rowCount){await mfa.beginLoginChallenge(user.id,req,res);return res.json({ok:true,mfaRequired:true});}
     const token=crypto.randomBytes(32).toString('base64url');
     const expires=new Date(Date.now()+SESSION_MS);
