@@ -50,7 +50,7 @@ async function completeLogin(req,res){
     session=crypto.randomBytes(32).toString('base64url');userId=u.user_id;
     await client.query('INSERT INTO auth_sessions(user_id,token_hash,expires_at) VALUES($1,$2,$3)',[userId,crypto.createHash('sha256').update(session).digest('hex'),new Date(Date.now()+8*60*60*1000)]);
     await client.query('DELETE FROM auth_mfa_challenges WHERE token_hash=$1',[hash]);
-    await client.query("INSERT INTO audit_logs(organization_id,actor_user_id,action,entity_type,entity_id,details) SELECT organization_id,$2,'auth.mfa_login','user',$2,'{}'::jsonb FROM users WHERE id=$2",[userId]);
+    await client.query("INSERT INTO audit_logs(organization_id,actor_user_id,action,entity_type,entity_id,details) SELECT organization_id,$2,'auth.mfa_login','user',$2::text,'{}'::jsonb FROM users WHERE id=$2",[userId]);
     await client.query('COMMIT');
   }catch(e){
     await client.query('ROLLBACK').catch(()=>{});
