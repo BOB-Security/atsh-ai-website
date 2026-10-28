@@ -5,13 +5,17 @@ on:
     paths:
       - 'platform/**'
       - 'db/**'
+      - 'docs/TRACEABILITY.md'
       - '.github/workflows/rebuild-platform-ci.yml'
+      - '.github/workflows/platform-staging-deploy.yml'
   pull_request:
     branches: [main]
     paths:
       - 'platform/**'
       - 'db/**'
+      - 'docs/TRACEABILITY.md'
       - '.github/workflows/rebuild-platform-ci.yml'
+      - '.github/workflows/platform-staging-deploy.yml'
 permissions:
   contents: read
 jobs:
