@@ -86,6 +86,22 @@ function bindCatalog(d){
  t.insertAdjacentHTML('beforeend','<section class="data-card"><h3>إضافة خدمة اختيارية</h3><form id="addon-form" class="admin-form"><label>المعرّف<input name="slug" pattern="[a-z0-9-]{2,60}" required></label><label>الاسم بالعربية<input name="nameAr" required></label><label>الاسم بالإنجليزية<input name="nameEn" required></label><label>الوصف العربي<input name="descriptionAr"></label><label>الوصف الإنجليزي<input name="descriptionEn"></label><label>رسوم التأسيس (وحدة صغرى)<input name="setupAmountMinor" type="number" min="0" value="0" required></label><label>شهريًا<input name="monthlyAmountMinor" type="number" min="0" value="0" required></label><label>سنويًا<input name="annualAmountMinor" type="number" min="0" value="0" required></label><label>العملة<input name="currency" value="EGP" minlength="3" maxlength="3" required></label><label class="inline"><input name="active" type="checkbox"> إتاحة الإضافة بعد اعتماد السعر</label><button class="button primary">حفظ الإضافة</button></form><p id="addon-status" role="status"></p></section>');
  t.querySelector('#addon-form').addEventListener('submit',async e=>{e.preventDefault();const f=e.currentTarget,v=Object.fromEntries(new FormData(f));v.active=f.elements.active.checked;v.setupAmountMinor=Number(v.setupAmountMinor);v.monthlyAmountMinor=Number(v.monthlyAmountMinor);v.annualAmountMinor=Number(v.annualAmountMinor);try{await api('/catalog/addons',{method:'POST',body:JSON.stringify(v)});$('#addon-status').textContent='تم حفظ الإضافة.';loadPanel('catalog');}catch(err){$('#addon-status').textContent=err.message;}});
 
+ t.insertAdjacentHTML('beforeend','<section class="data-card"><h3>إدارة العناصر الحالية</h3><p class="muted">يمكن إيقاف نشر فئة أو باقة أو إضافة وإعادة تفعيلها دون حذف سجلها. راجع السعر واعتماده قبل التفعيل.</p><div id="catalog-existing"></div></section>');
+ const existing=t.querySelector('#catalog-existing');
+ const renderExisting=()=>{
+  const groups=[['categories','الفئات','/catalog/categories'],['plans','الباقات','/catalog/plans'],['addons','الإضافات','/catalog/addons']];
+  existing.innerHTML=groups.map(([key,label,path])=>'<h4>'+label+'</h4>'+((d[key]||[]).length?(d[key]||[]).map(x=>{const active=!!x.active;const name=x.name_ar||x.nameAr||x.slug;const price=key==='categories'?'':(' · '+esc(x.currency||'EGP')+' · تأسيس '+esc(x.setup_amount_minor??0)+' · شهري '+esc(x.monthly_amount_minor??0)+' · سنوي '+esc(x.annual_amount_minor??0));return '<article class="data-card"><strong>'+esc(name)+'</strong><p>'+esc(x.name_en||x.nameEn||x.slug)+' '+price+'</p><p>الحالة: '+(active?'منشور/مفعّل':'مسودة/متوقف')+'</p><button type="button" class="button '+(active?'ghost':'primary')+'" data-catalog-toggle data-path="'+path+'" data-id="'+esc(x.id)+'" data-active="'+String(active)+'">'+(active?'إيقاف النشر':'تفعيل')+'</button></article>';}).join('')):'<p class="muted">لا توجد سجلات.</p>').join('');
+  existing.querySelectorAll('[data-catalog-toggle]').forEach(button=>button.addEventListener('click',async()=>{
+   const active=button.dataset.active==='true';
+   const noun=button.dataset.path.endsWith('categories')?'الفئة':button.dataset.path.endsWith('plans')?'الباقة':'الإضافة';
+   if(!confirm((active?'إيقاف نشر ':'تفعيل ')+noun+'؟'))return;
+   button.disabled=true;
+   try{await api(button.dataset.path+'/'+button.dataset.id,{method:'PATCH',body:JSON.stringify({active:!active})});$('#console-status').textContent=active?'تم إيقاف النشر.':'تم التفعيل.';loadPanel('catalog');}
+   catch(err){$('#console-status').textContent=err.message;button.disabled=false;}
+  }));
+ };
+ renderExisting();
+
 }
 
 
