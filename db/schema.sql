@@ -636,3 +636,10 @@ CREATE TABLE IF NOT EXISTS project_change_requests (
 );
 CREATE INDEX IF NOT EXISTS idx_project_change_requests_queue ON project_change_requests(organization_id,status,created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_project_change_requests_customer ON project_change_requests(customer_id,created_at DESC);
+
+
+-- db/018_admin_totp_mfa.sql
+ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_enabled boolean NOT NULL DEFAULT false, ADD COLUMN IF NOT EXISTS mfa_secret_enc text, ADD COLUMN IF NOT EXISTS mfa_pending_secret_enc text, ADD COLUMN IF NOT EXISTS mfa_last_counter bigint, ADD COLUMN IF NOT EXISTS mfa_enrolled_at timestamptz;
+ALTER TABLE auth_sessions ADD COLUMN IF NOT EXISTS mfa_verified_at timestamptz;
+CREATE TABLE IF NOT EXISTS user_mfa_recovery_codes(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,code_hash text NOT NULL,created_at timestamptz NOT NULL DEFAULT now(),UNIQUE(user_id,code_hash));
+CREATE INDEX IF NOT EXISTS idx_user_mfa_recovery_codes_user ON user_mfa_recovery_codes(user_id);
