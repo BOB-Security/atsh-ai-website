@@ -58,4 +58,5 @@ This matrix maps the reference specification to the isolated implementation trac
 ### MFA concurrency hardening follow-up
 - Setup requests no longer replace a non-expired pending secret; a conflicting request is rejected until the pending setup expires. Enable now binds the update to the exact encrypted secret that was verified, preventing stale-secret promotion if the row changes concurrently.
 - Login challenge verification now locks the challenge and MFA rows within one PostgreSQL transaction, increments attempts while locked, and consumes the challenge on success. Static regression assertions cover the intended transaction/locking shape.
-- These changes have not yet passed CI at the current head. Static tests are not proof of database race behavior; parallel PostgreSQL integration tests and browser E2E remain required.
+- Added a PostgreSQL-backed regression test that races two uses of the same MFA challenge/recovery code and expects exactly one successful login. The test uses the isolated CI database and skips when the bootstrap owner already has MFA configured.
+- This test and the latest changes still require a completed green CI run on the exact current PR head. One concurrency test does not cover every challenge expiry/attempt-limit or browser workflow; browser E2E, full recovery lifecycle, staging migration and backup/restore remain release gates.
