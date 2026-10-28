@@ -136,3 +136,5 @@ test('catalog admin UI exposes permission-protected activate/deactivate controls
  assert.match(ui,/\['addons','الإضافات','\/catalog\/addons'\]/);
  for(const type of ['categories','plans','addons'])assert.match(routes,new RegExp("router\\.patch\\('\\/catalog\\/"+type+"\\/:id',requirePermission\\('catalog\\.manage'\\)"));
 });
+
+test('quote email uses currency-specific minor-unit formatting and refuses expired issuance',()=>{const admin=fs.readFileSync(path.join(root,'platform/src/routes/admin.js'),'utf8');assert.match(admin,/new Intl\.NumberFormat\('en-US',\{style:'currency',currency:code\}\)/);assert.match(admin,/Math\.pow\(10,digits\)/);assert.match(admin,/انتهت صلاحية العرض/);});
