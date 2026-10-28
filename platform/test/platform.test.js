@@ -138,3 +138,5 @@ test('catalog admin UI exposes permission-protected activate/deactivate controls
 });
 
 test('quote email uses currency-specific minor-unit formatting and refuses expired issuance',()=>{const admin=fs.readFileSync(path.join(root,'platform/src/routes/admin.js'),'utf8');assert.match(admin,/new Intl\.NumberFormat\('en-US',\{style:'currency',currency:code\}\)/);assert.match(admin,/Math\.pow\(10,digits\)/);assert.match(admin,/انتهت صلاحية العرض/);});
+
+test('admin quote expiry comparison uses the browser local calendar date rather than UTC date',()=>{const ui=fs.readFileSync(path.join(root,'platform/public/admin.js'),'utf8');assert.match(ui,/const localDateKey=\(\)=>\{const d=new Date\(\);return d\.getFullYear\(\)/);assert.doesNotMatch(ui,/valid_until\)\.slice\(0,10\)<new Date\(\)\.toISOString\(\)\.slice\(0,10\)/);});
