@@ -88,3 +88,12 @@ test('admin customer cards support editing customer profile fields through scope
  assert.ok(routes.includes("router.patch('/customers/:id',requirePermission('customers.manage')"));
  assert.ok(routes.includes('display_name=COALESCE($3,display_name)'));
 });
+
+
+test('admin project cards load and display scoped project update history',()=>{
+ const ui=fs.readFileSync(path.join(root,'platform/public/admin.js'),'utf8');
+ const routes=fs.readFileSync(path.join(root,'platform/src/routes/admin.js'),'utf8');
+ assert.match(ui,/project-update-history/);
+ assert.match(ui,/update-history-item/);
+ assert.match(routes,/router\.get\('\/projects\/:id\/updates'/);
+});
