@@ -70,3 +70,5 @@ This matrix maps the reference specification to the isolated implementation trac
 - The operation writes `auth.mfa_rotated` audit evidence with whether a recovery code was used, and the endpoint is rate-limited.
 - Static regression assertions were added. These are not yet evidence that concurrent recovery/rotation requests, password-reset races, browser UX, or full session revocation behavior pass against PostgreSQL. CI on the exact current PR head and dedicated integration/browser tests remain mandatory.
 - The rotation response returns a new TOTP setup secret/URI; the user must confirm it through the existing `/auth/mfa/enable` route within 10 minutes to complete rotation and receive a fresh recovery-code set. The prior recovery codes are invalidated immediately, so the user should complete setup before leaving the flow.
+
+- Added the admin console form and client handler for the rotation endpoint. During re-enrollment, the UI hides operational modules; successful confirmation returns through the existing MFA enable path. UI assertions were added, but a real browser E2E run is still required.
