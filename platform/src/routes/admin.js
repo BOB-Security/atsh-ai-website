@@ -2,8 +2,47 @@
 const express=require('express');
 const {z}=require('zod');
 const {getPool}=require('../db');
-const {requireAuth,requirePermission,login,logout}=require('../auth');
+const {requireAuth,requirePermission,login,logout,passwordHash}=require('../auth');
+const crypto=require('node:crypto');
 const router=express.Router();
+
+router.post('/auth/password-reset/request',async(req,res,next)=>{
+ try{
+  const s=z.object({email:z.string().trim().email().max(254)}).strict().parse(req.body);
+  const cfg=req.app.locals.config;
+  if(!cfg.resendApiKey||!cfg.emailFrom||!cfg.publicBaseUrl)return res.status(503).json({error:'خدمة استعادة كلمة المرور غير مهيأة حاليًا.'});
+  const {rows}=await getPool().query("SELECT id,email,full_name FROM users WHERE organization_id=$1 AND lower(email)=lower($2) AND status='active' LIMIT 1",[req.app.locals.organizationId,s.email]);
+  if(rows[0]){
+   const token=crypto.randomBytes(32).toString('base64url'),hash=crypto.createHash('sha256').update(token).digest('hex'),expires=new Date(Date.now()+30*60*1000);
+   await getPool().query('DELETE FROM password_reset_tokens WHERE user_id=$1',[rows[0].id]);
+   await getPool().query('INSERT INTO password_reset_tokens(user_id,token_hash,expires_at) VALUES($1,$2,$3)',[rows[0].id,hash,expires]);
+   const link=cfg.publicBaseUrl.replace(/\/$/,'')+'/password-reset.html?token='+encodeURIComponent(token);
+   const esc=v=>String(v).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+   try{
+    const sent=await fetch('https://api.resend.com/emails',{method:'POST',headers:{Authorization:'Bearer '+cfg.resendApiKey,'Content-Type':'application/json'},body:JSON.stringify({from:cfg.emailFrom,to:[rows[0].email],subject:'استعادة كلمة مرور ATSH AI',html:'<p>مرحبًا '+esc(rows[0].full_name)+'</p><p>لطلب تغيير كلمة المرور، استخدم الرابط التالي خلال 30 دقيقة:</p><p><a href="'+link+'">استعادة كلمة المرور</a></p><p>إذا لم تطلب ذلك، فتجاهل الرسالة.</p>'}),signal:AbortSignal.timeout(15000)});
+    if(!sent.ok)throw new Error('Email provider rejected reset request.');
+   }catch(e){await getPool().query('DELETE FROM password_reset_tokens WHERE user_id=$1',[rows[0].id]);throw e;}
+  }
+  res.status(202).json({ok:true,message:'إذا كان البريد مرتبطًا بحساب نشط، فستصلك رسالة استعادة قريبًا.'});
+ }catch(e){if(e.name==='ZodError')return res.status(400).json({error:'أدخل بريدًا إلكترونيًا صحيحًا.'});next(e);}
+});
+router.post('/auth/password-reset/confirm',async(req,res,next)=>{
+ const db=getPool();let client;
+ try{
+  const s=z.object({token:z.string().min(30).max(200),password:z.string().min(14).max(256)}).strict().parse(req.body);
+  const hash=crypto.createHash('sha256').update(s.token).digest('hex');client=await db.connect();await client.query('BEGIN');
+  const {rows}=await client.query("SELECT t.user_id FROM password_reset_tokens t JOIN users u ON u.id=t.user_id WHERE t.token_hash=$1 AND t.expires_at>now() AND u.status='active' FOR UPDATE OF t,u",[hash]);
+  if(!rows[0]){await client.query('ROLLBACK');return res.status(400).json({error:'رابط الاستعادة غير صالح أو انتهت صلاحيته.'});}
+  const userId=rows[0].user_id;
+  await client.query('UPDATE users SET password_hash=$2,updated_at=now() WHERE id=$1',[userId,await passwordHash(s.password)]);
+  await client.query('DELETE FROM password_reset_tokens WHERE user_id=$1',[userId]);
+  await client.query('DELETE FROM auth_sessions WHERE user_id=$1',[userId]);
+  await client.query("INSERT INTO audit_logs(organization_id,actor_user_id,action,entity_type,entity_id,details) SELECT organization_id,$2,'auth.password_reset','user',$2,'{}'::jsonb FROM users WHERE id=$2",[userId]);
+  await client.query('COMMIT');res.json({ok:true,message:'تم تغيير كلمة المرور. يمكنك تسجيل الدخول من جديد.'});
+ }catch(e){if(client)await client.query('ROLLBACK').catch(()=>{});if(e.name==='ZodError')return res.status(400).json({error:'كلمة المرور الجديدة يجب ألا تقل عن 14 حرفًا.'});next(e);}
+ finally{client?.release();}
+});
+
 router.post('/auth/login',login);
 router.post('/auth/logout',requireAuth,logout);
 router.get('/auth/me',requireAuth,(req,res)=>res.json({user:{id:req.user.id,email:req.user.email,name:req.user.full_name,roles:req.user.roles,permissions:req.permissionSets||[]}}));
