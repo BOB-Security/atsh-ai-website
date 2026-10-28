@@ -3,6 +3,7 @@ const crypto = require('node:crypto');
 const { promisify } = require('node:util');
 const scrypt = promisify(crypto.scrypt);
 const { getPool } = require('./db');
+const mfa = require('./mfa');
 const COOKIE = 'atsh_platform_session';
 const SESSION_MS = 8 * 60 * 60 * 1000;
 function digest(token) { return crypto.createHash('sha256').update(token).digest('hex'); }
@@ -35,6 +36,8 @@ async function login(req,res,next) {
        WHERE u.organization_id=$1 AND lower(u.email)=lower($2) GROUP BY u.id LIMIT 1`,[org,email]);
     const user=rows[0];
     if (!user || user.status!=='active' || !await verifyPassword(password,user.password_hash)) return res.status(401).json({error:'البريد الإلكتروني أو كلمة المرور غير صحيحة.'});
+    let enabledMfa={rowCount:0};try{enabledMfa=await getPool().query('SELECT enabled FROM user_mfa WHERE user_id=$1 AND enabled=true',[user.id]);}catch(mfaError){if(mfaError.code!=='42P01')throw mfaError;}
+    if(enabledMfa.rowCount){await mfa.beginLoginChallenge(user.id,req,res);return res.json({ok:true,mfaRequired:true});}
     const token=crypto.randomBytes(32).toString('base64url');
     const expires=new Date(Date.now()+SESSION_MS);
     await getPool().query('INSERT INTO auth_sessions(user_id,token_hash,expires_at) VALUES($1,$2,$3)',[user.id,digest(token),expires]);
@@ -78,4 +81,5 @@ async function logout(req,res,next) {
     res.json({ok:true});
   } catch(err){next(err);}
 }
-module.exports={passwordHash,verifyPassword,login,requireAuth,requirePermission,logout};
+async function verifyMfaLogin(req,res,next){try{const result=await mfa.completeLogin(req,res);return res.status(result.status).json(result.body);}catch(err){next(err);}}
+module.exports={passwordHash,verifyPassword,login,requireAuth,requirePermission,logout,verifyMfaLogin};

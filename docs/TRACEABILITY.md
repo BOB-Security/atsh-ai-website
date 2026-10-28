@@ -9,7 +9,7 @@ This matrix maps the reference specification to the isolated implementation trac
 | Multi-step project configurator | `project-builder.html`, `builder.js`, `POST /api/public/project-inquiries` | Implemented baseline | Accessibility, field coverage, real browser E2E, spam tests, email/notification workflow |
 | Reference number and stored request | `leads`, `customers`, transactional intake | Partial | Customer duplicate policy, notification delivery, admin E2E |
 | Central database | `db/001..005_*.sql`, `platform/src/db.js` | Schema and runner implemented | Apply to real PostgreSQL, migration test, backup/restore test, connection policy |
-| Admin authentication | `platform/src/auth.js`, opaque DB sessions, rate-limited login, owner-controlled roles | Partial — release blocker | Implement MFA for privileged users, password recovery, session revocation UI, rate-limit tests and secure deployment settings |
+| Admin authentication | `platform/src/auth.js`, opaque DB sessions, rate-limited login, TOTP MFA, encrypted MFA secrets and single-use recovery codes | Partial — release blocker | Configure `MFA_ENCRYPTION_KEY` in deployment; apply migration; test enrollment/login/recovery in staging; complete password recovery and session revocation UI |
 | Team roles/invitations | `platform/src/routes/team.js`, bootstrap role seeds | Partial | Invite email integration test, role matrix test, UI actions for all cases |
 | Leads/customers/projects/tasks | `platform/src/routes/admin.js` | Partial | CRUD completion, filtering/pagination, field-level validation, workflow tests |
 | Quotes and immutable snapshot | `quotes`, `quote_items`, public estimate page, email issue and one-time response token | Partial — admin status/expiry display and currency-aware minor-unit formatting implemented | Browser acceptance, customer-facing quote rendering/PDF, payment workflow, currency/rounding integration tests and email-provider E2E remain required |
@@ -29,3 +29,9 @@ This matrix maps the reference specification to the isolated implementation trac
 - Do not publish example prices or placeholder legal copy as approved commercial policy.
 - Do not claim backup success unless an actual provider operation succeeded; do not claim recoverability until a restore test is recorded.
 - Do not deploy a client project until a valid final-release approval token has been consumed and the approval record is present.
+
+
+## MFA implementation status
+- TOTP enrollment and verification are implemented on the isolated MFA branch; secrets use AES-256-GCM with a dedicated 32-byte hexadecimal `MFA_ENCRYPTION_KEY` environment variable.
+- Recovery codes are generated once and stored as hashes; successful TOTP steps are tracked to prevent replay.
+- This implementation is not production-ready until CI, migration, staging secret configuration, browser tests and recovery-path acceptance pass.
