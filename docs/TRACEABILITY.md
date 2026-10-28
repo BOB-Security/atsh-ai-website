@@ -62,3 +62,11 @@ This matrix maps the reference specification to the isolated implementation trac
 - This test and the latest changes still require a completed green CI run on the exact current PR head. One concurrency test does not cover every challenge expiry/attempt-limit or browser workflow; browser E2E, full recovery lifecycle, staging migration and backup/restore remain release gates.
 
 - The first PostgreSQL concurrency run exposed an audit INSERT parameter type mismatch (UUID reused for a text `entity_id`). Login and enrollment audit inserts now use separate typed parameters. The next CI run must confirm this correction before the integration test is considered passing.
+
+
+### MFA recovery and rotation endpoint (implementation, acceptance pending)
+- Added authenticated `POST /api/admin/auth/mfa/rotate`. It requires the current password plus either a valid non-replayed TOTP code or an unused recovery code.
+- The endpoint locks the active MFA row in a PostgreSQL transaction, consumes a recovery code when used, replaces the authenticator secret with a 10-minute pending setup, deletes remaining recovery codes and outstanding MFA challenges, revokes all other platform sessions, and limits the current session to MFA enrollment for 15 minutes.
+- The operation writes `auth.mfa_rotated` audit evidence with whether a recovery code was used, and the endpoint is rate-limited.
+- Static regression assertions were added. These are not yet evidence that concurrent recovery/rotation requests, password-reset races, browser UX, or full session revocation behavior pass against PostgreSQL. CI on the exact current PR head and dedicated integration/browser tests remain mandatory.
+- The rotation response returns a new TOTP setup secret/URI; the user must confirm it through the existing `/auth/mfa/enable` route within 10 minutes to complete rotation and receive a fresh recovery-code set. The prior recovery codes are invalidated immediately, so the user should complete setup before leaving the flow.
