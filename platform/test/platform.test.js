@@ -70,3 +70,12 @@ test('admin support panel exposes ticket creation backed by the protected ticket
  assert.match(ui,/api\('\/api\/ops\/tickets'/);
  assert.match(routes,/router\.post\('\/tickets',requirePermission\('tickets\.manage'\)/);
 });
+
+test('knowledge article lifecycle is editable only through permission-protected organization-scoped route',()=>{
+ const routes=fs.readFileSync(path.join(root,'platform/src/routes/ops.js'),'utf8');
+ const ui=fs.readFileSync(path.join(root,'platform/public/admin.js'),'utf8');
+ assert.match(routes,/router\.patch\('\/knowledge\/:id',requirePermission\('knowledge\.manage'\)/);
+ assert.match(routes,/WHERE id=\$1 AND organization_id=\$2 RETURNING id,title_ar,title_en,body_ar,body_en,status/);
+ assert.match(ui,/knowledge-edit-form/);
+ assert.match(ui,/api\('\/api\/ops\/knowledge\/'+f\.dataset\.articleId/);
+});
