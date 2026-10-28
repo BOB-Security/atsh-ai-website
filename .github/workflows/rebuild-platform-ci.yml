@@ -6,6 +6,7 @@ on:
       - 'platform/**'
       - 'db/**'
       - '.github/workflows/rebuild-platform-ci.yml'
+      - 'docs/TRACEABILITY.md'
   pull_request:
     branches: [main]
     paths:
