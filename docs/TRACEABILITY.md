@@ -72,3 +72,12 @@ This matrix maps the reference specification to the isolated implementation trac
 - The rotation response returns a new TOTP setup secret/URI; the user must confirm it through the existing `/auth/mfa/enable` route within 10 minutes to complete rotation and receive a fresh recovery-code set. The prior recovery codes are invalidated immediately, so the user should complete setup before leaving the flow.
 
 - Added the admin console form and client handler for the rotation endpoint. During re-enrollment, the UI hides operational modules; successful confirmation returns through the existing MFA enable path. UI assertions were added, but a real browser E2E run is still required.
+
+
+## Verified CI evidence — 2026-10-28
+- Exact code commit tested: `5646ae37e005158e814dba8b02b5433a8e37b634` (the PR #43 head at the time of the run).
+- GitHub Actions run: [40748893428](https://github.com/BOB-Security/atsh-ai-website/actions/runs/40748893428), workflow `ATSH AI Platform Rebuild CI`, job `validate`.
+- Observed job steps succeeded: dependency installation, `npm run build`, `npm run db:migrate`, `npm run db:bootstrap`, and `npm test` against the workflow's disposable PostgreSQL 16 service.
+- Test summary from the job log: 43 tests, 43 passed, 0 failed, 0 skipped. The PostgreSQL concurrency test `PostgreSQL serializes concurrent MFA challenge use and permits only one recovery login` is explicitly reported as passing (not skipped).
+- Scope of evidence: this confirms the test suite and migration/bootstrap workflow ran successfully on that commit in CI. It does not prove browser E2E, an upgrade from a real existing database, production secret configuration, deployed HTTPS/cookie settings, a real Azure staging deployment, or a successful encrypted backup restore.
+- Current release decision remains **not production-approved** until the remaining acceptance gates above are completed and recorded. This entry supersedes earlier statements in this file that the latest code commit still needed its first CI pass; it does not close the remaining release gates.
