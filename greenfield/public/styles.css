@@ -89,3 +89,9 @@
 .process-timeline h2{font-size:17px;margin:0 0 5px}
 .process-timeline p{font-size:12px;color:var(--muted);line-height:2;margin:0}
 @media(max-width:800px){.pricing-principles,.about-grid{grid-template-columns:1fr}.page-hero{padding-top:65px}.service-catalog{grid-template-columns:1fr}.bottom-cta{margin-bottom:50px}}
+
+.consent-row{display:flex;align-items:flex-start;gap:10px;margin-top:18px;padding:12px;border:1px solid var(--line);border-radius:10px;color:var(--muted);font-size:11px;line-height:1.9}
+.consent-row input{margin-top:7px;accent-color:var(--purple);flex:0 0 auto}
+.consent-row a{color:var(--lilac);text-decoration:underline;text-underline-offset:3px}
+#submissionStatus{min-height:64px}
+#submissionStatus strong{color:var(--gold)}
