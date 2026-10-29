@@ -99,7 +99,15 @@ async function loadPageContent(){
   for(const [page,fields] of Object.entries(pageFieldMap)){
    for(const [key,name] of Object.entries(fields)){
     const input=pageContentForm.elements.namedItem(name);
-    if(input)input.value=content[page]?.[key]||'';
+    const originalPageContent={
+   home:{title:'فكرتك تستحق تنفيذًا يُعتمد عليه.',description:'نحوّل احتياجاتك إلى مواقع وتطبيقات وحلول ذكاء اصطناعي واضحة النطاق، قابلة للاختبار، ومبنية لتتطور مع عملك.'},
+   services:{title:'الحل المناسب يبدأ بفهم الاحتياج.',description:'نطاق كل خدمة ومخرجاتها يُحددان بوضوح قبل التنفيذ. لا نعرض سعرًا ثابتًا إذا كان يتوقف على متطلبات لم تُراجع بعد.'},
+   pricing:{title:'السعر الصحيح يبدأ من نطاق واضح.',description:'أضفنا أسعارًا مبدئية بالجنيه المصري لتبدأ منها، ويمكن تعديلها لاحقًا من كتالوج الإدارة. الأسعار ليست عرضًا نهائيًا، والاستضافة والرسوم الدورية منفصلة عن تكلفة التطوير.'},
+   process:{title:'مراحل واضحة من أول نقاش حتى التسليم.',description:'الخطوات التالية هي نموذج العمل المستهدف؛ يُحدد لكل مشروع ما ينطبق عليه قبل بدء التنفيذ.'},
+   about:{title:'نحوّل الاحتياج إلى تنفيذ يمكن مراجعته.',description:'نعمل على بناء حلول رقمية واضحة النطاق، من المواقع والمنصات إلى الأنظمة والتكاملات والذكاء الاصطناعي.'},
+   faq:{title:'إجابات واضحة قبل أن تبدأ.',description:'إذا كانت لديك حالة خاصة، أضفها في ملخص المشروع لنحدد ما ينطبق عليها.'}
+  };
+    if(input)input.value=content[page]?.[key]||originalPageContent[page]?.[key]||'';
    }
   }
   pageContentMessage('تم تحميل محتوى الصفحات الحالي.','success');
