@@ -64,7 +64,7 @@ async function loadSiteSettings(){
   const result=await response.json().catch(()=>({}));
   if(!response.ok||!result.ok){siteSettingsMessage(response.status===403?'لا يملك هذا الحساب صلاحية إدارة إعدادات الموقع.':'إعدادات الموقع غير متاحة. تأكد من تطبيق ترحيل قاعدة البيانات.','error');return;}
   const values=result.settings||{};
-  for(const key of ['hero_title','hero_description','logo_url','primary_color','accent_color','contact_email']){
+  for(const key of ['hero_title','hero_description','logo_url','hero_background_url','primary_color','accent_color','contact_email']){
    const field=siteSettingsForm.elements.namedItem(key);if(field&&typeof values[key]==='string')field.value=values[key];
   }
   siteSettingsMessage('تم تحميل الإعدادات الحالية.','success');
@@ -73,7 +73,7 @@ async function loadSiteSettings(){
 if(siteSettingsForm)siteSettingsForm.addEventListener('submit',async event=>{
  event.preventDefault();
  const submit=siteSettingsForm.querySelector('button[type="submit"]');if(submit)submit.disabled=true;
- const settings={};for(const key of ['hero_title','hero_description','logo_url','primary_color','accent_color','contact_email'])settings[key]=String(siteSettingsForm.elements.namedItem(key)?.value||'').trim();
+ const settings={};for(const key of ['hero_title','hero_description','logo_url','hero_background_url','primary_color','accent_color','contact_email'])settings[key]=String(siteSettingsForm.elements.namedItem(key)?.value||'').trim();
  siteSettingsMessage('جارٍ حفظ الإعدادات…');
  try{
   const response=await fetch('/api/admin/site-settings',{method:'PUT',credentials:'same-origin',headers:{'content-type':'application/json','accept':'application/json','x-csrf-token':csrfToken},body:JSON.stringify({settings})});
