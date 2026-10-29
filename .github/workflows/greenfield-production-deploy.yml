@@ -36,7 +36,7 @@ jobs:
       - name: Package greenfield app
         run: |
           set -euo pipefail
-          zip -r ../atsh-ai-greenfield.zip . -x 'node_modules/*' '.data/*' '*.log' '.env*'
+          zip -r ../atsh-ai-greenfield.zip . -x '.data/*' '*.log' '.env*'
       - uses: actions/upload-artifact@v4
         with:
           name: atsh-ai-greenfield
