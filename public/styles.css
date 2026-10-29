@@ -23,3 +23,16 @@ html[dir="ltr"] body{font-family:Manrope,"IBM Plex Sans Arabic",sans-serif}html[
 /* ATSH metallic coin mark: show only the circular emblem in every public header. */
 .site-header .brand-mark{width:46px;height:46px;flex:0 0 46px;border:0;border-radius:50%;display:block;overflow:hidden;background-image:url('/images/atsh-logo.jpg');background-repeat:no-repeat;background-position:center;background-size:auto 122%;font-size:0;letter-spacing:0;color:transparent;transform:none;box-shadow:0 0 0 1px rgba(190,202,218,.25)}
 .site-header .brand-mark span{display:none}
+
+/* FINAL brand correction: coin only, no square frame or wordmark. */
+.site-header .brand{gap:0!important}
+.site-header .brand-mark{width:54px!important;height:54px!important;flex:0 0 54px!important;border:0!important;border-radius:50%!important;display:block!important;overflow:hidden!important;background-image:url('/images/atsh-logo.jpg')!important;background-repeat:no-repeat!important;background-position:center!important;background-size:auto 122%!important;font-size:0!important;letter-spacing:0!important;color:transparent!important;transform:none!important;box-shadow:none!important}
+.site-header .brand-mark span,.site-header .brand-word{display:none!important}
+/* Move the AI feature card to the upper-left position marked in the owner's screenshot. */
+.hero-visual .core-card{position:absolute!important;top:8px!important;left:0!important;right:auto!important;transform:none!important;z-index:3!important}
+.hero-visual .orbit-outer{transform:translate(-35px,-38px) rotate(-24deg)!important}
+.hero-visual .orbit-middle{transform:translate(-35px,-38px) rotate(54deg)!important}
+.hero-visual .orbit-inner{transform:translate(-35px,-38px)!important}
+.hero-visual .chip-top{top:0!important;left:48%!important;right:auto!important}
+.hero-visual .chip-side{top:52%!important;right:0!important}
+@media(max-width:760px){.site-header .brand-mark{width:44px!important;height:44px!important;flex-basis:44px!important}.hero-visual{height:350px!important}.hero-visual .core-card{top:10px!important;left:4%!important}.hero-visual .orbit-outer{width:300px;height:220px}.hero-visual .chip-top{left:auto!important;right:0!important}}
