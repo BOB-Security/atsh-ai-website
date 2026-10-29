@@ -10,6 +10,7 @@ const { checkDatabase, closePool } = require('./src/db');
 const { validateInquiry, createProjectInquiry, getPublicCatalog } = require('./src/intake');
 const { login, beginMfaSetup, completeMfaSetup, getSession, logout, cookieHeader, clearCookieHeader, readCookie, hasPermission } = require('./src/auth');
 const { listCatalog, createCategory, updateCategory, createPlan, updatePlan, createAddon, updateAddon, setCatalogApproval } = require('./src/admin-catalog');
+const { listLeads, updateLead, createQuote, listQuotes, issueQuote, getPublicQuote, respondToQuote } = require('./src/admin-operations');
 const config = loadConfig();
 const app = express();
 app.disable('x-powered-by');
@@ -23,6 +24,30 @@ async function loadAdminSession(req, res, allowSetup = false) { const token = re
 app.use(express.static(path.join(__dirname, 'public'), { extensions: ['html'], etag: true }));
 app.get('/health', (_req, res) => res.json({ ok: true, service: 'atsh-ai-platform', version: '2.0.0' }));
 app.get('/ready', async (_req, res) => { try { await checkDatabase(config); res.json({ ok: true, database: { connected: true } }); } catch { res.status(503).json({ ok: false, reason: config.databaseUrl ? 'database_unavailable' : 'database_not_configured' }); } });
+app.post('/api/public/quotes/lookup', sameOrigin, async (req, res) => {
+  try {
+    const quote = await getPublicQuote(config, req.body && req.body.token);
+    if (!quote) return res.status(404).json({ error: 'quote_not_found', message: 'رابط عرض السعر غير صالح أو انتهت صلاحيته.' });
+    if (quote.expired) return res.status(410).json({ error: 'quote_expired', reference: quote.reference, message: 'انتهت صلاحية عرض السعر.' });
+    res.setHeader('Cache-Control', 'no-store');
+    return res.json({ ok: true, quote });
+  } catch (error) {
+    console.error('Public quote lookup failed', { code: error && error.code || 'unknown' });
+    return res.status(503).json({ error: 'quote_unavailable', message: 'تعذر تحميل عرض السعر مؤقتًا.' });
+  }
+});
+app.post('/api/public/quotes/respond', sameOrigin, async (req, res) => {
+  try {
+    const result = await respondToQuote(config, req.body && req.body.token, req.body && req.body.decision);
+    if (result.expired) return res.status(410).json({ error: 'quote_expired', reference: result.reference, message: 'انتهت صلاحية عرض السعر.' });
+    res.setHeader('Cache-Control', 'no-store');
+    return res.json({ ok: true, quote: result });
+  } catch (error) {
+    console.error('Public quote response failed', { code: error && error.code || 'unknown' });
+    const status = error && error.code === 'NOT_FOUND' ? 404 : error && ['ECONNREFUSED','ETIMEDOUT','ENOTFOUND'].includes(error.code) ? 503 : 400;
+    return res.status(status).json({ error: status === 404 ? 'quote_not_found' : 'quote_response_failed', message: status === 404 ? 'رابط عرض السعر غير صالح أو انتهت صلاحيته.' : 'تعذر تسجيل ردك؛ لم يتم تأكيد الموافقة.' });
+  }
+});
 app.get('/api/public/catalog', async (_req, res) => {
   try { res.json(await getPublicCatalog(config)); }
   catch (error) {
@@ -113,6 +138,41 @@ function catalogError(res, error) {
   if (error && ['ECONNREFUSED','ETIMEDOUT','ENOTFOUND','42P01','42703','23503'].includes(error.code)) return res.status(503).json({ error: 'catalog_unavailable', message: 'كتالوج الإدارة غير متاح مؤقتًا.' });
   return res.status(400).json({ error: 'invalid_catalog_input', message: error && error.message || 'راجع البيانات المدخلة.' });
 }
+function operationsError(res,error) {
+  console.error('Admin operations failed', { code:error&&error.code||'validation_or_unknown' });
+  if(error&&error.code==='NOT_FOUND')return res.status(404).json({error:'not_found',message:'السجل المطلوب غير موجود.'});
+  if(error&&['INVALID_TRANSITION','QUOTE_REQUIRED','LEAD_NOT_READY'].includes(error.code))return res.status(409).json({error:error.code.toLowerCase(),message:error.message});
+  if(error&&error.code==='23505')return res.status(409).json({error:'duplicate_reference'});
+  if(error&&error.code==='ORGANIZATION_NOT_CONFIGURED')return res.status(503).json({error:'organization_not_configured'});
+  if(error&&['ECONNREFUSED','ETIMEDOUT','ENOTFOUND','42P01','42703','23503'].includes(error.code))return res.status(503).json({error:'operations_unavailable'});
+  return res.status(400).json({error:'invalid_request',message:error&&error.message||'راجع البيانات المدخلة.'});
+}
+app.get('/api/admin/leads', async (req,res) => {
+  const session=await requirePermission(req,res,'leads.read');if(!session)return;
+  try { return res.json({ok:true,...await listLeads(config,{status:req.query.status||'',search:req.query.search||'',limit:req.query.limit,offset:req.query.offset})}); }
+  catch(error){return operationsError(res,error);}
+});
+app.patch('/api/admin/leads/:id', sameOrigin, async (req,res) => {
+  const session=await requirePermission(req,res,'leads.manage');if(!session)return;
+  try { return res.json({ok:true,lead:await updateLead(config,session,req.params.id,req.body||{},requestIpHash(req))}); }
+  catch(error){return operationsError(res,error);}
+});
+app.get('/api/admin/quotes', async (req,res) => {
+  const session=await requirePermission(req,res,'quotes.read');if(!session)return;
+  try { return res.json({ok:true,...await listQuotes(config,{status:req.query.status||'',limit:req.query.limit,offset:req.query.offset})}); }
+  catch(error){return operationsError(res,error);}
+});
+app.post('/api/admin/quotes', sameOrigin, async (req,res) => {
+  const session=await requirePermission(req,res,'quotes.write');if(!session)return;
+  if(!hasPermission(session,'pricing.write'))return res.status(403).json({error:'pricing_permission_required'});
+  try { return res.status(201).json({ok:true,quote:await createQuote(config,session,req.body||{},requestIpHash(req))}); }
+  catch(error){return operationsError(res,error);}
+});
+app.post('/api/admin/quotes/:id/issue', sameOrigin, async (req,res) => {
+  const session=await requirePermission(req,res,'quotes.issue');if(!session)return;
+  try { return res.json({ok:true,...await issueQuote(config,session,req.params.id,requestIpHash(req))}); }
+  catch(error){return operationsError(res,error);}
+});
 app.get('/api/admin/catalog', async (req, res) => {
   const session = await requirePermission(req, res, 'catalog.read');
   if (!session) return;
