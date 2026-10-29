@@ -1,0 +1,23 @@
+name: ATSH AI Greenfield CI
+on:
+  push:
+    branches: ['rebuild/atsh-ai-greenfield']
+  pull_request:
+    branches: ['rebuild/atsh-ai-greenfield']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: greenfield
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install
+      - run: npm run build
+      - run: npm test
