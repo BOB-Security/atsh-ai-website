@@ -18,6 +18,23 @@
 <p id="adminLoginMessage" class="admin-message" role="status" aria-live="polite">لن تُفعّل جلسة الإدارة حتى يكتمل ربط خدمة المصادقة والتحقق من قاعدة البيانات.</p>
 <button class="btn primary" type="submit">محاولة تسجيل الدخول <span>←</span></button>
 </form>
+<div class="admin-recovery-actions"><button id="adminShowRecovery" class="text-link" type="button">نسيت كلمة المرور؟ استرجاع الحساب</button></div>
+<section id="adminRecoveryPanel" class="admin-recovery-panel" hidden aria-labelledby="adminRecoveryTitle">
+<div class="admin-panel-heading"><div><small>استعادة الوصول</small><h3 id="adminRecoveryTitle">استرجاع حساب الإدارة</h3></div><button id="adminHideRecovery" class="btn secondary" type="button">العودة للدخول</button></div>
+<p id="adminRecoveryAvailability" class="admin-subtext" role="status">جارٍ التحقق من جاهزية خدمة الاسترجاع…</p>
+<form id="adminRecoveryRequestForm" class="admin-form">
+<label for="adminRecoveryEmail">البريد الإلكتروني المرتبط بالحساب</label><input id="adminRecoveryEmail" name="email" type="email" autocomplete="email" required maxlength="254" placeholder="name@company.com">
+<p id="adminRecoveryRequestMessage" class="admin-message" role="status" aria-live="polite"></p>
+<button class="btn primary" type="submit">إرسال رابط الاسترجاع</button>
+</form>
+<form id="adminRecoveryResetForm" class="admin-form" hidden>
+<label for="adminRecoveryNewPassword">كلمة المرور الجديدة</label><input id="adminRecoveryNewPassword" name="password" type="password" autocomplete="new-password" required minlength="12" maxlength="128">
+<label for="adminRecoveryConfirmPassword">تأكيد كلمة المرور الجديدة</label><input id="adminRecoveryConfirmPassword" name="confirm_password" type="password" autocomplete="new-password" required minlength="12" maxlength="128>
+<p class="admin-subtext">استخدم 12 حرفًا على الأقل. رابط الاسترجاع صالح لمدة 30 دقيقة ولمرة واحدة.</p>
+<p id="adminRecoveryResetMessage" class="admin-message" role="status" aria-live="polite"></p>
+<button class="btn primary" type="submit">تغيير كلمة المرور</button>
+</form>
+</section>
 </section>
 <section id="adminDashboard" class="admin-dashboard" hidden>
 <div class="admin-welcome"><div><small>نظرة عامة</small><h2 id="adminWelcomeTitle">مرحبًا</h2></div><button id="adminLogout" class="btn secondary" type="button">تسجيل الخروج</button></div>
