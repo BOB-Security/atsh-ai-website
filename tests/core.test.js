@@ -16,3 +16,14 @@ test('inquiry validation rejects invalid email, missing consent and unsupported 
 test('public references have the ATSH date-based format', () => {
   assert.match(makeReference(new Date('2026-10-29T12:00:00Z')), /^ATSH-20261029-[A-F0-9]{8}$/);
 });
+
+const crypto = require('node:crypto');
+const { verifyPassword } = require('../src/auth');
+test('scrypt password verification supports the existing stored hash format', async () => {
+  const password = 'correct horse battery staple';
+  const salt = crypto.randomBytes(16);
+  const derived = crypto.scryptSync(password, salt, 64, { maxmem: 64 * 1024 * 1024 });
+  const stored = 'scrypt$' + salt.toString('hex') + '$' + derived.toString('hex');
+  assert.equal(await verifyPassword(password, stored), true);
+  assert.equal(await verifyPassword('wrong password', stored), false);
+});
