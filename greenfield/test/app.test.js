@@ -16,6 +16,19 @@ test('public catalog returns only database-backed catalog data',async t=>{
  assert.deepEqual(result.categories,catalog);
  assert.match(response.headers.get('cache-control'),/max-age=60/);
 });
+test('public catalog supplies editable provisional EGP defaults when no organization catalog exists',async t=>{
+ const base=await withServer(t,config,{checkConnection:async()=>true,inspectSchema:async()=>[],listPublicCatalog:async()=>{const e=new Error('not configured');e.code='CATALOG_NOT_CONFIGURED';throw e;}});
+ const response=await fetch(base+'/api/public/catalog');
+ assert.equal(response.status,200);
+ const result=await response.json();
+ assert.equal(result.ok,true);
+ assert.equal(result.provisional,true);
+ assert.ok(result.categories.some(category=>category.slug==='hosting'));
+ const plans=result.categories.flatMap(category=>category.plans);
+ assert.ok(plans.some(plan=>plan.slug==='landing-page'&&plan.amountsMinor.setup==='450000'));
+ assert.ok(plans.some(plan=>plan.slug==='hosting-starter'&&plan.amountsMinor.monthly==='25000'));
+ assert.ok(plans.every(plan=>plan.currency==='EGP'));
+});
 test('public catalog fails closed when organization/schema is not configured',async t=>{
  const db={checkConnection:async()=>true,inspectSchema:async()=>[],listPublicCatalog:async()=>{const e=new Error('not ready');e.code='CATALOG_SCHEMA_MISMATCH';throw e;}};
  const base=await withServer(t,config,db);
@@ -49,7 +62,7 @@ test('services page includes database-backed catalog with safe static fallback',
  assert.match(js,/fetch\('\/api\/public\/catalog'/);
  assert.match(js,/staticCatalog\.hidden=true/);
 });
-test('pricing page does not publish invented amounts',async t=>{const base=await withServer(t,config,{checkConnection:async()=>false,inspectSchema:async()=>[]});const html=await (await fetch(base+'/pricing.html')).text();assert.match(html,/قائمة الأسعار غير مفعّلة/);assert.match(html,/لا تُعد هذه الصفحة عرضًا ماليًا/);});
+test('pricing page clearly labels editable starter estimates as provisional',async t=>{const base=await withServer(t,config,{checkConnection:async()=>false,inspectSchema:async()=>[]});const html=await (await fetch(base+'/pricing.html')).text();assert.match(html,/أسعار افتراضية مبدئية قابلة للتعديل/);assert.match(html,/ليست عرضًا ماليًا نهائيًا/);});
 
 test('intake validates consent and reports persisted reference only after commit',async t=>{
  const cfg={...config,intakeEnabled:true,publicOrganizationId:'11111111-1111-4111-8111-111111111111'};
