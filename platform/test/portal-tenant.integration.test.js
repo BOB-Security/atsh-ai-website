@@ -48,7 +48,8 @@ test('PostgreSQL customer portal queries isolate two customers across projects, 
     assert.deepEqual(quotes.rows.map(x => x.id), [quoteA]);
     assert.deepEqual(tickets.rows.map(x => x.id), [ticketA]);
     assert.deepEqual(messages.rows.map(x => x.body), ['customer A reply']);
-    assert.equal(invalidChangeRequestError?.code, '23503', 'Database must reject change requests linked to another customer project');\n    assert.equal(wrongOrganizationProject.rowCount, 0, 'Customer A must not read another organization project');
+    assert.equal(invalidChangeRequestError?.code, '23503', 'Database must reject change requests linked to another customer project');
+    assert.equal(wrongOrganizationProject.rowCount, 0, 'Customer A must not read another organization project');
     assert.equal(wrongProject.rowCount, 0, 'Customer A must not read Customer B project');
     assert.equal(wrongQuote.rowCount, 0, 'Customer A must not mutate Customer B quote');
     assert.equal(wrongTicket.rowCount, 0, 'Customer A must not read Customer B ticket');
