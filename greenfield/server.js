@@ -59,9 +59,13 @@ function createApp(overrides = {}) {
       return res.status(503).json({ error: 'schema_inspection_unavailable' });
     }
   });
-  app.get('/api/admin/password-recovery/status', (req, res) => {
+  app.get('/api/admin/password-recovery/status', async (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
-    return res.json({ ok: true, configured: Boolean(config.passwordRecoveryConfigured) });
+    let schemaReady = false;
+    if (config.passwordRecoveryConfigured && typeof database.checkAdminPasswordRecoveryReady === 'function') {
+      schemaReady = await database.checkAdminPasswordRecoveryReady();
+    }
+    return res.json({ ok: true, configured: Boolean(config.passwordRecoveryConfigured && schemaReady) });
   });
   app.post('/api/admin/password-recovery/request', rateLimit({ windowMs: 900000, limit: 5, standardHeaders: 'draft-8', legacyHeaders: false }), async (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
