@@ -6,6 +6,21 @@ test('health works without database',async t=>{const base=await withServer(t,con
 test('home page serves from clean public root',async t=>{const base=await withServer(t,config,{checkConnection:async()=>false,inspectSchema:async()=>[]});const r=await fetch(base+'/');assert.equal(r.status,200);assert.match(await r.text(),/فكرتك تستحق/);});
 test('readiness reports database failure',async t=>{const base=await withServer(t,config,{checkConnection:async()=>{const e=new Error('offline');e.code='ECONNREFUSED';throw e;},inspectSchema:async()=>[]});const r=await fetch(base+'/ready');assert.equal(r.status,503);assert.deepEqual(await r.json(),{ok:false,database:'unavailable',code:'DATABASE_CONNECTION_FAILED'});});
 test('schema diagnostics require bearer token',async t=>{const cfg={...config,diagnosticsToken:'test-only-long-secret'};const base=await withServer(t,cfg,{checkConnection:async()=>true,inspectSchema:async()=>[{table_schema:'public',table_name:'example',column_name:'id',data_type:'uuid',is_nullable:'NO'}]});assert.equal((await fetch(base+'/api/diagnostics/database-schema')).status,404);const r=await fetch(base+'/api/diagnostics/database-schema',{headers:{authorization:'Bearer test-only-long-secret'}});assert.equal(r.status,200);assert.equal((await r.json()).readOnly,true);});
+test('customer portal readiness is protected and uses read-only schema inspection',async t=>{
+ const cfg={...config,diagnosticsToken:'test-only-long-secret'};
+ const schema=[{table_schema:'public',table_name:'customers',column_name:'id',data_type:'uuid',is_nullable:'NO'}];
+ let inspections=0;
+ const base=await withServer(t,cfg,{checkConnection:async()=>true,inspectSchema:async()=>{inspections++;return schema;}});
+ assert.equal((await fetch(base+'/api/diagnostics/customer-portal-readiness')).status,404);
+ const response=await fetch(base+'/api/diagnostics/customer-portal-readiness',{headers:{authorization:'Bearer test-only-long-secret'}});
+ assert.equal(response.status,200);
+ const result=await response.json();
+ assert.equal(result.ok,true);
+ assert.equal(result.readOnly,true);
+ assert.equal(result.ready,false);
+ assert.ok(result.missingRequired.some(item=>item.table==='customer_portal_accounts'));
+ assert.equal(inspections,1);
+});
 test('public catalog returns only database-backed catalog data',async t=>{
  const catalog=[{id:'category-1',slug:'web',name:{ar:'المواقع',en:'Web'},description:{ar:'',en:''},plans:[{id:'plan-1',slug:'web-basic',name:{ar:'أساسي',en:'Basic'},description:{ar:'',en:''},amountsMinor:{setup:'50000',monthly:'0',annual:'0'},currency:'EGP',features:['Responsive design']}]}];
  const base=await withServer(t,config,{checkConnection:async()=>true,inspectSchema:async()=>[],listPublicCatalog:async()=>catalog});
