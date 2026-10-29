@@ -19,11 +19,11 @@
   const root=document.documentElement;
   if(/^#[0-9a-f]{6}$/i.test(settings.primary_color||'')){root.style.setProperty('--purple',settings.primary_color);root.style.setProperty('--lilac',settings.primary_color);}
   if(/^#[0-9a-f]{6}$/i.test(settings.accent_color||''))root.style.setProperty('--gold',settings.accent_color);
-  if(typeof settings.hero_title==='string'&&settings.hero_title.trim()){
+  if(!(page&&typeof page.title==='string'&&page.title.trim())&&typeof settings.hero_title==='string'&&settings.hero_title.trim()){
    const heading=document.querySelector('.hero h1, .page-hero h1');
    if(heading)heading.textContent=settings.hero_title.trim();
   }
-  if(typeof settings.hero_description==='string'&&settings.hero_description.trim()){
+  if(!(page&&typeof page.description==='string'&&page.description.trim())&&typeof settings.hero_description==='string'&&settings.hero_description.trim()){
    const description=document.querySelector('.hero .lead, .page-hero>p:not(.eyebrow)');
    if(description)description.textContent=settings.hero_description.trim();
   }
