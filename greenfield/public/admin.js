@@ -34,6 +34,22 @@ function showSignedIn(user){
  if(welcome)welcome.textContent='مرحبًا، '+(user?.name||user?.email||'فريق ATSH AI');
  renderPermissions(user?.permissions);
 }
+async function loadSchemaReadiness(){
+ const root=document.getElementById('adminSchemaReadiness');if(!root)return;
+ root.replaceChildren();const pending=document.createElement('p');pending.textContent='جارٍ فحص توافق الجداول والأعمدة…';root.append(pending);
+ try{
+  const response=await fetch('/api/admin/schema-readiness',{credentials:'same-origin',headers:{accept:'application/json'}});
+  const result=await response.json().catch(()=>({}));root.replaceChildren();
+  if(!response.ok||!result.ok){const p=document.createElement('p');p.textContent=response.status===403?'حسابك لا يملك صلاحية فحص الجاهزية.':'تعذر فحص مخطط قاعدة البيانات؛ لم يتم تغيير أي بيانات.';root.append(p);return;}
+  for(const group of result.groups||[]){
+   const section=document.createElement('section');section.className='admin-schema-group';
+   const title=document.createElement('h3');title.textContent=group.name+' — '+(group.ready?'جاهز':'يحتاج مراجعة');section.append(title);
+   if(group.ready){const p=document.createElement('p');p.textContent='الجداول والأعمدة المطلوبة موجودة.';section.append(p);}
+   else for(const item of group.missing||[]){const p=document.createElement('p');p.textContent=item.table+': الأعمدة الناقصة '+(item.missingColumns||[]).join('، ');section.append(p);}
+   root.append(section);
+  }
+ }catch{root.replaceChildren();const p=document.createElement('p');p.textContent='تعذر الاتصال بخدمة فحص الجاهزية.';root.append(p);}
+}
 async function loadOverview(){
  const response=await fetch('/api/admin/overview',{credentials:'same-origin',headers:{accept:'application/json'}});
  const result=await response.json().catch(()=>({}));
@@ -107,7 +123,7 @@ async function checkSession(){
   const response=await fetch('/api/admin/me',{credentials:'same-origin',headers:{accept:'application/json'}});
   if(!response.ok)return;
   const result=await response.json();
-  if(result.ok&&result.user){csrfToken=result.csrfToken||'';showSignedIn(result.user);await loadOverview();await loadCatalog();await loadLeads();}
+  if(result.ok&&result.user){csrfToken=result.csrfToken||'';showSignedIn(result.user);await loadOverview();await loadSchemaReadiness();await loadCatalog();await loadLeads();}
  }catch{}
 }
 if(loginForm)loginForm.addEventListener('submit',async event=>{
@@ -120,12 +136,13 @@ if(loginForm)loginForm.addEventListener('submit',async event=>{
   const response=await fetch('/api/admin/login',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json','accept':'application/json'},body:JSON.stringify({email:formData.get('email'),password:formData.get('password')})});
   const result=await response.json().catch(()=>({}));
   if(!response.ok||!result.ok){showMessage(result.message||'لم يكتمل تسجيل الدخول. لم يتم إنشاء جلسة إدارة.','error');return;}
-  csrfToken=result.csrfToken||'';loginForm.reset();showSignedIn(result.user);await loadOverview();await loadCatalog();await loadLeads();
+  csrfToken=result.csrfToken||'';loginForm.reset();showSignedIn(result.user);await loadOverview();await loadSchemaReadiness();await loadCatalog();await loadLeads();
  }catch{showMessage('تعذر الوصول إلى خدمة المصادقة. لم يتم تسجيل الدخول.','error');}
  finally{if(submit)submit.disabled=false;}
 });
 const reloadCatalog=document.getElementById('adminReloadCatalog');if(reloadCatalog)reloadCatalog.addEventListener('click',loadCatalog);
 const reloadLeads=document.getElementById('adminReloadLeads');if(reloadLeads)reloadLeads.addEventListener('click',loadLeads);
+const schemaReload=document.getElementById('adminReloadSchema');if(schemaReload)schemaReload.addEventListener('click',loadSchemaReadiness);
 const logout=document.getElementById('adminLogout');
 if(logout)logout.addEventListener('click',async()=>{
  try{
