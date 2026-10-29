@@ -148,10 +148,9 @@ function createApp(overrides = {}) {
         'الخدمات والباقات': {
           service_categories: ['id','organization_id','slug','name_ar','name_en','description_ar','description_en','active','sort_order'],
           service_plans: ['id','organization_id','category_id','slug','name_ar','name_en','description_ar','description_en','setup_amount_minor','monthly_amount_minor','annual_amount_minor','currency','features','active','sort_order']
-        },
-        'إعدادات الموقع': {
-          site_settings: ['organization_id','settings','updated_by','updated_at']
         }
+      };
+        'إعدادات الموقع': { site_settings: ['organization_id','settings','updated_by','updated_at'] }
       };
       const report = Object.entries(groups).map(([name, tables]) => {
         const missing = [];
