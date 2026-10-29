@@ -64,7 +64,7 @@ test('admin overview requires an authenticated session',async t=>{
  const base=await withServer(t,config,{checkConnection:async()=>false,inspectSchema:async()=>[],getAdminSession:async()=>{reads++;return null;}});
  const response=await fetch(base+'/api/admin/overview');
  assert.equal(response.status,401);
- assert.equal(reads,1);
+ assert.equal(reads,0);
 });
 test('admin login uses rate-limited credentials and creates an HttpOnly session',async t=>{
  const crypto=require('node:crypto');
