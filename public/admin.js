@@ -7,7 +7,7 @@ async function api(path, body, method) {
   return result;
 }
 function status(id, message, kind = 'error') { const node = $(id); node.textContent = message || ''; node.dataset.state = message ? kind : ''; }
-function showPanel(id) { ['loginPanel','setupPanel','recoveryPanel','dashboardPanel','catalogPanel'].forEach(key => { $(key).hidden = key !== id; }); }
+function showPanel(id) { ['loginPanel','setupPanel','recoveryPanel','dashboardPanel','catalogPanel','leadsPanel','quotesPanel'].forEach(key => { $(key).hidden = key !== id; }); }
 function setBusy(form, busy) { const button = form.querySelector('button[type="submit"]'); if (button) button.disabled = busy; }
 async function loadDashboard(user) {
   showPanel('dashboardPanel');
@@ -152,4 +152,66 @@ $('togglePublication').addEventListener('click',async()=>{
   if(approved&&!window.confirm('هل راجعت الأسعار والعملة والرسوم الدورية؟ سيظل عرض الأسعار متوقفًا حتى تفعيل CATALOG_PUBLICATION_APPROVED في إعدادات بيئة الإنتاج.'))return;
   try { const result=await api('/api/admin/catalog/publication',{approved});await loadCatalog();status('catalogStatus',result.publicPricesVisible?'تم اعتماد النشر على مستوى قاعدة البيانات والبيئة.':'تم تحديث اعتماد قاعدة البيانات؛ لا تزال بوابة البيئة تتحكم في إظهار الأسعار.','success'); }
   catch(error){status('catalogStatus',error.message||'تعذر تحديث اعتماد النشر.');}
+});
+
+const leadStatusLabels={new:'جديد',qualified:'مؤهل',scoped:'تم تحديد النطاق',quoted:'تم إرسال عرض',won:'تم الفوز',lost:'خاسر',spam:'مزعج'};
+const quoteStatusLabels={draft:'مسودة',issued:'مرسل',accepted:'مقبول',rejected:'مرفوض',expired:'منتهي',cancelled:'ملغي'};
+$('openLeads').addEventListener('click',async()=>{showPanel('leadsPanel');await loadLeads();});
+$('openQuotes').addEventListener('click',async()=>{showPanel('quotesPanel');await loadQuotes();await loadQuoteLeadOptions();});
+$('leadsBack').addEventListener('click',()=>showPanel('dashboardPanel'));
+$('quotesBack').addEventListener('click',()=>showPanel('dashboardPanel'));
+$('refreshLeads').addEventListener('click',loadLeads);
+async function loadQuoteLeadOptions(){
+ try{const result=await api('/api/admin/leads?limit=100');const select=$('quoteLead');select.replaceChildren();const placeholder=makeElement('option',null,'اختر طلبًا مؤهلًا لعرض السعر');placeholder.value='';select.append(placeholder);(result.items||[]).forEach(lead=>{const option=makeElement('option',null,lead.reference+' — '+(lead.customer_name||'عميل')+' ('+(leadStatusLabels[lead.status]||lead.status)+')');option.value=lead.id;select.append(option);});}
+ catch(error){status('quotesStatus',error.message||'تعذر تحميل الطلبات المرتبطة بالعروض.');}
+}
+async function loadLeads(){
+ status('leadsStatus','جارٍ تحميل الطلبات…','pending');
+ const params=new URLSearchParams({limit:'100'});if($('leadSearch').value.trim())params.set('search',$('leadSearch').value.trim());if($('leadStatusFilter').value)params.set('status',$('leadStatusFilter').value);
+ try{
+  const result=await api('/api/admin/leads?'+params.toString());const root=$('leadsList');root.replaceChildren();
+  if(!(result.items||[]).length)root.append(makeElement('p','catalog-empty','لا توجد طلبات مطابقة.'));
+  (result.items||[]).forEach(lead=>{
+   const card=makeElement('article','catalog-item');const title=makeElement('h4',null,lead.reference+' — '+(leadStatusLabels[lead.status]||lead.status));card.append(title);
+   card.append(makeElement('p',null,(lead.customer_name||'عميل')+(lead.customer_email?' · '+lead.customer_email:'')));
+   card.append(makeElement('p',null,lead.project_goal||'لم يكتب ملخصًا للمشروع.'));
+   card.append(makeElement('p',null,'الخدمة: '+(lead.solution_type||'غير محددة')+' · '+new Date(lead.created_at).toLocaleDateString('ar-EG')));
+   const actions=makeElement('div','item-actions');const select=document.createElement('select');Object.entries(leadStatusLabels).forEach(([value,label])=>{const option=makeElement('option',null,label);option.value=value;option.selected=value===lead.status;select.append(option);});
+   const save=makeElement('button','button','حفظ الحالة');save.type='button';save.addEventListener('click',async()=>{save.disabled=true;try{await api('/api/admin/leads/'+encodeURIComponent(lead.id),{status:select.value},'PATCH');status('leadsStatus','تم تحديث حالة الطلب.','success');await loadLeads();await loadQuoteLeadOptions();}catch(error){status('leadsStatus',error.message||'تعذر تحديث الحالة.');}finally{save.disabled=false;}});
+   actions.append(select,save);card.append(actions);root.append(card);
+  });
+  status('leadsStatus','تم تحميل '+(result.total||0)+' طلب.','success');
+ }catch(error){status('leadsStatus',error.message||'تعذر تحميل الطلبات. تحقق من الصلاحيات والاتصال.');}
+}
+async function loadQuotes(){
+ status('quotesStatus','جارٍ تحميل عروض الأسعار…','pending');
+ try{
+  const result=await api('/api/admin/quotes?limit=100');const root=$('quotesList');root.replaceChildren();
+  if(!(result.items||[]).length)root.append(makeElement('p','catalog-empty','لا توجد عروض أسعار بعد.'));
+  (result.items||[]).forEach(quote=>{
+   const card=makeElement('article','catalog-item');card.append(makeElement('h4',null,quote.reference+' — '+(quoteStatusLabels[quote.status]||quote.status)));
+   card.append(makeElement('p',null,(quote.customer_name||'عميل')+(quote.customer_email?' · '+quote.customer_email:'')));
+   card.append(makeElement('p',null,'التأسيس: '+moneyMinor(quote.setup_total_minor,quote.currency)+' · شهري: '+moneyMinor(quote.monthly_total_minor,quote.currency)+' · سنوي: '+moneyMinor(quote.annual_total_minor,quote.currency)));
+   if(quote.lead_reference)card.append(makeElement('p',null,'الطلب: '+quote.lead_reference));
+   if(quote.valid_until)card.append(makeElement('p',null,'صالح حتى: '+String(quote.valid_until).slice(0,10)));
+   if(quote.status==='draft'){
+    const issue=makeElement('button','button','إصدار العرض وإنشاء رابط الموافقة');issue.type='button';issue.addEventListener('click',async()=>{issue.disabled=true;try{const issued=await api('/api/admin/quotes/'+encodeURIComponent(quote.id)+'/issue',{},'POST');$('issuedQuoteLink').replaceChildren();$('issuedQuoteLink').hidden=false;$('issuedQuoteLink').append(makeElement('p',null,'تم إصدار العرض. أرسل الرابط التالي للعميل؛ الرابط سري ومخصص لهذا العرض:'));const a=makeElement('a','issued-url',issued.url);a.href=issued.url;a.target='_blank';a.rel='noopener noreferrer';$('issuedQuoteLink').append(a);status('quotesStatus','تم إصدار العرض وحفظ رابط الاستجابة.','success');await loadQuotes();}catch(error){status('quotesStatus',error.message||'تعذر إصدار العرض. تأكد من تأهيل الطلب أولًا.');}finally{issue.disabled=false;}});
+    const actions=makeElement('div','item-actions');actions.append(issue);card.append(actions);
+   }
+   root.append(card);
+  });
+  status('quotesStatus','تم تحميل '+(result.total||0)+' عرض سعر.','success');
+ }catch(error){status('quotesStatus',error.message||'تعذر تحميل عروض الأسعار.');}
+}
+$('leadStatusFilter').addEventListener('change',loadLeads);
+$('quoteForm').addEventListener('submit',async event=>{
+ event.preventDefault();const form=event.currentTarget;setBusy(form,true);$('issuedQuoteLink').hidden=true;
+ try{
+  const result=await api('/api/admin/quotes',{
+   lead_id:$('quoteLead').value,currency:$('quoteCurrency').value,valid_until:$('quoteValidUntil').value||null,customer_note:$('quoteNote').value,
+   items:[{description:$('quoteItemDescription').value,quantity:Number($('quoteQuantity').value),unit_setup_minor:Number($('quoteSetup').value),unit_monthly_minor:Number($('quoteMonthly').value),unit_annual_minor:Number($('quoteAnnual').value)}]
+  });
+  form.reset();$('quoteQuantity').value='1';$('quoteSetup').value='0';$('quoteMonthly').value='0';$('quoteAnnual').value='0';status('quotesStatus','تم حفظ المسودة '+result.quote.reference+'. لا يُرسل العرض للعميل حتى إصداره صراحة.','success');await loadQuotes();
+ }catch(error){status('quotesStatus',error.message||'تعذر إنشاء المسودة. تحقق من الصلاحيات والأسعار.');}
+ finally{setBusy(form,false);}
 });
