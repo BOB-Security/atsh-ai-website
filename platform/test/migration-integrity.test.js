@@ -6,10 +6,11 @@ const path = require('node:path');
 
 const root = path.resolve(__dirname, '../..');
 const migrationsDir = path.join(root, 'db');
+const migrationPattern = /^\d+.*\.sql$/;
 
 test('migration runner discovers every numbered SQL migration in deterministic order', () => {
   const migrations = fs.readdirSync(migrationsDir)
-    .filter(name => /^\\d+.*\\.sql$/.test(name))
+    .filter(name => migrationPattern.test(name))
     .sort();
 
   assert.ok(migrations.length > 0, 'at least one migration must exist');
@@ -28,7 +29,7 @@ test('migration runner discovers every numbered SQL migration in deterministic o
 
 test('privileged MFA migrations are present and ordered after the core schema', () => {
   const migrations = fs.readdirSync(migrationsDir)
-    .filter(name => /^\\d+.*\\.sql$/.test(name))
+    .filter(name => migrationPattern.test(name))
     .sort();
 
   for (const filename of [
@@ -44,9 +45,9 @@ test('privileged MFA migrations are present and ordered after the core schema', 
 
   const mfaRoutes = fs.readFileSync(path.join(root, 'platform/src/mfa-routes.js'), 'utf8');
   for (const route of [
-    `'/auth/mfa/status'`,
-    `'/auth/mfa/setup'`,
-    `'/auth/mfa/enable'`,
-    `'/auth/mfa/verify'`
+    "'/auth/mfa/status'",
+    "'/auth/mfa/setup'",
+    "'/auth/mfa/enable'",
+    "'/auth/mfa/verify'"
   ]) assert.ok(mfaRoutes.includes(route), 'missing MFA route: ' + route);
 });
