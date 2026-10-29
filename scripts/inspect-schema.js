@@ -16,6 +16,18 @@ async function main() {
       (SELECT count(*)::integer FROM service_plans p WHERE p.organization_id = o.id) AS plan_count,
       (SELECT count(*)::integer FROM service_addons a WHERE a.organization_id = o.id) AS addon_count
       FROM organizations o WHERE o.slug = $1`, [process.env.DEFAULT_ORGANIZATION_SLUG || 'atsh-ai'])).rows;
+    const passwordHashFormats = (await client.query(`SELECT CASE
+      WHEN password_hash IS NULL OR password_hash = '' THEN 'empty'
+      WHEN password_hash LIKE '$2a$%' OR password_hash LIKE '$2b$%' OR password_hash LIKE '$2y$%' THEN 'bcrypt'
+      WHEN password_hash LIKE '$argon2%' THEN 'argon2'
+      WHEN password_hash LIKE 'scrypt$%' THEN 'scrypt-prefixed'
+      WHEN password_hash LIKE 'pbkdf2$%' THEN 'pbkdf2-prefixed'
+      ELSE 'other-format'
+      END AS format, count(*)::integer AS user_count
+      FROM users GROUP BY 1 ORDER BY 1`)).rows;
+    const roleSummary = (await client.query(`SELECT r.name, count(ur.user_id)::integer AS assigned_users
+      FROM roles r LEFT JOIN user_roles ur ON ur.role_id = r.id
+      GROUP BY r.id, r.name ORDER BY r.name`)).rows;
     const tables = (await client.query(`SELECT table_schema, table_name, table_type
       FROM information_schema.tables
       WHERE table_schema NOT IN ('pg_catalog','information_schema')
@@ -40,7 +52,7 @@ async function main() {
     const indexes = (await client.query(`SELECT schemaname AS schema_name, tablename AS table_name, indexname, indexdef
       FROM pg_indexes WHERE schemaname NOT IN ('pg_catalog','information_schema')
       ORDER BY schemaname, tablename, indexname`)).rows;
-    const inventory = { generatedAt: new Date().toISOString(), scope: 'metadata-only; no customer rows selected', organizationMetadata, tables, columns, constraints, indexes };
+    const inventory = { generatedAt: new Date().toISOString(), scope: 'metadata-only; no customer rows selected', organizationMetadata, passwordHashFormats, roleSummary, tables, columns, constraints, indexes };
     process.stdout.write(JSON.stringify(inventory, null, 2) + '\n');
     await client.query('ROLLBACK');
   } finally {
