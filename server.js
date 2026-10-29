@@ -1,200 +1,26 @@
 'use strict';
-
-const http = require('node:http');
-const fs = require('node:fs');
+const express = require('express');
+const helmet = require('helmet');
+const compression = require('compression');
+const rateLimit = require('express-rate-limit');
 const path = require('node:path');
-const crypto = require('node:crypto');
-const adminCore = require('./admin-core');
-
-const ROOT = path.join(__dirname, 'public');
-const PORT = Number(process.env.PORT || 3000);
-const MAX_BODY = 24 * 1024;
-const MIME = {
-  '.html': 'text/html; charset=utf-8',
-  '.css': 'text/css; charset=utf-8',
-  '.js': 'text/javascript; charset=utf-8',
-  '.svg': 'image/svg+xml',
-  '.png': 'image/png',
-  '.jpg': 'image/jpeg',
-  '.webp': 'image/webp',
-  '.ico': 'image/x-icon',
-  '.json': 'application/json; charset=utf-8'
-};
-
-function send(res, status, body, type = 'application/json; charset=utf-8') {
-  res.writeHead(status, {
-    'Content-Type': type,
-    'Cache-Control': 'no-store',
-    'X-Content-Type-Options': 'nosniff',
-    'Referrer-Policy': 'strict-origin-when-cross-origin',
-    'X-Frame-Options': 'DENY',
-    'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
-    'Content-Security-Policy': "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
-  });
-  res.end(type.startsWith('application/json') ? JSON.stringify(body) : body);
-}
-
-function readBody(req) {
-  return new Promise((resolve, reject) => {
-    let raw = '';
-    req.on('data', chunk => {
-      raw += chunk;
-      if (Buffer.byteLength(raw) > MAX_BODY) {
-        reject(Object.assign(new Error('Request too large'), { status: 413 }));
-        req.destroy();
-      }
-    });
-    req.on('end', () => {
-      try { resolve(JSON.parse(raw || '{}')); }
-      catch { reject(Object.assign(new Error('Invalid JSON'), { status: 400 })); }
-    });
-    req.on('error', reject);
-  });
-}
-
-function clean(value, max = 2000) {
-  return typeof value === 'string' ? value.trim().slice(0, max) : '';
-}
-
-async function handleInquiry(req, res) {
-  let data;
-  try { data = await readBody(req); }
-  catch (err) { return send(res, err.status || 400, { error: err.message || 'Invalid request' }); }
-
-  // Honeypot: silently accept bot submissions without forwarding them.
-  if (clean(data.website, 200)) {
-    return send(res, 202, { ok: true, reference: crypto.randomUUID() });
-  }
-
-  const inquiry = {
-    reference: crypto.randomUUID(),
-    createdAt: new Date().toISOString(),
-    name: clean(data.name, 120),
-    email: clean(data.email, 254),
-    service: clean(data.service, 100),
-    budget: clean(data.budget, 100),
-    timeline: clean(data.timeline, 100),
-    message: clean(data.message, 5000),
-    language: data.language === 'en' ? 'en' : 'ar'
-  };
-
-  if (!inquiry.name || !inquiry.email || !inquiry.message ||
-      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(inquiry.email)) {
-    return send(res, 400, { error: 'يرجى إدخال الاسم والبريد الإلكتروني الصحيح ووصف المشروع.' });
-  }
-
-  const webhook = process.env.INQUIRY_WEBHOOK_URL;
-  if (!webhook) {
-    return send(res, 503, {
-      error: inquiry.language === 'en'
-        ? 'Online submission is not activated yet. Please contact the company through its verified contact channel.'
-        : 'استقبال الطلبات الإلكتروني لم يُفعّل بعد. لم يتم حفظ طلبك أو إرساله؛ يرجى التواصل عبر قناة الشركة المعتمدة.'
-    });
-  }
-
-  let endpoint;
-  try { endpoint = new URL(webhook); }
-  catch { return send(res, 503, { error: 'Inquiry integration is not configured correctly.' }); }
-  if (endpoint.protocol !== 'https:') {
-    return send(res, 503, { error: 'Inquiry integration must use HTTPS.' });
-  }
-
-  try {
-    const upstream = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Request-Reference': inquiry.reference },
-      body: JSON.stringify(inquiry),
-      signal: AbortSignal.timeout(8000)
-    });
-    if (!upstream.ok) throw new Error('Inquiry provider rejected request');
-    return send(res, 201, { ok: true, reference: inquiry.reference });
-  } catch {
-    return send(res, 502, {
-      error: inquiry.language === 'en'
-        ? 'We could not send the request right now. Please try again later.'
-        : 'تعذر إرسال الطلب الآن. لم نؤكد استلامه؛ يرجى المحاولة لاحقًا.'
-    });
-  }
-}
-
-const server = http.createServer(async (req, res) => {
-  const url = new URL(req.url, 'http://localhost');
-
-  if (url.pathname.startsWith('/api/admin/') || url.pathname === '/api/site-content' || url.pathname === '/api/pricing' || url.pathname === '/api/quotes' || url.pathname.startsWith('/media/')) {
-    try {
-      const handled = await adminCore.handler(req, res, url);
-      if (handled !== false) return;
-    } catch (error) {
-      console.error('Admin API failure:', error.message);
-      return send(res, 500, { error: 'حدث خطأ داخلي. حاول لاحقًا.' });
-    }
-  }
-  if (req.method === 'GET' && url.pathname === '/health') {
-    return send(res, 200, { ok: true, service: 'atsh-ai-website' });
-  }
-  if (req.method === 'POST' && url.pathname === '/api/project-inquiries') {
-    return handleInquiry(req, res);
-  }
-  if (req.method !== 'GET' && req.method !== 'HEAD') {
-    return send(res, 405, { error: 'Method not allowed' });
-  }
-
-  let pathname;
-  try { pathname = decodeURIComponent(url.pathname); }
-  catch { return send(res, 400, { error: 'Bad path' }); }
-  if (pathname === '/') pathname = '/index.html';
-  if (pathname === '/admin' || pathname === '/admin/') pathname = '/admin/index.html';
-  if (pathname === '/staff/login' || pathname === '/staff/login/') pathname = '/staff/login.html';
-  if (pathname === '/staff/activate' || pathname === '/staff/activate/') pathname = '/staff/activate.html';
-
-  const filePath = path.resolve(ROOT, '.' + pathname);
-  if (!filePath.startsWith(ROOT + path.sep) && filePath !== path.join(ROOT, 'index.html')) {
-    return send(res, 403, { error: 'Forbidden' });
-  }
-
-  try {
-    let resolved = filePath;
-    let stat;
-    try { stat = await fs.promises.stat(resolved); } catch { stat = null; }
-    if (!stat || !stat.isFile()) {
-      const store = await adminCore.readStore();
-      const cmsPage = (store.content.pages || []).find(page => page.visible && page.path === url.pathname);
-      if (cmsPage) {
-        resolved = path.join(ROOT, 'cms-page.html');
-        stat = await fs.promises.stat(resolved);
-      } else {
-        return send(res, 404, { error: 'Not found' });
-      }
-    }
-    const type = MIME[path.extname(resolved).toLowerCase()] || 'application/octet-stream';
-    res.writeHead(200, {
-      'Content-Type': type,
-      'X-Content-Type-Options': 'nosniff',
-      'Referrer-Policy': 'strict-origin-when-cross-origin',
-      'X-Frame-Options': 'DENY',
-      'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
-      'Content-Security-Policy': "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
-      'Cache-Control': path.extname(resolved) === '.html' ? 'no-cache' : 'public, max-age=3600'
-    });
-    if (req.method === 'HEAD') return res.end();
-    if (path.extname(resolved) === '.html' && !url.pathname.startsWith('/admin') && !url.pathname.startsWith('/staff')) {
-      let html = await fs.promises.readFile(resolved, 'utf8');
-      if (!html.includes('href="/cms.css"')) html = html.replace('</head>', '<link rel="stylesheet" href="/cms.css"></head>');
-      if (!html.includes('src="/site-cms.js"')) html = html.replace('</body>', '<script src="/site-cms.js" defer></script></body>');
-      return res.end(html);
-    }
-    return fs.createReadStream(resolved).pipe(res);
-  } catch (error) {
-    console.error('Static response failure:', error.message);
-    if (!res.headersSent) return send(res, 500, { error: 'Internal server error' });
-    return res.end();
-  }
-});
-
-if (require.main === module) {
-  server.listen(PORT, '0.0.0.0', () => {
-    console.log(`atsh-ai website listening on port ${PORT}`);
-  });
-}
-
-module.exports = server;
+const { loadConfig } = require('./src/config');
+const { checkDatabase, closePool } = require('./src/db');
+const config = loadConfig();
+const app = express();
+app.disable('x-powered-by');
+app.use(helmet({ contentSecurityPolicy: { directives: { defaultSrc: ["'self'"], scriptSrc: ["'self'"], styleSrc: ["'self'", "'unsafe-inline'"], imgSrc: ["'self'", 'data:'], connectSrc: ["'self'"], objectSrc: ["'none'"], frameAncestors: ["'none'"] } } }));
+app.use(compression());
+app.use(express.json({ limit: '64kb' }));
+app.use('/api/public', rateLimit({ windowMs: 900000, limit: 40, standardHeaders: 'draft-8', legacyHeaders: false }));
+app.use(express.static(path.join(__dirname, 'public'), { extensions: ['html'], etag: true }));
+app.get('/health', (_req, res) => res.json({ ok: true, service: 'atsh-ai-platform', version: '2.0.0' }));
+app.get('/ready', async (_req, res) => { try { await checkDatabase(config); res.json({ ok: true, database: { connected: true } }); } catch { res.status(503).json({ ok: false, reason: config.databaseUrl ? 'database_unavailable' : 'database_not_configured' }); } });
+app.get('/api/public/catalog', (_req, res) => res.status(503).json({ error: 'catalog_not_configured', message: 'الخدمات والأسعار غير متاحة حتى التحقق من مخطط قاعدة البيانات الحالية واعتماد الكتالوج.' }));
+app.post('/api/public/project-inquiries', (_req, res) => res.status(503).json({ error: 'intake_not_configured', message: 'لم يتم تفعيل حفظ الطلبات قبل التحقق من قاعدة البيانات الحية؛ لم يتم حفظ بياناتك.' }));
+app.get('/admin', (_req, res) => res.sendFile(path.join(__dirname, 'public', 'admin.html')));
+app.use((err, _req, res, _next) => { console.error('Request failed', { name: err && err.name || 'Error', code: err && err.code || 'unknown' }); if (!res.headersSent) res.status(500).json({ error: 'internal_error' }); });
+const server = app.listen(config.port, () => console.log('ATSH AI listening on ' + config.port));
+async function shutdown() { server.close(async () => { try { await closePool(); process.exit(0); } catch { process.exit(1); } }); setTimeout(() => process.exit(1), 10000).unref(); }
+process.on('SIGTERM', shutdown); process.on('SIGINT', shutdown);
+module.exports = { app };

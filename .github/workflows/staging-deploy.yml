@@ -1,0 +1,70 @@
+name: ATSH AI clean rebuild — staging deploy
+on:
+  workflow_dispatch:
+    inputs:
+      resource_group:
+        description: Existing Azure resource group for staging
+        required: true
+        type: string
+      app_name:
+        description: Existing staging Web App name; must end in -staging
+        required: true
+        type: string
+permissions:
+  contents: read
+  id-token: write
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/rebuild/atsh-ai-clean-v2'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+      - name: Validate staging target and secrets
+        env:
+          APP_NAME: ${{ inputs.app_name }}
+          RESOURCE_GROUP: ${{ inputs.resource_group }}
+          DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+          OWNER_EMAIL: ${{ secrets.STAGING_OWNER_EMAIL }}
+          OWNER_PASSWORD: ${{ secrets.STAGING_OWNER_PASSWORD }}
+        run: |
+          set -euo pipefail
+          [[ "$APP_NAME" == *-staging ]] || { echo "Refusing deployment: app_name must end in -staging"; exit 1; }
+          [[ -n "$RESOURCE_GROUP" && -n "$DATABASE_URL" && -n "$OWNER_EMAIL" && -n "$OWNER_PASSWORD" ]] || { echo "Configure staging-only target and secrets"; exit 1; }
+      - run: npm install --package-lock-only
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
+      - name: Package
+        run: zip -r atsh-ai-clean-staging.zip . -x 'node_modules/*' '.env*' '*.log'
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Verify staging App Service
+        env:
+          APP_NAME: ${{ inputs.app_name }}
+          RESOURCE_GROUP: ${{ inputs.resource_group }}
+        run: |
+          set -euo pipefail
+          state=$(az webapp show --name "$APP_NAME" --resource-group "$RESOURCE_GROUP" --query state -o tsv)
+          [[ "$state" == "Running" ]] || { echo "Staging App Service must exist and be Running"; exit 1; }
+      - uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ inputs.app_name }}
+          package: atsh-ai-clean-staging.zip
+      - name: Verify health
+        env:
+          APP_NAME: ${{ inputs.app_name }}
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 18); do
+            code=$(curl -sS -o /tmp/health.json -w '%{http_code}' "https://$APP_NAME.azurewebsites.net/health" || true)
+            if [[ "$code" == "200" ]] && grep -q '"ok":true' /tmp/health.json; then cat /tmp/health.json; exit 0; fi
+            sleep 10
+          done
+          cat /tmp/health.json || true
+          exit 1

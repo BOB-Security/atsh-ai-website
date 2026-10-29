@@ -1,14 +1,20 @@
 {
-  "name": "atsh-ai-website",
-  "version": "1.0.0",
+  "name": "atsh-ai-platform",
+  "version": "2.0.0",
   "private": true,
-  "description": "Official website for atsh-ai",
   "engines": {
-    "node": ">=24"
+    "node": ">=22"
   },
   "scripts": {
     "start": "node server.js",
-    "build": "node --check server.js && node --check admin-core.js && node --check public/app.js && node --check public/admin/app.js && node --check public/site-cms.js && node --check public/staff/app.js && node scripts/check-site.js",
-    "test": "node --test"
+    "build": "node --check server.js && node --check src/config.js && node --check src/db.js && node --check src/pricing.js && node --check public/app.js",
+    "test": "node --test tests/*.test.js"
+  },
+  "dependencies": {
+    "compression": "^1.8.1",
+    "express": "^5.1.0",
+    "express-rate-limit": "^8.1.0",
+    "helmet": "^8.1.0",
+    "pg": "^8.16.3"
   }
 }

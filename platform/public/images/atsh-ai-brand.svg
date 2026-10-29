@@ -1,8 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 180" role="img" aria-labelledby="title desc">
-<title id="title">ATSH AI</title><desc id="desc">ATSH AI wordmark with the official circular metallic ATSH emblem.</desc>
-<image href="/images/atsh-logo.jpg" x="12" y="0" width="164" height="164" preserveAspectRatio="xMidYMid meet"/>
-<text x="190" y="110" fill="#eef1f3" font-family="Arial,sans-serif" font-size="82" font-weight="700" letter-spacing="-3">atsh</text>
-<text x="390" y="110" fill="#ff6b72" font-family="Arial,sans-serif" font-size="82" font-weight="700" letter-spacing="-3">ai</text>
-<path d="M191 128H487" stroke="#89939c" stroke-width="2"/>
-<text x="492" y="126" fill="#aeb8c1" font-family="Arial,sans-serif" font-size="13" letter-spacing="4">INTELLIGENCE</text>
-</svg>

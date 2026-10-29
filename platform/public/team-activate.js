@@ -1,3 +1,0 @@
-'use strict';
-const form=document.querySelector('#activate-form'),status=document.querySelector('#status');
-form.addEventListener('submit',async e=>{e.preventDefault();const token=new URLSearchParams(location.search).get('token');if(!token){status.textContent='رابط الدعوة غير صالح.';return;}const button=form.querySelector('button');button.disabled=true;try{const r=await fetch('/api/team/activate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token,password:form.elements.password.value})});const d=await r.json();if(!r.ok)throw Error(d.error||'تعذر التفعيل');status.textContent=d.message+' يمكنك الآن تسجيل الدخول من /admin/.';form.reset();}catch(err){status.textContent=err.message;}finally{button.disabled=false;}});
