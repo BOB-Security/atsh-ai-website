@@ -17,6 +17,15 @@
    if(description)description.textContent=page.description.trim();
   }
   const root=document.documentElement;
+  if(typeof settings.hero_background_url==='string'&&settings.hero_background_url.trim()){
+   const value=settings.hero_background_url.trim();
+   const safe=/^https:\/\//i.test(value)||(/^\/(?!\/)[A-Za-z0-9_./-]+$/.test(value)&&!value.split('/').includes('..'));
+   const hero=document.querySelector('.hero, .page-hero');
+   if(safe&&hero){
+    hero.style.backgroundImage='linear-gradient(110deg, rgba(17,16,32,.88), rgba(17,16,32,.62)), url("'+value.replace(/["\\]/g,'')+'")';
+    hero.style.backgroundSize='cover';hero.style.backgroundPosition='center';
+   }
+  }
   if(/^#[0-9a-f]{6}$/i.test(settings.primary_color||'')){root.style.setProperty('--purple',settings.primary_color);root.style.setProperty('--lilac',settings.primary_color);}
   if(/^#[0-9a-f]{6}$/i.test(settings.accent_color||''))root.style.setProperty('--gold',settings.accent_color);
   if(!(page&&typeof page.title==='string'&&page.title.trim())&&typeof settings.hero_title==='string'&&settings.hero_title.trim()){
