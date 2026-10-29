@@ -23,6 +23,22 @@
 <div class="admin-welcome"><div><small>نظرة عامة</small><h2 id="adminWelcomeTitle">مرحبًا</h2></div><button id="adminLogout" class="btn secondary" type="button">تسجيل الخروج</button></div>
 <div id="adminOverviewGrid" class="admin-stats"></div>
 <div class="admin-panel"><div class="admin-panel-heading"><div><small>فحص آمن للبيانات</small><h2>جاهزية قاعدة البيانات</h2></div><button id="adminReloadSchema" class="btn secondary" type="button">إعادة الفحص</button></div><p class="admin-subtext">فحص للقراءة فقط؛ لا يغيّر أي بيانات.</p><div id="adminSchemaReadiness" aria-live="polite"><p>جارٍ فحص الجداول المطلوبة…</p></div></div>
+<div class="admin-panel">
+<div class="admin-panel-heading"><div><small>المحتوى والهوية البصرية</small><h2>إعدادات الموقع</h2></div><button id="adminReloadSiteSettings" class="btn secondary" type="button">إعادة تحميل</button></div>
+<p class="admin-subtext">تُحفظ الإعدادات على مستوى المؤسسة وتظهر للزوار بعد الحفظ. استخدم رابط صورة عامًا موثوقًا للشعار.</p>
+<form id="adminSiteSettingsForm" class="admin-form admin-settings-form">
+<label for="siteHeroTitle">عنوان الواجهة الرئيسية</label><input id="siteHeroTitle" name="hero_title" maxlength="180" required>
+<label for="siteHeroDescription">وصف الواجهة الرئيسية</label><textarea id="siteHeroDescription" name="hero_description" rows="3" maxlength="1000"></textarea>
+<label for="siteLogoUrl">رابط الشعار (اختياري)</label><input id="siteLogoUrl" name="logo_url" type="url" maxlength="1000" placeholder="https://...">
+<div class="admin-settings-grid">
+<div><label for="sitePrimaryColor">اللون الأساسي</label><input id="sitePrimaryColor" name="primary_color" type="color" value="#8c7aff"></div>
+<div><label for="siteAccentColor">لون التمييز</label><input id="siteAccentColor" name="accent_color" type="color" value="#f0c87b"></div>
+</div>
+<label for="siteContactEmail">بريد التواصل (اختياري)</label><input id="siteContactEmail" name="contact_email" type="email" maxlength="254">
+<p id="adminSiteSettingsMessage" class="admin-message" role="status" aria-live="polite">جارٍ تحميل إعدادات الموقع…</p>
+<button class="btn primary" type="submit">حفظ إعدادات الموقع</button>
+</form>
+</div>
 <div class="admin-panel admin-catalog-panel"><div class="admin-panel-heading"><div><small>الخدمات والباقات</small><h2>الكتالوج الحالي</h2></div><button id="adminReloadCatalog" class="btn secondary" type="button">تحديث البيانات</button></div><p class="admin-subtext">عرض للقراءة فقط في هذه المرحلة. تعديل الأسعار أو تفعيل الباقات لن يكون متاحًا قبل اعتماد سجل التدقيق والصلاحيات.</p><div id="adminCatalogList" class="admin-catalog-list" aria-live="polite"></div></div>
 <div class="admin-panel"><div class="admin-panel-heading"><div><small>المبيعات</small><h2>أحدث الطلبات</h2></div><button id="adminReloadLeads" class="btn secondary" type="button">تحديث الطلبات</button></div><p class="admin-subtext">عرض آخر 50 طلبًا حسب صلاحيات حسابك. هذه المرحلة للقراءة فقط.</p><div id="adminLeadsList" class="admin-leads-list" aria-live="polite"></div></div><div class="admin-panel"><h2>الوصول حسب الصلاحيات</h2><div id="adminPermissionList" class="admin-permissions"></div></div>
 </section>
