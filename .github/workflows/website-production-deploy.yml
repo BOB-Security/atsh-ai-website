@@ -1,0 +1,113 @@
+name: Deploy ATSH AI Website to Azure
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'public/**'
+      - 'server.js'
+      - 'admin-core.js'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/website-production-deploy.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: atsh-ai-website-production
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verify website
+        run: |
+          set -euo pipefail
+          npm install
+          npm run build
+          npm test
+      - name: Package website only
+        run: |
+          set -euo pipefail
+          zip -r website.zip server.js admin-core.js package.json package-lock.json public
+      - uses: actions/upload-artifact@v4
+        with:
+          name: atsh-ai-website
+          path: website.zip
+          if-no-files-found: error
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: verify
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: atsh-ai-website
+      - name: Verify Azure configuration
+        env:
+          AZURE_CLIENT_ID: ${{ secrets.AZUREAPPSERVICE_CLIENTID_1DF03D06E1D444CCA0654B27E8C75231 }}
+          AZURE_TENANT_ID: ${{ secrets.AZUREAPPSERVICE_TENANTID_5EF8FCB25D80477A8D0F2FCEE63A981A }}
+          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_A4D19EA9941D4136AF1DD6E315BFA1E2 }}
+        run: |
+          set -euo pipefail
+          for key in AZURE_CLIENT_ID AZURE_TENANT_ID AZURE_SUBSCRIPTION_ID; do
+            if [ -z "${!key:-}" ]; then
+              echo "::error::Missing Azure OIDC secret: $key"
+              exit 1
+            fi
+          done
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_1DF03D06E1D444CCA0654B27E8C75231 }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_5EF8FCB25D80477A8D0F2FCEE63A981A }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_A4D19EA9941D4136AF1DD6E315BFA1E2 }}
+      - name: Locate existing website App Service
+        id: app
+        run: |
+          set -euo pipefail
+          APP='atsh-ai-website'
+          RG=$(az webapp list --query "[?name=='$APP'].resourceGroup | [0]" -o tsv)
+          if [ -z "$RG" ] || [ "$RG" = "None" ]; then
+            echo "::error::Existing website App Service was not found; refusing to create one automatically."
+            exit 1
+          fi
+          HOST=$(az webapp show --resource-group "$RG" --name "$APP" --query defaultHostName -o tsv)
+          echo "resource_group=$RG" >> "$GITHUB_OUTPUT"
+          echo "host=$HOST" >> "$GITHUB_OUTPUT"
+      - name: Configure website runtime
+        env:
+          RG: ${{ steps.app.outputs.resource_group }}
+        run: |
+          set -euo pipefail
+          az webapp config appsettings set --resource-group "$RG" --name atsh-ai-website --settings NODE_ENV=production WEBSITE_NODE_DEFAULT_VERSION='~24' SCM_DO_BUILD_DURING_DEPLOYMENT=true ENABLE_ORYX_BUILD=true --output none
+          az webapp config set --resource-group "$RG" --name atsh-ai-website --startup-file "npm start" --output none
+          az webapp start --resource-group "$RG" --name atsh-ai-website
+      - name: Deploy website
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: atsh-ai-website
+          package: website.zip
+      - name: Verify deployed website
+        env:
+          HOST: ${{ steps.app.outputs.host }}
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 18); do
+            code=$(curl -sS -o /tmp/health.json -w '%{http_code}' "https://$HOST/health" || true)
+            if [ "$code" = "200" ] && grep -q '"ok":true' /tmp/health.json; then break; fi
+            sleep 10
+          done
+          if [ "${code:-}" != "200" ]; then
+            cat /tmp/health.json || true
+            echo "::error::Website health check failed after deployment."
+            exit 1
+          fi
+          cat /tmp/health.json
