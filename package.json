@@ -7,7 +7,7 @@
   },
   "scripts": {
     "start": "node server.js",
-    "build": "node --check server.js && node --check src/config.js && node --check src/db.js && node --check src/pricing.js && node --check src/intake.js && node --check src/auth.js && node --check src/mfa.js && node --check src/admin-catalog.js && node --check src/admin-operations.js && node --check public/app.js && node --check public/builder.js && node --check public/builder-fix.js && node --check public/quote-response.js && node --check public/admin.js && node --check tests/core.test.js && node --check tests/http.test.js && node --check tests/mfa.test.js",
+    "build": "node --check server.js && node --check src/config.js && node --check src/db.js && node --check src/pricing.js && node --check src/intake.js && node --check src/auth.js && node --check src/mfa.js && node --check src/admin-catalog.js && node --check src/admin-operations.js && node --check src/admin-projects.js && node --check public/app.js && node --check public/builder.js && node --check public/builder-fix.js && node --check public/quote-response.js && node --check public/admin.js && node --check public/admin.js && node --check tests/core.test.js && node --check tests/http.test.js && node --check tests/mfa.test.js",
     "test": "node --test tests/*.test.js"
   },
   "dependencies": {

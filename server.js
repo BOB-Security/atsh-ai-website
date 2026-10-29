@@ -11,6 +11,7 @@ const { validateInquiry, createProjectInquiry, getPublicCatalog } = require('./s
 const { login, beginMfaSetup, completeMfaSetup, getSession, logout, cookieHeader, clearCookieHeader, readCookie, hasPermission } = require('./src/auth');
 const { listCatalog, createCategory, updateCategory, createPlan, updatePlan, createAddon, updateAddon, setCatalogApproval } = require('./src/admin-catalog');
 const { listLeads, updateLead, createQuote, listQuotes, issueQuote, getPublicQuote, respondToQuote } = require('./src/admin-operations');
+const { listProjects, createProjectFromLead, updateProjectStatus, recordClientApproval, updateProjectLinks } = require('./src/admin-projects');
 const config = loadConfig();
 const app = express();
 app.disable('x-powered-by');
@@ -143,7 +144,7 @@ function catalogError(res, error) {
 function operationsError(res,error) {
   console.error('Admin operations failed', { code:error&&error.code||'validation_or_unknown' });
   if(error&&error.code==='NOT_FOUND')return res.status(404).json({error:'not_found',message:'السجل المطلوب غير موجود.'});
-  if(error&&['INVALID_TRANSITION','QUOTE_REQUIRED','LEAD_NOT_READY'].includes(error.code))return res.status(409).json({error:error.code.toLowerCase(),message:error.message});
+  if(error&&['INVALID_TRANSITION','QUOTE_REQUIRED','LEAD_NOT_READY','LEAD_NOT_WON','ACCEPTED_QUOTE_REQUIRED','APPROVAL_EVIDENCE_REQUIRED','APPROVAL_REQUIRED'].includes(error.code))return res.status(409).json({error:error.code.toLowerCase(),message:error.message});
   if(error&&error.code==='23505')return res.status(409).json({error:'duplicate_reference'});
   if(error&&error.code==='ORGANIZATION_NOT_CONFIGURED')return res.status(503).json({error:'organization_not_configured'});
   if(error&&['ECONNREFUSED','ETIMEDOUT','ENOTFOUND','42P01','42703','23503'].includes(error.code))return res.status(503).json({error:'operations_unavailable'});
@@ -173,6 +174,34 @@ app.post('/api/admin/quotes', sameOrigin, async (req,res) => {
 app.post('/api/admin/quotes/:id/issue', sameOrigin, async (req,res) => {
   const session=await requirePermission(req,res,'quotes.issue');if(!session)return;
   try { return res.json({ok:true,...await issueQuote(config,session,req.params.id,requestIpHash(req))}); }
+  catch(error){return operationsError(res,error);}
+});
+app.get('/api/admin/projects', async (req,res) => {
+  const session=await requirePermission(req,res,'projects.read');if(!session)return;
+  try { return res.json({ok:true,...await listProjects(config,{status:req.query.status||'',limit:req.query.limit,offset:req.query.offset})}); }
+  catch(error){return operationsError(res,error);}
+});
+app.post('/api/admin/projects/from-lead', sameOrigin, async (req,res) => {
+  const session=await requirePermission(req,res,'projects.write');if(!session)return;
+  try { return res.status(201).json({ok:true,project:await createProjectFromLead(config,session,req.body||{},requestIpHash(req))}); }
+  catch(error){return operationsError(res,error);}
+});
+app.patch('/api/admin/projects/:id/status', sameOrigin, async (req,res) => {
+  const session=await requirePermission(req,res,'projects.write');if(!session)return;
+  if(req.body&&req.body.status==='deploying'&&!hasPermission(session,'projects.deploy'))return res.status(403).json({error:'deploy_permission_required'});
+  try { return res.json({ok:true,project:await updateProjectStatus(config,session,req.params.id,req.body&&req.body.status,requestIpHash(req))}); }
+  catch(error){return operationsError(res,error);}
+});
+app.post('/api/admin/projects/:id/record-approval', sameOrigin, async (req,res) => {
+  const session=await loadAdminSession(req,res);if(!session)return;
+  if(!session.roles.includes('Owner'))return res.status(403).json({error:'owner_required'});
+  try { return res.json({ok:true,project:await recordClientApproval(config,session,req.params.id,req.body&&req.body.evidence,requestIpHash(req))}); }
+  catch(error){return operationsError(res,error);}
+});
+app.patch('/api/admin/projects/:id/links', sameOrigin, async (req,res) => {
+  const session=await requirePermission(req,res,'projects.write');if(!session)return;
+  if(req.body&&Object.prototype.hasOwnProperty.call(req.body,'production_url')&&req.body.production_url&&!hasPermission(session,'projects.deploy'))return res.status(403).json({error:'deploy_permission_required'});
+  try { return res.json({ok:true,project:await updateProjectLinks(config,session,req.params.id,req.body||{},requestIpHash(req))}); }
   catch(error){return operationsError(res,error);}
 });
 app.get('/api/admin/catalog', async (req, res) => {

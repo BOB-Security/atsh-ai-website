@@ -7,7 +7,7 @@ async function api(path, body, method) {
   return result;
 }
 function status(id, message, kind = 'error') { const node = $(id); node.textContent = message || ''; node.dataset.state = message ? kind : ''; }
-function showPanel(id) { ['loginPanel','setupPanel','recoveryPanel','dashboardPanel','catalogPanel','leadsPanel','quotesPanel'].forEach(key => { $(key).hidden = key !== id; }); }
+function showPanel(id) { ['loginPanel','setupPanel','recoveryPanel','dashboardPanel','catalogPanel','leadsPanel','quotesPanel','projectsPanel'].forEach(key => { $(key).hidden = key !== id; }); }
 function setBusy(form, busy) { const button = form.querySelector('button[type="submit"]'); if (button) button.disabled = busy; }
 async function loadDashboard(user) {
   showPanel('dashboardPanel');
@@ -213,5 +213,39 @@ $('quoteForm').addEventListener('submit',async event=>{
   });
   form.reset();$('quoteQuantity').value='1';$('quoteSetup').value='0';$('quoteMonthly').value='0';$('quoteAnnual').value='0';status('quotesStatus','تم حفظ المسودة '+result.quote.reference+'. لا يُرسل العرض للعميل حتى إصداره صراحة.','success');await loadQuotes();
  }catch(error){status('quotesStatus',error.message||'تعذر إنشاء المسودة. تحقق من الصلاحيات والأسعار.');}
+ finally{setBusy(form,false);}
+});
+
+const projectStatusLabels={discovery:'اكتشاف',scoped:'تحديد النطاق',approved:'النطاق معتمد',in_progress:'قيد التنفيذ',blocked:'متوقف',review:'مراجعة',preview_ready:'المعاينة جاهزة',changes_requested:'تعديلات مطلوبة',client_approved:'موافقة العميل مسجلة',deploying:'جارٍ النشر',delivered:'تم التسليم',cancelled:'ملغي'};
+const projectNextStatuses={discovery:['scoped','cancelled'],scoped:['approved','cancelled'],approved:['in_progress','cancelled'],in_progress:['blocked','review','preview_ready','cancelled'],blocked:['in_progress','cancelled'],review:['changes_requested'],preview_ready:['changes_requested'],changes_requested:['in_progress','cancelled'],client_approved:['deploying'],deploying:['delivered','blocked'],delivered:[],cancelled:[]};
+$('openProjects').addEventListener('click',async()=>{showPanel('projectsPanel');await loadProjectLeadOptions();await loadProjects();});
+$('projectsBack').addEventListener('click',()=>showPanel('dashboardPanel'));
+async function loadProjectLeadOptions(){
+ try{const result=await api('/api/admin/leads?status=won&limit=100');const select=$('projectLead');select.replaceChildren();const placeholder=makeElement('option',null,'اختر طلبًا فاز به العميل');placeholder.value='';select.append(placeholder);(result.items||[]).forEach(lead=>{const option=makeElement('option',null,lead.reference+' — '+(lead.customer_name||'عميل'));option.value=lead.id;select.append(option);});}
+ catch(error){status('projectsStatus',error.message||'تعذر تحميل الطلبات المؤهلة لإنشاء مشروع.');}
+}
+async function loadProjects(){
+ status('projectsStatus','جارٍ تحميل المشاريع…','pending');
+ try{
+  const result=await api('/api/admin/projects?limit=100');const root=$('projectsList');root.replaceChildren();
+  if(!(result.items||[]).length)root.append(makeElement('p','catalog-empty','لا توجد مشاريع بعد. أنشئ مشروعًا من طلب وافق العميل على عرضه.'));
+  (result.items||[]).forEach(project=>{
+   const card=makeElement('article','catalog-item');card.append(makeElement('h4',null,project.title+' — '+(projectStatusLabels[project.status]||project.status)));
+   card.append(makeElement('p',null,(project.customer_name||'عميل')+(project.customer_email?' · '+project.customer_email:'')));
+   if(project.lead_reference)card.append(makeElement('p',null,'الطلب المرتبط: '+project.lead_reference));
+   if(project.due_date)card.append(makeElement('p',null,'موعد التسليم: '+String(project.due_date).slice(0,10)));
+   const next=projectNextStatuses[project.status]||[];
+   if(next.length){const actions=makeElement('div','item-actions');const select=document.createElement('select');next.forEach(value=>{const option=makeElement('option',null,projectStatusLabels[value]||value);option.value=value;select.append(option);});const save=makeElement('button','button','تحديث الحالة');save.type='button';save.addEventListener('click',async()=>{save.disabled=true;try{await api('/api/admin/projects/'+encodeURIComponent(project.id)+'/status',{status:select.value},'PATCH');status('projectsStatus','تم تحديث حالة المشروع.','success');await loadProjects();}catch(error){status('projectsStatus',error.message||'تعذر تحديث الحالة.');}finally{save.disabled=false;}});actions.append(select,save);card.append(actions);}
+   if(['review','preview_ready'].includes(project.status)){const approval=makeElement('button','ghost','تسجيل موافقة العميل');approval.type='button';approval.addEventListener('click',async()=>{const evidence=window.prompt('أدخل مرجع إثبات موافقة العميل وتاريخها (لا تلصق بيانات حساسة):');if(!evidence)return;approval.disabled=true;try{await api('/api/admin/projects/'+encodeURIComponent(project.id)+'/record-approval',{evidence});status('projectsStatus','تم تسجيل موافقة العميل في سجل التدقيق.','success');await loadProjects();}catch(error){status('projectsStatus',error.message||'تعذر تسجيل الموافقة.');}finally{approval.disabled=false;}});const actions=makeElement('div','item-actions');actions.append(approval);card.append(actions);}
+   const links=makeElement('div','project-link-fields');const preview=document.createElement('input');preview.type='url';preview.placeholder='رابط المعاينة HTTPS';preview.value=project.preview_url||'';const repo=document.createElement('input');repo.type='url';repo.placeholder='رابط GitHub HTTPS';repo.value=project.repo_url||'';const production=document.createElement('input');production.type='url';production.placeholder='رابط الإنتاج HTTPS';production.value=project.production_url||'';const saveLinks=makeElement('button','ghost','حفظ الروابط');saveLinks.type='button';saveLinks.addEventListener('click',async()=>{saveLinks.disabled=true;try{await api('/api/admin/projects/'+encodeURIComponent(project.id)+'/links',{preview_url:preview.value,repo_url:repo.value,production_url:production.value},'PATCH');status('projectsStatus','تم حفظ الروابط بعد التحقق من HTTPS.','success');await loadProjects();}catch(error){status('projectsStatus',error.message||'تعذر حفظ الروابط.');}finally{saveLinks.disabled=false;}});links.append(preview,repo,production,saveLinks);card.append(links);
+   root.append(card);
+  });
+  status('projectsStatus','تم تحميل '+(result.total||0)+' مشروع.','success');
+ }catch(error){status('projectsStatus',error.message||'تعذر تحميل المشاريع. تحقق من الصلاحيات والاتصال.');}
+}
+$('projectForm').addEventListener('submit',async event=>{
+ event.preventDefault();const form=event.currentTarget;setBusy(form,true);
+ try{const result=await api('/api/admin/projects/from-lead',{lead_id:$('projectLead').value,title:$('projectTitle').value,description:$('projectDescription').value,due_date:$('projectDueDate').value||null});form.reset();status('projectsStatus','تم إنشاء المشروع '+result.project.title+' في مرحلة الاكتشاف.','success');await loadProjects();await loadProjectLeadOptions();}
+ catch(error){status('projectsStatus',error.message||'تعذر إنشاء المشروع. يلزم عرض سعر مقبول من العميل.');}
  finally{setBusy(form,false);}
 });
