@@ -187,7 +187,116 @@ function createDatabase(config, dependencies = {}) {
       client.release();
     }
   }
+
+  async function assertAdminSchema(client) {
+    const result = await client.query(
+      "SELECT table_name, column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name IN ('users','organizations','roles','user_roles','auth_sessions')"
+    );
+    const found = new Map();
+    for (const row of result.rows) {
+      if (!found.has(row.table_name)) found.set(row.table_name, new Set());
+      found.get(row.table_name).add(row.column_name);
+    }
+    const required = {
+      users: ['id','organization_id','email','full_name','password_hash','status','last_login_at'],
+      organizations: ['id','status'],
+      roles: ['id','organization_id','name','permissions'],
+      user_roles: ['user_id','role_id'],
+      auth_sessions: ['id','user_id','token_hash','expires_at','last_seen_at','created_at']
+    };
+    for (const [table, columns] of Object.entries(required)) {
+      if (!found.has(table) || columns.some(column => !found.get(table).has(column))) {
+        const error = new Error('Admin authentication schema has not been verified.');
+        error.code = 'ADMIN_SCHEMA_MISMATCH';
+        throw error;
+      }
+    }
+  }
+  async function findAdminUser(email) {
+    const client = await getPool().connect();
+    try {
+      await assertAdminSchema(client);
+      const result = await client.query(
+        `SELECT u.id, u.organization_id, u.email, u.full_name, u.password_hash,
+                u.status, o.status AS organization_status,
+                COALESCE(jsonb_agg(DISTINCT r.permissions) FILTER (WHERE r.id IS NOT NULL), '[]'::jsonb) AS role_permission_sets
+           FROM users u
+           JOIN organizations o ON o.id = u.organization_id
+           LEFT JOIN user_roles ur ON ur.user_id = u.id
+           LEFT JOIN roles r ON r.id = ur.role_id AND (r.organization_id = u.organization_id OR r.organization_id IS NULL)
+          WHERE lower(u.email) = lower($1)
+          GROUP BY u.id, o.status
+          LIMIT 1`,
+        [email]
+      );
+      return result.rows[0] || null;
+    } finally { client.release(); }
+  }
+  async function createAdminSession(userId, tokenHash) {
+    const client = await getPool().connect();
+    try {
+      await assertAdminSchema(client);
+      const result = await client.query(
+        "INSERT INTO auth_sessions (user_id, token_hash, expires_at) SELECT $1,$2,now() + interval '8 hours' WHERE EXISTS (SELECT 1 FROM users u JOIN organizations o ON o.id=u.organization_id WHERE u.id=$1 AND u.status='active' AND o.status='active') RETURNING id, expires_at",
+        [userId, tokenHash]
+      );
+      if (!result.rows[0]) { const error = new Error('Admin account is no longer active.'); error.code = 'ADMIN_NOT_ACTIVE'; throw error; }
+      await client.query("UPDATE users SET last_login_at=now(), updated_at=now() WHERE id=$1", [userId]);
+      return result.rows[0];
+    } finally { client.release(); }
+  }
+  async function getAdminSession(tokenHash) {
+    const client = await getPool().connect();
+    try {
+      await assertAdminSchema(client);
+      const result = await client.query(
+        `SELECT u.id, u.organization_id, u.email, u.full_name, u.status,
+                o.status AS organization_status, s.expires_at,
+                COALESCE(jsonb_agg(DISTINCT r.permissions) FILTER (WHERE r.id IS NOT NULL), '[]'::jsonb) AS role_permission_sets
+           FROM auth_sessions s
+           JOIN users u ON u.id=s.user_id
+           JOIN organizations o ON o.id=u.organization_id
+           LEFT JOIN user_roles ur ON ur.user_id=u.id
+           LEFT JOIN roles r ON r.id=ur.role_id AND (r.organization_id=u.organization_id OR r.organization_id IS NULL)
+          WHERE s.token_hash=$1 AND s.expires_at>now() AND u.status='active' AND o.status='active'
+          GROUP BY u.id, s.expires_at
+          LIMIT 1`,
+        [tokenHash]
+      );
+      if (!result.rows[0]) return null;
+      await client.query("UPDATE auth_sessions SET last_seen_at=now() WHERE token_hash=$1", [tokenHash]);
+      return result.rows[0];
+    } finally { client.release(); }
+  }
+  async function deleteAdminSession(tokenHash) {
+    const client = await getPool().connect();
+    try {
+      await assertAdminSchema(client);
+      await client.query("DELETE FROM auth_sessions WHERE token_hash=$1", [tokenHash]);
+    } finally { client.release(); }
+  }
+  async function getAdminOverview(organizationId) {
+    if (!organizationId) { const error = new Error('Organization is missing.'); error.code = 'ADMIN_NOT_CONFIGURED'; throw error; }
+    const client = await getPool().connect();
+    try {
+      const result = await client.query(
+        `SELECT
+          (SELECT count(*)::int FROM leads WHERE organization_id=$1) AS leads_total,
+          (SELECT count(*)::int FROM leads WHERE organization_id=$1 AND status='new') AS leads_new,
+          (SELECT count(*)::int FROM projects WHERE organization_id=$1) AS projects_total,
+          (SELECT count(*)::int FROM support_tickets WHERE organization_id=$1 AND status NOT IN ('closed','resolved')) AS tickets_open,
+          (SELECT count(*)::int FROM service_categories WHERE organization_id=$1 AND active=true) AS categories_active,
+          (SELECT count(*)::int FROM service_plans WHERE organization_id=$1 AND active=true) AS plans_active`,
+        [organizationId]
+      );
+      return result.rows[0];
+    } catch (error) {
+      if (error.code === '42P01' || error.code === '42703') { error.code = 'ADMIN_OVERVIEW_SCHEMA_MISMATCH'; }
+      throw error;
+    } finally { client.release(); }
+  }
+
   async function close() { if (pool) { const current = pool; pool = undefined; await current.end(); } }
-  return { checkConnection, inspectSchema, createInquiry, listPublicCatalog, close };
+  return { checkConnection, inspectSchema, createInquiry, listPublicCatalog, findAdminUser, createAdminSession, getAdminSession, deleteAdminSession, getAdminOverview, close };
 }
 module.exports = { createDatabase };
