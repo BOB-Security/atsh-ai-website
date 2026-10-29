@@ -107,7 +107,86 @@ function createDatabase(config) {
       client.release();
     }
   }
+  async function listPublicCatalog() {
+    if (!config.publicOrganizationId) {
+      const error = new Error('Public catalog organization has not been configured.');
+      error.code = 'CATALOG_NOT_CONFIGURED';
+      throw error;
+    }
+    const client = await getPool().connect();
+    try {
+      const schema = await client.query(
+        "SELECT table_name, column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name IN ('service_categories','service_plans')"
+      );
+      const found = new Map();
+      for (const row of schema.rows) {
+        if (!found.has(row.table_name)) found.set(row.table_name, new Set());
+        found.get(row.table_name).add(row.column_name);
+      }
+      const required = {
+        service_categories: ['id','organization_id','slug','name_ar','name_en','description_ar','description_en','active','sort_order'],
+        service_plans: ['id','organization_id','category_id','slug','name_ar','name_en','description_ar','description_en','setup_amount_minor','monthly_amount_minor','annual_amount_minor','currency','features','active','sort_order']
+      };
+      for (const [table, columns] of Object.entries(required)) {
+        if (!found.has(table) || columns.some(column => !found.get(table).has(column))) {
+          const error = new Error('Public catalog schema has not been verified.');
+          error.code = 'CATALOG_SCHEMA_MISMATCH';
+          throw error;
+        }
+      }
+      const result = await client.query(
+        `SELECT
+           c.id AS category_id, c.slug AS category_slug, c.name_ar AS category_name_ar,
+           c.name_en AS category_name_en, c.description_ar AS category_description_ar,
+           c.description_en AS category_description_en, c.sort_order AS category_sort_order,
+           p.id AS plan_id, p.slug AS plan_slug, p.name_ar AS plan_name_ar, p.name_en AS plan_name_en,
+           p.description_ar AS plan_description_ar, p.description_en AS plan_description_en,
+           p.setup_amount_minor::text AS setup_amount_minor,
+           p.monthly_amount_minor::text AS monthly_amount_minor,
+           p.annual_amount_minor::text AS annual_amount_minor,
+           p.currency AS currency, p.features AS features, p.sort_order AS plan_sort_order
+         FROM service_categories c
+         LEFT JOIN service_plans p
+           ON p.category_id = c.id
+          AND p.organization_id = c.organization_id
+          AND p.active = true
+         WHERE c.organization_id = $1 AND c.active = true
+         ORDER BY c.sort_order, c.name_ar, p.sort_order, p.name_ar`,
+        [config.publicOrganizationId]
+      );
+      const categories = new Map();
+      for (const row of result.rows) {
+        if (!categories.has(row.category_id)) {
+          categories.set(row.category_id, {
+            id: row.category_id,
+            slug: row.category_slug,
+            name: { ar: row.category_name_ar, en: row.category_name_en },
+            description: { ar: row.category_description_ar, en: row.category_description_en },
+            plans: []
+          });
+        }
+        if (row.plan_id) {
+          categories.get(row.category_id).plans.push({
+            id: row.plan_id,
+            slug: row.plan_slug,
+            name: { ar: row.plan_name_ar, en: row.plan_name_en },
+            description: { ar: row.plan_description_ar, en: row.plan_description_en },
+            amountsMinor: {
+              setup: row.setup_amount_minor,
+              monthly: row.monthly_amount_minor,
+              annual: row.annual_amount_minor
+            },
+            currency: String(row.currency || '').trim(),
+            features: Array.isArray(row.features) ? row.features : [],
+          });
+        }
+      }
+      return Array.from(categories.values());
+    } finally {
+      client.release();
+    }
+  }
   async function close() { if (pool) { const current = pool; pool = undefined; await current.end(); } }
-  return { checkConnection, inspectSchema, createInquiry, close };
+  return { checkConnection, inspectSchema, createInquiry, listPublicCatalog, close };
 }
 module.exports = { createDatabase };
