@@ -157,6 +157,41 @@ function openPlanForm(plan=null,categoryId=''){
  const msg=document.getElementById('adminPlanMessage');if(msg)msg.textContent='';
  form.scrollIntoView({behavior:'smooth',block:'start'});
 }
+async function loadAdminMembers(){
+ const root=document.getElementById('adminMembersList');const roleSelect=document.getElementById('adminMemberRole');if(!root||!roleSelect)return;
+ root.replaceChildren();const pending=document.createElement('p');pending.textContent='جارٍ تحميل فريق الإدارة…';root.append(pending);
+ try{
+  const response=await fetch('/api/admin/members',{credentials:'same-origin',headers:{accept:'application/json'}});
+  const result=await response.json().catch(()=>({}));root.replaceChildren();
+  if(!response.ok||!result.ok){root.textContent=response.status===403?'هذا الحساب لا يملك صلاحية إدارة أفراد الفريق.':'تعذر تحميل أفراد الإدارة.';return;}
+  roleSelect.replaceChildren();
+  for(const role of (result.roles||[])){const option=document.createElement('option');option.value=role.id;option.textContent=role.name;roleSelect.append(option);}
+  if(!roleSelect.options.length){const option=document.createElement('option');option.value='';option.textContent='لا توجد أدوار مهيأة لهذه المؤسسة';roleSelect.append(option);}
+  for(const member of (result.members||[])){
+   const card=document.createElement('article');card.className='admin-catalog-plan';
+   const title=document.createElement('strong');title.textContent=member.full_name||member.email;
+   const detail=document.createElement('p');detail.textContent=(member.email||'')+' · '+(member.status||'غير معروف')+' · '+(Array.isArray(member.roles)?member.roles.map(r=>r.name).join('، '):'بدون دور');
+   card.append(title,detail);root.append(card);
+  }
+  if(!(result.members||[]).length)root.textContent='لا توجد حسابات فريق مسجلة.';
+ }catch{root.textContent='تعذر الاتصال بخدمة إدارة الفريق.';}
+}
+const memberForm=document.getElementById('adminMemberForm');
+const memberMessage=document.getElementById('adminMemberMessage');
+if(memberForm)memberForm.addEventListener('submit',async event=>{
+ event.preventDefault();const form=event.currentTarget;const val=name=>String(form.elements.namedItem(name)?.value||'').trim();
+ const submit=form.querySelector('button[type="submit"]');if(submit)submit.disabled=true;
+ if(memberMessage)memberMessage.textContent='جارٍ إنشاء الحساب…';
+ try{
+  const response=await fetch('/api/admin/members',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json','accept':'application/json','x-csrf-token':csrfToken},body:JSON.stringify({member:{full_name:val('full_name'),email:val('email'),role_id:val('role_id'),password:String(form.elements.namedItem('password')?.value||'')}})});
+  const result=await response.json().catch(()=>({}));
+  if(!response.ok||!result.ok){if(memberMessage)memberMessage.textContent=result.message||(response.status===403?'الحساب لا يملك صلاحية إدارة الفريق.':'تعذر إنشاء الحساب. تحقق من الدور والبريد الإلكتروني.');return;}
+  form.reset();if(memberMessage)memberMessage.textContent='تم إنشاء الحساب. سلّم كلمة المرور المؤقتة للفرد عبر قناة آمنة.';
+  await loadAdminMembers();
+ }catch{if(memberMessage)memberMessage.textContent='تعذر الاتصال بخدمة إنشاء الحساب.';}
+ finally{if(submit)submit.disabled=false;}
+});
+const reloadMembers=document.getElementById('adminReloadMembers');if(reloadMembers)reloadMembers.addEventListener('click',loadAdminMembers);
 async function loadCatalog(){
  const root=document.getElementById('adminCatalogList');if(!root)return;
  root.replaceChildren();const pending=document.createElement('p');pending.textContent='جارٍ تحميل الكتالوج…';root.append(pending);
@@ -250,7 +285,7 @@ async function checkSession(){
   const response=await fetch('/api/admin/me',{credentials:'same-origin',headers:{accept:'application/json'}});
   if(!response.ok)return;
   const result=await response.json();
-  if(result.ok&&result.user){csrfToken=result.csrfToken||'';showSignedIn(result.user);await loadOverview();await loadSchemaReadiness();await loadCatalog();await loadLeads();await loadSiteSettings();await loadPageContent();}
+  if(result.ok&&result.user){csrfToken=result.csrfToken||'';showSignedIn(result.user);await loadOverview();await loadSchemaReadiness();await loadCatalog();await loadLeads();await loadSiteSettings();await loadPageContent();await loadAdminMembers();}
  }catch{}
 }
 if(loginForm)loginForm.addEventListener('submit',async event=>{
