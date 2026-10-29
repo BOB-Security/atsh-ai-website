@@ -1,4 +1,62 @@
 'use strict';
-const menu=document.getElementById('menuToggle');const nav=document.getElementById('mainNav');if(menu&&nav){menu.onclick=()=>{const open=nav.classList.toggle('open');menu.setAttribute('aria-expanded',open?'true':'false');};nav.querySelectorAll('a').forEach(a=>{a.onclick=()=>{nav.classList.remove('open');menu.setAttribute('aria-expanded','false');};});}
-const y=document.getElementById('year');if(y)y.textContent=String(new Date().getFullYear());
-const form=document.getElementById('inquiryForm');if(form){form.onsubmit=e=>{e.preventDefault();const status=document.getElementById('formStatus');if(status)status.textContent='الإرسال متوقف مؤقتًا؛ لم تُرسل بياناتك ولم يُنشأ طلب.';};}
+const menu=document.getElementById('menuToggle');
+const nav=document.getElementById('mainNav');
+if(menu&&nav){
+  menu.addEventListener('click',()=>{const open=nav.classList.toggle('open');menu.setAttribute('aria-expanded',open?'true':'false');});
+  nav.querySelectorAll('a').forEach(a=>a.addEventListener('click',()=>{nav.classList.remove('open');menu.setAttribute('aria-expanded','false');}));
+}
+const year=document.getElementById('year');if(year)year.textContent=String(new Date().getFullYear());
+const wizard=document.getElementById('projectWizard');
+if(wizard){
+ const steps=[
+  {title:'ما الذي تريد بناءه؟',intro:'اختر أقرب نوع لاحتياجك. يمكنك توضيح التفاصيل لاحقًا.',key:'service',type:'choice',required:true,options:[['موقع أو منصة','مواقع الشركات، صفحات الهبوط، بوابات العملاء والمنصات.'],['تطبيق أو نظام','تطبيقات الويب والموبايل والأنظمة الداخلية.'],['ذكاء اصطناعي أو أتمتة','مساعدات ذكية، وكلاء وتدفقات عمل مؤتمتة.'],['تكامل أو دعم تقني','ربط الأنظمة، API، الصيانة والتحسين.'],['أحتاج إلى التوجيه','ساعدوني في تحديد الحل والنطاق المناسب.']]},
+  {title:'ما حجم المشروع؟',intro:'اختَر تقديرًا مبدئيًا؛ يمكن تعديل النطاق بعد مراجعة المتطلبات.',key:'scope',type:'fields',fields:[{key:'size',label:'حجم الحل',kind:'select',required:true,options:['صفحة واحدة / تجربة أولية','موقع صغير','موقع متعدد الصفحات','منصة أو نظام متعدد الوحدات','غير محدد بعد']},{key:'pages',label:'عدد الصفحات أو الوحدات (إن عُرف)',kind:'text',placeholder:'مثال: 8 صفحات أو 4 وحدات'},{key:'languages',label:'اللغات المطلوبة',kind:'select',required:true,options:['العربية','العربية والإنجليزية','الإنجليزية','أكثر من لغتين','غير محدد بعد']}]},
+  {title:'الهوية والمحتوى',intro:'حدد ما هو جاهز وما تحتاج المساعدة في إعداده.',key:'brand',type:'choice',required:true,options:[['لدي شعار وهوية ومحتوى','سأوفر الأصول المعتمدة.'],['لدي بعض الأصول','أحتاج استكمال أجزاء محددة.'],['أحتاج تصميم الهوية والمحتوى','أحتاج مساعدة في التأسيس.'],['أحتاج مراجعة وتوجيهًا','نحدد المطلوب أثناء التحليل.']]},
+  {title:'الخصائص والتكاملات',intro:'يمكنك اختيار أكثر من عنصر. هذه الاختيارات لا تعني أن التكامل متاح قبل المراجعة.',key:'features',type:'multi',options:['لوحة إدارة ومستخدمون وصلاحيات','تسجيل دخول وبوابة عميل','الدفع الإلكتروني أو الفواتير','ذكاء اصطناعي أو chatbot','أتمتة n8n وربط API','بحث أو تقارير أو لوحات مؤشرات','إشعارات بريدية أو رسائل','تحليلات وSEO','صيانة ودعم بعد الإطلاق','أحتاج توصية من الفريق']},
+  {title:'الاستضافة والنطاق',intro:'اختر احتياجك فقط؛ لن تُعرض باقة أو رسوم تجديد غير معتمدة.',key:'hosting',type:'choice',required:true,options:[['لدي استضافة ونطاق','أحتاج النشر على البنية الحالية.'],['أحتاج استضافة ونطاق','تحديد المزود والتكلفة لاحقًا.'],['أحتاج استضافة مُدارة ونسخًا احتياطيًا','نحدد حدود الخدمة ووتيرة النسخ.'],['أريد عرضًا منفصلًا للاستضافة','افصل رسوم التشغيل المتكررة عن التطوير.'],['غير متأكد','ساعدوني في اختيار الأنسب.']]},
+  {title:'بيانات التواصل',intro:'هذه البيانات محلية في الصفحة فقط حاليًا؛ لا يتم إرسالها أو حفظها في قاعدة البيانات.',key:'contact',type:'fields',fields:[{key:'name',label:'الاسم',kind:'text',required:true,placeholder:'اسمك'},{key:'email',label:'البريد الإلكتروني',kind:'email',required:true,placeholder:'you@example.com'},{key:'phone',label:'رقم الهاتف (اختياري)',kind:'tel',placeholder:'+20'},{key:'company',label:'الشركة أو المشروع (اختياري)',kind:'text',placeholder:'اسم النشاط'}]},
+  {title:'الهدف والقيود',intro:'أضف ما يساعد على فهم النجاح المطلوب والقيود المهمة.',key:'details',type:'fields',fields:[{key:'goal',label:'ما الهدف أو المشكلة التي تريد حلها؟',kind:'textarea',required:true,placeholder:'صف الهدف والنتيجة المتوقعة (20 حرفًا على الأقل).'},{key:'audience',label:'من سيستخدم الحل؟',kind:'text',placeholder:'العملاء، الموظفون، شركاء العمل...'},{key:'integrations',label:'أنظمة أو تكاملات محددة (إن وجدت)',kind:'text',placeholder:'أسماء الأنظمة أو الروابط المتاحة'},{key:'deadline',label:'الموعد المستهدف (إن وجد)',kind:'text',placeholder:'مثال: خلال 6 أسابيع'},{key:'constraints',label:'قيود أو متطلبات خاصة (اختياري)',kind:'textarea',placeholder:'الميزانية التقريبية، متطلبات الأمان، أو أمور يجب تجنبها'}]},
+  {title:'مراجعة الملخص',intro:'راجع المعلومات قبل اعتمادها. لا توجد أسعار أو إرسال طلب في هذه النسخة.',key:'review',type:'review'}
+ ];
+ const data={features:[]};let current=0;
+ const body=document.getElementById('wizardBody'),title=document.getElementById('wizardTitle'),label=document.getElementById('wizardStepLabel'),percent=document.getElementById('wizardPercent'),fill=document.getElementById('wizardProgressFill'),progress=document.getElementById('wizardProgress'),back=document.getElementById('wizardBack'),next=document.getElementById('wizardNext'),error=document.getElementById('wizardError'),footnote=document.getElementById('wizardFootnote');
+ const esc=v=>String(v==null?'':v).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+ const digits=['٠','١','٢','٣','٤','٥','٦','٧','٨','٩'];const arnum=n=>String(n).replace(/\d/g,d=>digits[Number(d)]);
+ function fieldMarkup(f){
+  const value=data[f.key]||'',required=f.required?' required':'',placeholder=f.placeholder?' placeholder="'+esc(f.placeholder)+'"':'';
+  if(f.kind==='select')return '<label class="field"><span>'+esc(f.label)+(f.required?' *':'')+'</span><select data-field="'+esc(f.key)+'"'+required+'><option value="">اختر</option>'+f.options.map(o=>'<option'+(value===o?' selected':'')+'>'+esc(o)+'</option>').join('')+'</select></label>';
+  if(f.kind==='textarea')return '<label class="field"><span>'+esc(f.label)+(f.required?' *':'')+'</span><textarea data-field="'+esc(f.key)+'" rows="3"'+required+(f.key==='goal'?' minlength="20"':'')+placeholder+'>'+esc(value)+'</textarea></label>';
+  return '<label class="field"><span>'+esc(f.label)+(f.required?' *':'')+'</span><input data-field="'+esc(f.key)+'" type="'+esc(f.kind)+'" value="'+esc(value)+'"'+required+placeholder+(f.kind==='email'?' maxlength="254"':'')+'></label>';
+ }
+ function summaryRows(){
+  const rows=[['نوع الحل',data.service],['حجم الحل',data.size],['عدد الصفحات/الوحدات',data.pages],['اللغات',data.languages],['الهوية والمحتوى',data.brand],['الخصائص',data.features.join('، ')],['الاستضافة والنطاق',data.hosting],['الاسم',data.name],['البريد',data.email],['الهاتف',data.phone],['الشركة',data.company],['الهدف',data.goal],['المستخدمون المستهدفون',data.audience],['التكاملات',data.integrations],['الموعد المستهدف',data.deadline],['القيود',data.constraints]].filter(r=>r[1]&&String(r[1]).trim());
+  return '<dl class="review-list">'+rows.map(r=>'<div><dt>'+esc(r[0])+'</dt><dd>'+esc(r[1])+'</dd></div>').join('')+'</dl><p class="estimate-note">السعر: لم يُحدد. يحتاج التسعير إلى قواعد معتمدة ومراجعة النطاق، ولن نعرض تقديرًا مخترعًا.</p><p class="estimate-note">الحالة: مسودة محلية غير مرسلة. لا يوجد رقم طلب حتى يتم تفعيل التخزين الآمن.</p>';
+ }
+ function render(){
+  const step=steps[current],pct=Math.round((current+1)/steps.length*100);
+  title.textContent=step.title;label.textContent='الخطوة '+arnum(current+1)+' من '+arnum(steps.length);percent.textContent=arnum(pct)+'٪';fill.style.width=pct+'%';progress.setAttribute('aria-valuenow',String(current+1));back.disabled=current===0;next.textContent=current===steps.length-1?'إعادة مراجعة الاختيارات':'التالي ↗';footnote.textContent=current===steps.length-1?'المراجعة لا تُنشئ طلبًا ولا ترسل بيانات. زر الإرسال سيُفعّل بعد ربط قاعدة البيانات والتحقق من الحفظ.':'الأسعار والعروض النهائية تعتمد من ATSH AI ولا تُحسب من قيم تخمينية.';error.hidden=true;
+  if(step.type==='choice'){
+   body.innerHTML='<p class="wizard-intro">'+esc(step.intro)+'</p><div class="choice-grid">'+step.options.map(o=>'<button type="button" class="choice-card'+(data[step.key]===o[0]?' selected':'')+'" data-choice="'+esc(o[0])+'" aria-pressed="'+(data[step.key]===o[0]?'true':'false')+'"><span class="choice-check">'+(data[step.key]===o[0]?'✓':'+')+'</span><strong>'+esc(o[0])+'</strong><small>'+esc(o[1])+'</small></button>').join('')+'</div>';
+   body.querySelectorAll('[data-choice]').forEach(b=>b.addEventListener('click',()=>{data[step.key]=b.dataset.choice;render();}));
+  }else if(step.type==='multi'){
+   body.innerHTML='<p class="wizard-intro">'+esc(step.intro)+'</p><div class="multi-grid">'+step.options.map(o=>'<label class="multi-option"><input type="checkbox" data-feature="'+esc(o)+'"'+(data.features.includes(o)?' checked':'')+'><span>'+esc(o)+'</span></label>').join('')+'</div>';
+   body.querySelectorAll('[data-feature]').forEach(i=>i.addEventListener('change',()=>{if(i.checked){if(!data.features.includes(i.dataset.feature))data.features.push(i.dataset.feature);}else data.features=data.features.filter(x=>x!==i.dataset.feature);}));
+  }else if(step.type==='fields'){
+   body.innerHTML='<p class="wizard-intro">'+esc(step.intro)+'</p><div class="field-grid">'+step.fields.map(fieldMarkup).join('')+'</div>';
+   body.querySelectorAll('[data-field]').forEach(i=>{i.addEventListener('input',()=>{data[i.dataset.field]=i.value;});i.addEventListener('change',()=>{data[i.dataset.field]=i.value;});});
+  }else{
+   body.innerHTML='<p class="wizard-intro">'+esc(step.intro)+'</p>'+summaryRows()+'<div class="review-actions"><button type="button" class="text-link" id="editContact">تعديل بيانات التواصل</button><button type="button" class="text-link" id="editDetails">تعديل الهدف والقيود</button></div><div class="submission-disabled" role="status"><strong>الإرسال غير مفعّل بعد</strong><span>لن نعرض رسالة نجاح وهمية. بعد توافق قاعدة البيانات سنربط الإرسال ونختبر حفظ الطلب ورقمه المرجعي.</span></div>';
+   document.getElementById('editContact').addEventListener('click',()=>{current=5;render();});document.getElementById('editDetails').addEventListener('click',()=>{current=6;render();});
+  }
+ }
+ function valid(){
+  const step=steps[current];
+  if(step.type==='choice'&&step.required&&!data[step.key])return 'اختر أحد الخيارات للمتابعة.';
+  if(step.type==='fields')for(const f of step.fields){const v=String(data[f.key]||'').trim();if(f.required&&!v)return 'يرجى إكمال حقل «'+f.label+'».';if(f.kind==='email'&&v&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v))return 'تحقق من صيغة البريد الإلكتروني.';if(f.key==='goal'&&v.length<20)return 'اكتب وصفًا للهدف لا يقل عن ٢٠ حرفًا.';}
+  return '';
+ }
+ back.addEventListener('click',()=>{if(current>0){current--;render();}});
+ next.addEventListener('click',()=>{if(current===steps.length-1){current=0;render();wizard.scrollIntoView({behavior:'smooth',block:'start'});return;}const msg=valid();if(msg){error.textContent=msg;error.hidden=false;return;}current++;render();wizard.scrollIntoView({behavior:'smooth',block:'start'});});
+ document.querySelectorAll('[data-service]').forEach(a=>a.addEventListener('click',()=>{const found=steps[0].options.find(o=>o[0]===a.dataset.service||o[0].startsWith(a.dataset.service));if(found){data.service=found[0];current=0;render();wizard.scrollIntoView({behavior:'smooth',block:'start'});}}));
+ render();
+}
