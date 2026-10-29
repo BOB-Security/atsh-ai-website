@@ -28,6 +28,15 @@ test('intake never claims an unsaved request succeeded',async t=>{const base=awa
 test('home exposes the eight-step project configurator and honest submission state',async t=>{const base=await withServer(t,config,{checkConnection:async()=>false,inspectSchema:async()=>[]});const html=await (await fetch(base+'/')).text();assert.match(html,/id="projectWizard"/);assert.match(html,/مهيئ المشروع/);assert.doesNotMatch(html,/<form[^>]*id="inquiryForm"/);const js=await (await fetch(base+'/app.js')).text();assert.match(js,/الخطوة/);assert.match(js,/submission-disabled/);assert.match(js,/لم يتم إرسال الطلب بعد/);});
 
 test('public service, pricing, about, FAQ and process pages are served',async t=>{const base=await withServer(t,config,{checkConnection:async()=>false,inspectSchema:async()=>[]});for(const path of ['/services.html','/pricing.html','/about.html','/faq.html','/process.html']){const r=await fetch(base+path);assert.equal(r.status,200,path);assert.match(r.headers.get('content-type'),/text\/html/);const html=await r.text();assert.match(html,/ATSH AI/);}});
+test('services page includes database-backed catalog with safe static fallback',async t=>{
+ const base=await withServer(t,config,{checkConnection:async()=>false,inspectSchema:async()=>[]});
+ const html=await (await fetch(base+'/services.html')).text();
+ assert.match(html,/id="liveServiceCatalog"/);
+ assert.match(html,/id="staticServiceCatalog"/);
+ const js=await (await fetch(base+'/app.js')).text();
+ assert.match(js,/fetch\('\/api\/public\/catalog'/);
+ assert.match(js,/staticCatalog\.hidden=true/);
+});
 test('pricing page does not publish invented amounts',async t=>{const base=await withServer(t,config,{checkConnection:async()=>false,inspectSchema:async()=>[]});const html=await (await fetch(base+'/pricing.html')).text();assert.match(html,/قائمة الأسعار غير مفعّلة/);assert.match(html,/لا تُعد هذه الصفحة عرضًا ماليًا/);});
 
 test('intake validates consent and reports persisted reference only after commit',async t=>{
