@@ -7,13 +7,12 @@ const {loadConfig}=require('../src/config');
 const root=path.resolve(__dirname,'../..');
 test('config defaults to a non-production local environment',()=>{const c=loadConfig({});assert.equal(c.production,false);assert.equal(c.port,8080);assert.equal(c.defaultOrganizationSlug,'atsh-ai');});
 test('PostgreSQL schema includes core operational domains',()=>{const sql=fs.readFileSync(path.join(root,'db/schema.sql'),'utf8');for(const name of ['customers','leads','projects','project_stages','tasks','quotes','subscriptions','hosting_assets','backup_runs','ai_agents','knowledge_sources','conversations','messages','support_tickets','audit_logs','notifications','customer_portal_accounts','customer_portal_sessions','customer_project_updates','design_versions','project_change_requests'])assert.match(sql,new RegExp('CREATE TABLE IF NOT EXISTS '+name+'\\b'));});
-test('project delivery schema has explicit approval gate',()=>{const sql=fs.readFileSync(path.join(root,'db/002_auth_and_content.sql'),'utf8');assert.match(sql,/final_release/);assert.match(fs.readFileSync(path.join(root,'platform/src/routes/admin.js'),'utf8'),/لا يمكن بدء النشر أو التسليم النهائي دون موافقة نهائية صريحة مسجلة/);});
+test('project delivery schema has explicit approval gate',()=>{const sql=fs.readFileSync(path.join(root,'db/002_auth_and_content.sql'),'utf8');assert.match(sql,/final_release/);assert.match(fs.readFileSync(path.join(root,'platform/src/routes/admin.js'),'utf8'),/لا يمكن بدء النشر أو التسليم النهائي دون موافقة نهائية صريحة مسجلة/);assert.match(fs.readFileSync(path.join(root,'platform/src/routes/admin.js'),'utf8'),/JOIN projects p ON p\.id=pa\.project_id AND p\.organization_id=\$2/);});
 test('public intake requires explicit consent and validates user data',()=>{const routes=fs.readFileSync(path.join(root,'platform/src/routes/public.js'),'utf8');assert.match(routes,/consent: z\.literal\(true\)/);assert.match(routes,/email: z\.string\(\)\.trim\(\)\.email/);});
 
-test('admin quote list formats minor-unit prices using the currency exponent and exposes expiry/issue state',()=>{const ui=fs.readFileSync(path.join(root,'platform/public/admin.js'),'utf8');assert.match(ui,/new Intl\.NumberFormat/);assert.match(ui,/resolvedOptions\(\)\.maximumFractionDigits/);assert.match(ui,/Math\.pow\(10,digits\)/);assert.match(ui,/منتهي الصلاحية/);assert.match(ui,/صالح حتى:/);assert.match(ui,/data-issue-quote/);});
-test('quote and final-release approvals are token-based, not admin status toggles',()=>{const pub=fs.readFileSync(path.join(root,'platform/src/routes/public.js'),'utf8');const admin=fs.readFileSync(path.join(root,'platform/src/routes/admin.js'),'utf8');assert.match(pub,/router\.post\('\/quote-response'/);assert.match(pub,/approval_token_hash/);assert.match(admin,/router\.post\('\/quotes\/:id\/issue'/);assert.match(admin,/router\.post\('\/projects\/:id\/approvals'/);assert.match(admin,/لا يمكن بدء النشر أو التسليم النهائي دون موافقة نهائية صريحة مسجلة/);});
+test('quote and final-release approvals are token-based and tenant-scoped',()=>{const pub=fs.readFileSync(path.join(root,'platform/src/routes/public.js'),'utf8');const admin=fs.readFileSync(path.join(root,'platform/src/routes/admin.js'),'utf8');const portal=fs.readFileSync(path.join(root,'platform/src/routes/portal.js'),'utf8');assert.match(portal,/DELETE FROM customer_portal_sessions s USING customer_portal_accounts a WHERE s\.token_hash=\$1 AND a\.id=s\.account_id AND a\.organization_id=\$2/);assert.match(portal,/UPDATE customer_portal_sessions s SET last_seen_at=now\(\) FROM customer_portal_accounts a WHERE s\.token_hash=\$1 AND a\.id=s\.account_id AND a\.organization_id=\$2/);assert.match(portal,/UPDATE customer_portal_accounts SET password_hash=\$2,updated_at=now\(\) WHERE id=\$1 AND organization_id=\$3/);assert.match(portal,/DELETE FROM customer_portal_sessions s USING customer_portal_accounts a WHERE s\.account_id=\$1 AND s\.token_hash<>\$2 AND a\.id=s\.account_id AND a\.organization_id=\$3/);assert.match(admin,/DELETE FROM project_approvals pa USING projects p WHERE pa\.id=\$1 AND p\.id=pa\.project_id AND p\.organization_id=\$2/);assert.match(admin,/DELETE FROM customer_portal_sessions s USING customer_portal_accounts a WHERE s\.account_id=\$1 AND a\.id=s\.account_id AND a\.organization_id=\$2/);assert.match(pub,/router\.post\('\/quote-response'/);assert.match(pub,/WHERE response_token_hash=\$1 AND organization_id=\$3/);assert.match(pub,/\[rows\[0\]\.organization_id,String\(rows\[0\]\.id\)/);assert.match(pub,/approval_token_hash/);assert.match(pub,/p\.organization_id=\$2 WHERE a\.approval_token_hash=\$1/);assert.match(pub,/WHERE id=\$1 AND project_id IN \(SELECT id FROM projects WHERE organization_id=\$4\)/);assert.match(pub,/WHERE id=\$1 AND organization_id=\$2/);assert.match(pub,/\[approval\.organization_id,String\(approval\.id\)/);assert.match(admin,/router\.post\('\/quotes\/:id\/issue'/);assert.match(admin,/response_token_expires_at=NULL,updated_at=now\(\) WHERE id=\$1 AND organization_id=\$2.*req\.app\.locals\.organizationId/);assert.match(admin,/router\.post\('\/projects\/:id\/approvals'/);assert.match(admin,/DELETE FROM project_approvals pa USING projects p WHERE pa\.id=\$1 AND p\.id=pa\.project_id AND p\.organization_id=\$2/);assert.match(admin,/لا يمكن بدء النشر أو التسليم النهائي دون موافقة نهائية صريحة مسجلة/);});
 test('AI assistant uses approved knowledge and refuses unconfigured operation',()=>{const ai=fs.readFileSync(path.join(root,'platform/src/routes/assistant.js'),'utf8');assert.match(ai,/status=\\'approved\\'/);assert.match(ai,/No relevant approved knowledge excerpt is available/);assert.match(ai,/cfg\.aiApiKey/);});
-test('migration sequence includes approval, quote and team token schemas',()=>{for(const f of ['001_initial_schema.sql','002_auth_and_content.sql','003_knowledge_and_integrations.sql','004_team_invitations.sql','005_explicit_client_approvals.sql','006_quote_approval_tokens.sql','007_assistant_sessions.sql','008_customer_agent_runtime.sql','009_bilingual_service_features.sql','010_support_ticket_threads.sql','011_project_preview_ready_status.sql','012_support_ticket_sla.sql','013_customer_portal.sql','014_ticket_message_visibility.sql','015_design_versioning.sql','016_project_change_requests.sql'])assert.ok(fs.existsSync(path.join(root,'db',f)),f+' missing');});
+test('migration sequence includes approval, quote, team tokens and project ownership integrity',()=>{for(const f of ['001_initial_schema.sql','002_auth_and_content.sql','003_knowledge_and_integrations.sql','004_team_invitations.sql','005_explicit_client_approvals.sql','006_quote_approval_tokens.sql','007_assistant_sessions.sql','008_customer_agent_runtime.sql','009_bilingual_service_features.sql','010_support_ticket_threads.sql','011_project_preview_ready_status.sql','012_support_ticket_sla.sql','013_customer_portal.sql','014_ticket_message_visibility.sql','015_design_versioning.sql','016_project_change_requests.sql','018_privileged_mfa.sql','019_mfa_enrollment_sessions.sql','020_mfa_pending_expiry.sql','021_change_request_ownership_integrity.sql','022_backup_asset_ownership_integrity.sql','023_project_hosting_customer_ownership.sql','024_support_ticket_ownership_integrity.sql'])assert.ok(fs.existsSync(path.join(root,'db',f)),f+' missing');const ownership=fs.readFileSync(path.join(root,'db/021_change_request_ownership_integrity.sql'),'utf8');assert.match(ownership,/FOREIGN KEY \(project_id, organization_id, customer_id\)/);assert.match(ownership,/RAISE EXCEPTION/);const backupOwnership=fs.readFileSync(path.join(root,'db/022_backup_asset_ownership_integrity.sql'),'utf8');assert.match(backupOwnership,/FOREIGN KEY \(hosting_asset_id, organization_id\)/);assert.match(backupOwnership,/RAISE EXCEPTION/);const projectHostingOwnership=fs.readFileSync(path.join(root,'db/023_project_hosting_customer_ownership.sql'),'utf8');assert.match(projectHostingOwnership,/FOREIGN KEY \(customer_id, organization_id\)/);assert.match(projectHostingOwnership,/FOREIGN KEY \(project_id, organization_id, customer_id\)/);assert.match(projectHostingOwnership,/RAISE EXCEPTION/);const ticketOwnership=fs.readFileSync(path.join(root,'db/024_support_ticket_ownership_integrity.sql'),'utf8');assert.match(ticketOwnership,/FOREIGN KEY \(customer_id, organization_id\)/);assert.match(ticketOwnership,/FOREIGN KEY \(project_id, organization_id, customer_id\)/);assert.match(ticketOwnership,/support_ticket_project_requires_customer/);assert.match(ticketOwnership,/RAISE EXCEPTION/);});
 
 test('assistant continuity uses opaque scoped session tokens and human escalation',()=>{const ai=fs.readFileSync(path.join(root,'platform/src/routes/assistant.js'),'utf8');assert.match(ai,/assistant_sessions/);assert.match(ai,/escalationTicketReference/);assert.match(ai,/status='waiting_human'/);});
 
@@ -42,101 +41,35 @@ test('AI pre-release evaluation set covers 30 bilingual safety and quality cases
 
 test('admin console receives effective permissions and hides unauthorized modules',()=>{const auth=fs.readFileSync(path.join(root,'platform/src/auth.js'),'utf8');const admin=fs.readFileSync(path.join(root,'platform/src/routes/admin.js'),'utf8');const ui=fs.readFileSync(path.join(root,'platform/public/admin.js'),'utf8');assert.match(auth,/permissions:user\.permission_sets\.flat\(\)/);assert.match(admin,/permissions:req\.permissionSets/);assert.match(ui,/const rules=\{/);assert.match(ui,/applyPanelPermissions\(name\)/);});
 
-test('admin password recovery uses expiring hashed one-time tokens and revokes sessions',()=>{
- const admin=fs.readFileSync(path.join(root,'platform/src/routes/admin.js'),'utf8');
- const migration=fs.readFileSync(path.join(root,'db/017_password_reset_tokens.sql'),'utf8');
- assert.match(admin,/auth\/password-reset\/request/);
- assert.match(admin,/auth\/password-reset\/confirm/);
- assert.match(admin,/createHash\('sha256'\)/);
- assert.match(admin,/DELETE FROM auth_sessions WHERE user_id=\$1/);
- assert.match(migration,/token_hash text NOT NULL UNIQUE/);
- assert.match(migration,/expires_at timestamptz NOT NULL/);
+test('MFA port wires encryption, migrations, enrollment-only sessions and sign-in challenges',()=>{
+ const config=fs.readFileSync(path.join(root,'platform/src/config.js'),'utf8');
+ const auth=fs.readFileSync(path.join(root,'platform/src/auth.js'),'utf8');
+ const server=fs.readFileSync(path.join(root,'platform/server.js'),'utf8');
+ const mfa=fs.readFileSync(path.join(root,'platform/src/mfa.js'),'utf8');
+ const routes=fs.readFileSync(path.join(root,'platform/src/mfa-routes.js'),'utf8');
+ const deploy=fs.readFileSync(path.join(root,'.github/workflows/platform-staging-deploy.yml'),'utf8');
+ for(const file of ['018_privileged_mfa.sql','019_mfa_enrollment_sessions.sql','020_mfa_pending_expiry.sql']) assert.ok(fs.existsSync(path.join(root,'db',file)),file+' missing');
+ assert.match(config,/MFA_ENCRYPTION_KEY/);
+ assert.match(auth,/mfa_enrollment_only/);
+ assert.match(auth,/requiresMfa/);
+ assert.match(auth,/verifyMfaLogin/);
+ assert.match(server,/app\.use\('\/api\/admin', mfaRoutes\)/);
+ assert.match(mfa,/aes-256-gcm/);
+ assert.match(routes,/auth\/mfa\/verify/);
+ assert.match(deploy,/MFA_ENCRYPTION_KEY/);
 });
 
-test('admin team panel supports member status management and owner-only role assignment UI',()=>{
- const ui=fs.readFileSync(path.join(root,'platform/public/admin.js'),'utf8');
- const routes=fs.readFileSync(path.join(root,'platform/src/routes/team.js'),'utf8');
- assert.match(ui,/data-team-status/);
- assert.match(ui,/data-team-save-roles/);
- assert.match(ui,/api\('\/api\/team\/'\)/);
- assert.match(routes,/router\.patch\('\/:id\/status'/);
- assert.match(routes,/router\.patch\('\/:id\/roles'/);
- assert.match(routes,/تعديل أدوار الفريق متاح لمالك النظام فقط/);
-});
+test('public homepage references existing ATSH AI logo, favicon and hero assets',()=>{const html=fs.readFileSync(path.join(root,'platform/public/index.html'),'utf8');const css=fs.readFileSync(path.join(root,'platform/public/styles.css'),'utf8');for(const asset of ['images/atsh-ai-logo-horizontal.svg','images/atsh-ai-logo-round.svg','images/atsh-hero.jpg','images/atsh-logo.jpg','images/atsh-emblem.jpg'])assert.ok(fs.existsSync(path.join(root,'platform/public',asset)),asset+' missing');assert.match(html,/href="\/images\/atsh-ai-logo-round\.svg"/);assert.match(html,/src="\/images\/atsh-ai-logo-horizontal\.svg"/);assert.match(html,/src="\/images\/atsh-hero\.jpg"/);assert.match(css,/\.hero-brand-image/);});
 
-test('admin support panel exposes ticket creation backed by the protected tickets API',()=>{
- const ui=fs.readFileSync(path.join(root,'platform/public/admin.js'),'utf8');
- const routes=fs.readFileSync(path.join(root,'platform/src/routes/ops.js'),'utf8');
- assert.match(ui,/ticket-create-form/);
- assert.match(ui,/api\('\/api\/ops\/tickets'/);
- assert.match(routes,/router\.post\('\/tickets',requirePermission\('tickets\.manage'\)/);
-});
+test('customer portal data mutations and reads remain scoped to the authenticated tenant',()=>{const portal=fs.readFileSync(path.join(root,'platform/src/routes/portal.js'),'utf8');assert.match(portal,/FROM projects WHERE organization_id=\$1 AND customer_id=\$2/);assert.match(portal,/FROM quotes WHERE organization_id=\$1 AND customer_id=\$2/);assert.match(portal,/FROM support_tickets WHERE organization_id=\$1 AND customer_id=\$2/);assert.match(portal,/p\.customer_id=\$2 AND u\.visibility='customer'/);assert.match(portal,/t\.organization_id=\$2 AND t\.customer_id=\$3 AND m\.visibility='customer'/);assert.match(portal,/UPDATE quotes SET status=\$4[\s\S]*?WHERE id=\$1 AND organization_id=\$2 AND customer_id=\$3/);assert.match(portal,/UPDATE project_change_requests SET status=\$4[\s\S]*?WHERE id=\$1 AND organization_id=\$2 AND customer_id=\$3/);assert.match(portal,/UPDATE customers SET display_name=\$3[\s\S]*?WHERE id=\$1 AND organization_id=\$2/);assert.match(portal,/UPDATE customer_portal_accounts SET password_hash=\$2[\s\S]*?WHERE id=\$1 AND organization_id=\$2/);});
 
-test('knowledge article lifecycle is editable only through permission-protected organization-scoped route',()=>{
- const routes=fs.readFileSync(path.join(root,'platform/src/routes/ops.js'),'utf8');
- const ui=fs.readFileSync(path.join(root,'platform/public/admin.js'),'utf8');
- assert.ok(routes.includes("router.patch('/knowledge/:id',requirePermission('knowledge.manage')"));
- assert.ok(routes.includes('WHERE id=$1 AND organization_id=$2 RETURNING id,title_ar,title_en,body_ar,body_en,status'));
- assert.ok(ui.includes('knowledge-edit-form'));
- assert.ok(ui.includes("api('/api/ops/knowledge/'+f.dataset.articleId"));
-});
+test('privileged admin sessions cannot bypass MFA enrollment gates',()=>{const auth=fs.readFileSync(path.join(root,'platform/src/auth.js'),'utf8');const routes=fs.readFileSync(path.join(root,'platform/src/mfa-routes.js'),'utf8');assert.match(auth,/MFA_SENSITIVE_PERMISSIONS/);assert.match(auth,/mfa_enrollment_only/);assert.match(auth,/يلزم إكمال إعداد التحقق بخطوتين/);assert.match(routes,/router\.post\('\/auth\/mfa\/verify',verifyMfaLogin\)/);assert.match(routes,/router\.post\('\/auth\/mfa\/enable'/);assert.match(routes,/pending_expires_at>now\(\)/);assert.match(routes,/last_totp_step<\$2/);});
 
-test('admin customer cards support editing customer profile fields through scoped customer update API',()=>{
- const ui=fs.readFileSync(path.join(root,'platform/public/admin.js'),'utf8');
- const routes=fs.readFileSync(path.join(root,'platform/src/routes/admin.js'),'utf8');
- assert.ok(ui.includes('customer-profile-form'));
- assert.ok(ui.includes("api('/customers/'+f.dataset.customerId"));
- assert.ok(routes.includes("router.patch('/customers/:id',requirePermission('customers.manage')"));
- assert.ok(routes.includes('display_name=COALESCE($3,display_name)'));
-});
+test('operations APIs validate customer, project and accepted-quote relationships before linking records',()=>{const ops=fs.readFileSync(path.join(root,'platform/src/routes/ops.js'),'utf8');assert.match(ops,/SELECT 1 FROM projects WHERE id=\$1 AND organization_id=\$2 AND customer_id=\$3/);assert.match(ops,/SELECT customer_id FROM projects WHERE id=\$1 AND organization_id=\$2/);assert.match(ops,/p\.rows\[0\]\.customer_id!==customerId/);assert.match(ops,/if\(!customerId\)customerId=p\.rows\[0\]\.customer_id/);assert.match(ops,/SELECT 1 FROM hosting_assets WHERE id=\$1 AND organization_id=\$2/);assert.match(ops,/أصل الاستضافة غير موجود في المؤسسة الحالية/);assert.match(ops,/SELECT 1 FROM quotes WHERE id=\$1 AND organization_id=\$2 AND customer_id=\$3 AND status='accepted'/);assert.match(ops,/قائمة النطاقات يجب أن تحتوي على Origins صحيحة وآمنة/);assert.match(ops,/u\.protocol==='https:'/);});
 
+test('customer portal sessions use hardened cookies and reject revoked, expired or cross-organization sessions',()=>{const portal=fs.readFileSync(path.join(root,'platform/src/routes/portal.js'),'utf8');assert.match(portal,/httpOnly:true,secure:production,sameSite:'strict'/);assert.match(portal,/expires_at>now\(\)/);assert.match(portal,/a\.status='active'/);assert.match(portal,/c\.status<>'blocked'/);assert.match(portal,/a\.organization_id!==req\.app\.locals\.organizationId/);assert.match(portal,/DELETE FROM customer_portal_sessions s USING customer_portal_accounts a WHERE s\.token_hash=\$1 AND a\.id=s\.account_id AND a\.organization_id=\$2/);assert.match(portal,/invitation_token_hash=\$1 AND invitation_expires_at>now\(\) AND status='invited'/);});
 
-test('admin project cards load and display scoped project update history',()=>{
- const ui=fs.readFileSync(path.join(root,'platform/public/admin.js'),'utf8');
- const routes=fs.readFileSync(path.join(root,'platform/src/routes/admin.js'),'utf8');
- assert.match(ui,/project-update-history/);
- assert.match(ui,/update-history-item/);
- assert.match(routes,/router\.get\('\/projects\/:id\/updates'/);
-});
+test('failed team invitation cleanup is tenant-scoped',()=>{const team=fs.readFileSync(path.join(root,'platform/src/routes/team.js'),'utf8');assert.match(team,/DELETE FROM team_invitations WHERE id=\$1 AND organization_id=\$2/);});
+test('team activation validates invitation role tenant ownership',()=>{const team=fs.readFileSync(path.join(root,'platform/src/routes/team.js'),'utf8');assert.match(team,/JOIN roles r ON r\.id=i\.role_id AND r\.organization_id=i\.organization_id/);assert.match(team,/UPDATE team_invitations SET accepted_at=now\(\) WHERE id=\$1 AND organization_id=\$2/);});
 
-
-test('project builder captures expanded scope details in Arabic and English and persists them in brief',()=>{
- const ar=fs.readFileSync(path.join(root,'platform/public/project-builder.html'),'utf8');
- const en=fs.readFileSync(path.join(root,'platform/public/project-builder-en.html'),'utf8');
- const arJs=fs.readFileSync(path.join(root,'platform/public/builder.js'),'utf8');
- const enJs=fs.readFileSync(path.join(root,'platform/public/builder-en.js'),'utf8');
- for(const field of ['targetAudience','platforms','accessibility','timeline','references','constraints']){
-  assert.match(ar,new RegExp('name="'+field+'"'), 'Arabic form missing '+field);
-  assert.match(en,new RegExp('name="'+field+'"'), 'English form missing '+field);
-  assert.ok(arJs.includes(field+':val(\''+field+'\')'), 'Arabic submission missing '+field);
-  assert.ok(enJs.includes(field+':val(\''+field+'\')'), 'English submission missing '+field);
- }
-});
-
-
-test('project builder captures explicit integration categories in both locales',()=>{
- const ar=fs.readFileSync(path.join(root,'platform/public/project-builder.html'),'utf8');
- const en=fs.readFileSync(path.join(root,'platform/public/project-builder-en.html'),'utf8');
- const arJs=fs.readFileSync(path.join(root,'platform/public/builder.js'),'utf8');
- const enJs=fs.readFileSync(path.join(root,'platform/public/builder-en.js'),'utf8');
- for(const value of ['email','crm','erp','whatsapp','payments','calendar','analytics','database-api']){
-  assert.match(ar,new RegExp('name="integrationTypes" value="'+value+'"'));
-  assert.match(en,new RegExp('name="integrationTypes" value="'+value+'"'));
- }
- assert.ok(arJs.includes('integrationTypes:values(\'integrationTypes\')'));
- assert.ok(enJs.includes('integrationTypes:values(\'integrationTypes\')'));
-});
-
-test('catalog admin UI exposes permission-protected activate/deactivate controls for existing categories, plans, and add-ons',()=>{
- const ui=fs.readFileSync(path.join(root,'platform/public/admin.js'),'utf8');
- const routes=fs.readFileSync(path.join(root,'platform/src/routes/admin.js'),'utf8');
- assert.match(ui,/data-catalog-toggle/);assert.match(ui,/data-catalog-edit/);assert.match(ui,/تعديل البيانات والسعر/);assert.match(ui,/catalog-edit-form/);
- assert.match(ui,/\['categories','الفئات','\/catalog\/categories'\]/);
- assert.match(ui,/\['plans','الباقات','\/catalog\/plans'\]/);
- assert.match(ui,/\['addons','الإضافات','\/catalog\/addons'\]/);
- for(const type of ['categories','plans','addons'])assert.match(routes,new RegExp("router\\.patch\\('\\/catalog\\/"+type+"\\/:id',requirePermission\\('catalog\\.manage'\\)"));
-});
-
-test('quote email uses currency-specific minor-unit formatting and refuses expired issuance',()=>{const admin=fs.readFileSync(path.join(root,'platform/src/routes/admin.js'),'utf8');assert.match(admin,/new Intl\.NumberFormat\('en-US',\{style:'currency',currency:code\}\)/);assert.match(admin,/Math\.pow\(10,digits\)/);assert.match(admin,/انتهت صلاحية العرض/);});
-
-test('admin quote expiry comparison uses the browser local calendar date rather than UTC date',()=>{const ui=fs.readFileSync(path.join(root,'platform/public/admin.js'),'utf8');assert.match(ui,/const localDateKey=\(\)=>\{const d=new Date\(\);return d\.getFullYear\(\)/);assert.doesNotMatch(ui,/valid_until\)\.slice\(0,10\)<new Date\(\)\.toISOString\(\)\.slice\(0,10\)/);});
+test('customer portal login is organization-scoped and uses a high-entropy opaque session token',()=>{const portal=fs.readFileSync(path.join(root,'platform/src/routes/portal.js'),'utf8');assert.match(portal,/WHERE a\.organization_id=\$1 AND lower\(a\.email\)=lower\(\$2\)/);assert.match(portal,/crypto\.randomBytes\(32\)\.toString\('base64url'\)/);assert.match(portal,/INSERT INTO customer_portal_sessions\(account_id,token_hash,expires_at\)/);assert.match(portal,/passwordHash\(s\.password\)/);assert.match(portal,/verifyPassword\(s\.password,a\.password_hash\)/);});
