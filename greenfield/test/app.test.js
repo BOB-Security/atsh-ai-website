@@ -129,3 +129,18 @@ test('admin catalog denies a session without catalog permissions',async t=>{
  assert.equal(response.status,403);
  assert.equal(readCount,0);
 });
+
+
+test('admin leads require sales permission and use the authenticated organization',async t=>{
+ const crypto=require('node:crypto');
+ const token='test-admin-leads-token-1234567890-abcdef';
+ const tokenHash=crypto.createHash('sha256').update(token).digest('hex');
+ let organizationUsed='';
+ const sample=[{id:'lead-1',reference:'ATSH-TEST',status:'new',customer_name:'Sample',customer_email:null}];
+ const db={checkConnection:async()=>true,inspectSchema:async()=>[],getAdminSession:async hash=>hash===tokenHash?{id:'user-1',organization_id:'org-a',email:'sales@example.com',full_name:'Sales',role_permission_sets:[['leads.read']]}:null,listAdminLeads:async organizationId=>{organizationUsed=organizationId;return sample;}};
+ const base=await withServer(t,config,db);
+ const response=await fetch(base+'/api/admin/leads',{headers:{cookie:'atsh_admin_session='+encodeURIComponent(token)}});
+ assert.equal(response.status,200);
+ assert.deepEqual((await response.json()).leads,sample);
+ assert.equal(organizationUsed,'org-a');
+});
