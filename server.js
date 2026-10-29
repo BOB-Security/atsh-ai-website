@@ -20,7 +20,9 @@ app.get('/api/public/catalog', (_req, res) => res.status(503).json({ error: 'cat
 app.post('/api/public/project-inquiries', (_req, res) => res.status(503).json({ error: 'intake_not_configured', message: 'لم يتم تفعيل حفظ الطلبات قبل التحقق من قاعدة البيانات الحية؛ لم يتم حفظ بياناتك.' }));
 app.get('/admin', (_req, res) => res.sendFile(path.join(__dirname, 'public', 'admin.html')));
 app.use((err, _req, res, _next) => { console.error('Request failed', { name: err && err.name || 'Error', code: err && err.code || 'unknown' }); if (!res.headersSent) res.status(500).json({ error: 'internal_error' }); });
-const server = app.listen(config.port, () => console.log('ATSH AI listening on ' + config.port));
-async function shutdown() { server.close(async () => { try { await closePool(); process.exit(0); } catch { process.exit(1); } }); setTimeout(() => process.exit(1), 10000).unref(); }
-process.on('SIGTERM', shutdown); process.on('SIGINT', shutdown);
+if (require.main === module) {
+  const server = app.listen(config.port, () => console.log('ATSH AI listening on ' + config.port));
+  async function shutdown() { server.close(async () => { try { await closePool(); process.exit(0); } catch { process.exit(1); } }); setTimeout(() => process.exit(1), 10000).unref(); }
+  process.on('SIGTERM', shutdown); process.on('SIGINT', shutdown);
+}
 module.exports = { app };
