@@ -44,7 +44,7 @@ async function loadSchemaReadiness(){
   try{response=await fetch('/api/admin/schema-readiness',{credentials:'same-origin',headers:{accept:'application/json'},signal:controller.signal});}
   finally{clearTimeout(timeout);}
   const result=await response.json().catch(()=>({}));root.replaceChildren();
-  if(!response.ok||!result.ok){const p=document.createElement('p');p.textContent=response.status===403?'حسابك لا يملك صلاحية فحص الجاهزية.':'تعذر فحص مخطط قاعدة البيانات؛ لم يتم تغيير أي بيانات.';root.append(p);return;}
+  if(!response.ok||!result.ok){const p=document.createElement('p');p.textContent=response.status===403?'حسابك لا يملك صلاحية فحص الجاهزية.':'تعذر فحص مخطط قاعدة البيانات؛ رمز التشخيص: '+(result.diagnosticCode||'غير متاح')+'. لم يتم تغيير أي بيانات.';root.append(p);return;}
   for(const group of result.groups||[]){
    const section=document.createElement('section');section.className='admin-schema-group';
    const title=document.createElement('h3');title.textContent=group.name+' — '+(group.ready?'جاهز':'يحتاج مراجعة');section.append(title);
