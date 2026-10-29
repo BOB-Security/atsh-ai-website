@@ -58,10 +58,51 @@ function createApp(overrides = {}) {
       return res.status(503).json({ error: 'schema_inspection_unavailable' });
     }
   });
-  app.post('/api/public/inquiries', (_req, res) => res.status(503).json({
-    error: 'intake_not_enabled',
-    message: 'لم يتم تفعيل استقبال الطلبات قبل مطابقة مخطط قاعدة البيانات الحالية. لم يتم حفظ أي طلب.'
-  }));
+  app.post('/api/public/inquiries', async (req, res) => {
+    if (!config.intakeEnabled || !config.publicOrganizationId) {
+      return res.status(503).json({
+        error: 'intake_not_enabled',
+        message: 'استقبال الطلبات غير مفعّل بعد. لم يتم حفظ أي طلب.'
+      });
+    }
+    const body = req.body;
+    const allowed = new Set(['name','email','phone','company','service','size','pages','languages','brand','features','hosting','goal','audience','integrations','deadline','constraints','consent']);
+    if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).some(key => !allowed.has(key))) {
+      return res.status(400).json({ error: 'invalid_request', message: 'بيانات الطلب غير صالحة.' });
+    }
+    const str = (value, max) => typeof value === 'string' && value.trim().length > 0 && value.trim().length <= max;
+    if (!str(body.name, 160) || !str(body.email, 254) || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.email.trim()) ||
+        !str(body.service, 120) || !str(body.goal, 4000) || body.goal.trim().length < 20 ||
+        (body.phone != null && (typeof body.phone !== 'string' || body.phone.length > 40)) ||
+        (body.company != null && (typeof body.company !== 'string' || body.company.length > 200)) ||
+        (body.features != null && (!Array.isArray(body.features) || body.features.length > 30 || body.features.some(v => typeof v !== 'string' || v.length > 160))) ||
+        body.consent !== true) {
+      return res.status(400).json({ error: 'validation_failed', message: 'أكمل البيانات المطلوبة ووافق على معالجة بيانات الطلب قبل الإرسال.' });
+    }
+    for (const key of ['size','pages','languages','brand','hosting','audience','integrations','deadline','constraints']) {
+      if (body[key] != null && (typeof body[key] !== 'string' || body[key].length > 2000)) {
+        return res.status(400).json({ error: 'validation_failed', message: 'أحد الحقول يتجاوز الحد المسموح.' });
+      }
+    }
+    try {
+      const inquiry = await database.createInquiry({
+        name: body.name.trim(), email: body.email.trim(), phone: (body.phone || '').trim(),
+        company: (body.company || '').trim(), service: body.service.trim(), size: body.size || '',
+        pages: body.pages || '', languages: body.languages || '', brand: body.brand || '',
+        features: body.features || [], hosting: body.hosting || '', goal: body.goal.trim(),
+        audience: body.audience || '', integrations: body.integrations || '',
+        deadline: body.deadline || '', constraints: body.constraints || ''
+      });
+      res.setHeader('Cache-Control', 'no-store');
+      return res.status(201).json({ ok: true, inquiry: { reference: inquiry.reference, status: inquiry.status, createdAt: inquiry.created_at }, message: 'تم استلام طلبك بنجاح.' });
+    } catch (error) {
+      if (error.code === 'INTAKE_NOT_ENABLED' || error.code === 'INTAKE_SCHEMA_MISMATCH') {
+        return res.status(503).json({ error: 'intake_not_ready', message: 'لم يتم تفعيل استقبال الطلبات بعد مراجعة توافق قاعدة البيانات. لم يتم حفظ أي طلب.' });
+      }
+      console.error('Inquiry persistence failed:', error.code || 'unknown');
+      return res.status(503).json({ error: 'inquiry_save_failed', message: 'تعذر حفظ الطلب الآن. لم يتم تسجيله؛ حاول لاحقًا.' });
+    }
+  });
   app.get('*path', (req, res, next) => {
     if (req.path.startsWith('/api/')) return res.status(404).json({ error: 'not_found' });
     return res.status(404).sendFile(path.join(__dirname, 'public', '404.html'), error => error && next(error));
