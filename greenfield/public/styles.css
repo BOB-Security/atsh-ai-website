@@ -160,3 +160,15 @@
 .admin-plan-prices span{font-size:10px;color:var(--muted);padding:4px 7px;background:#ffffff08;border-radius:6px}
 .admin-feature-list{font-size:10px!important;line-height:1.9}
 @media(max-width:700px){.admin-catalog-list{grid-template-columns:1fr}.admin-catalog-heading{align-items:flex-start}}
+
+
+.admin-leads-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:18px}
+.admin-lead-card{padding:16px;border:1px solid var(--line);border-radius:13px;background:#11102080;min-width:0}
+.admin-lead-heading{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.admin-lead-heading strong{font:700 12px Manrope,Cairo,sans-serif;direction:ltr;overflow-wrap:anywhere}
+.admin-lead-card h3{font-size:14px;margin:12px 0 4px}
+.admin-lead-card p{font-size:11px;color:var(--muted);margin:5px 0;overflow-wrap:anywhere}
+.admin-lead-card .admin-lead-goal{color:#d4d0e9;line-height:1.9}
+.admin-lead-card .admin-lead-contact{direction:ltr;text-align:right;font-size:10px}
+.admin-lead-card>small{color:var(--muted);font-size:10px}
+@media(max-width:700px){.admin-leads-list{grid-template-columns:1fr}}
