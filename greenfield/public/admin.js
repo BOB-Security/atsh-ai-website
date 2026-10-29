@@ -130,46 +130,99 @@ async function loadOverview(){
  if(response.ok&&result.ok&&result.overview){renderStats(result.overview);return;}
  if(statsRoot){statsRoot.replaceChildren();const p=document.createElement('p');p.textContent=response.status===403?'هذا الحساب لا يملك صلاحية عرض الملخص.':'الملخص غير متاح حتى اكتمال إعداد جداول الإدارة في بيئة الاختبار.';statsRoot.append(p);}
 }
+let catalogCache=[];
+function currencyDigits(currency){try{return new Intl.NumberFormat('en',{style:'currency',currency}).resolvedOptions().maximumFractionDigits;}catch{return 2;}}
+function openPlanForm(plan=null,categoryId=''){
+ const form=document.getElementById('adminPlanForm');if(!form)return;
+ form.hidden=false;form.reset();
+ form.elements.namedItem('id').value=plan?.id||'';
+ const categorySelect=document.getElementById('adminPlanCategory');
+ categorySelect.replaceChildren();
+ for(const cat of catalogCache){const option=document.createElement('option');option.value=cat.id;option.textContent=cat.name?.ar||cat.slug;categorySelect.append(option);}
+ categorySelect.value=plan?.categoryId||categoryId||catalogCache[0]?.id||'';
+ const currency=plan?.currency||'EGP';const digits=currencyDigits(currency);const divisor=10**digits;const amounts=plan?.amountsMinor||{};
+ form.elements.namedItem('slug').value=plan?.slug||'';
+ form.elements.namedItem('name_ar').value=plan?.name?.ar||'';
+ form.elements.namedItem('name_en').value=plan?.name?.en||'';
+ form.elements.namedItem('description_ar').value=plan?.description?.ar||'';
+ form.elements.namedItem('description_en').value=plan?.description?.en||'';
+ form.elements.namedItem('currency').value=currency;
+ form.elements.namedItem('setup_amount').value=Number(amounts.setup||0)/divisor;
+ form.elements.namedItem('monthly_amount').value=Number(amounts.monthly||0)/divisor;
+ form.elements.namedItem('annual_amount').value=Number(amounts.annual||0)/divisor;
+ form.elements.namedItem('features').value=Array.isArray(plan?.features)?plan.features.join('\n'):'';
+ form.elements.namedItem('active').checked=plan?plan.active!==false:true;
+ form.elements.namedItem('sort_order').value=Number(plan?.sortOrder||0);
+ const title=document.getElementById('adminPlanFormTitle');if(title)title.textContent=plan?'تعديل الباقة':'إضافة باقة جديدة';
+ const msg=document.getElementById('adminPlanMessage');if(msg)msg.textContent='';
+ form.scrollIntoView({behavior:'smooth',block:'start'});
+}
 async function loadCatalog(){
  const root=document.getElementById('adminCatalogList');if(!root)return;
- root.replaceChildren();
- const pending=document.createElement('p');pending.textContent='جارٍ تحميل الكتالوج…';root.append(pending);
+ root.replaceChildren();const pending=document.createElement('p');pending.textContent='جارٍ تحميل الكتالوج…';root.append(pending);
  try{
   const response=await fetch('/api/admin/catalog',{credentials:'same-origin',headers:{accept:'application/json'}});
-  const result=await response.json().catch(()=>({}));
-  root.replaceChildren();
-  if(!response.ok||!result.ok){const p=document.createElement('p');p.textContent=response.status===403?'لا يملك هذا الحساب صلاحية قراءة الكتالوج.':'الكتالوج غير متاح قبل التحقق من مخطط قاعدة البيانات والصلاحيات.';root.append(p);return;}
-  if(!Array.isArray(result.categories)||!result.categories.length){const p=document.createElement('p');p.textContent='لا توجد خدمات مسجلة في قاعدة البيانات حتى الآن.';root.append(p);return;}
-  for(const category of result.categories){
+  const result=await response.json().catch(()=>({}));root.replaceChildren();
+  if(!response.ok||!result.ok){const p=document.createElement('p');p.textContent=response.status===403?'لا يملك هذا الحساب صلاحية قراءة الكتالوج.':'الكتالوج غير متاح؛ تحقق من قاعدة البيانات والصلاحيات.';root.append(p);return;}
+  catalogCache=Array.isArray(result.categories)?result.categories:[];
+  if(!catalogCache.length){const p=document.createElement('p');p.textContent='لا توجد خدمات مسجلة في قاعدة البيانات حتى الآن.';root.append(p);}
+  for(const category of catalogCache){
    const card=document.createElement('article');card.className='admin-catalog-category';
    const heading=document.createElement('div');heading.className='admin-catalog-heading';
    const title=document.createElement('h3');title.textContent=category.name?.ar||category.slug||'خدمة';
    const state=document.createElement('span');state.className='admin-state '+(category.active?'is-active':'is-inactive');state.textContent=category.active?'نشطة':'غير نشطة';
    heading.append(title,state);card.append(heading);
    const description=document.createElement('p');description.textContent=category.description?.ar||'';card.append(description);
-   const plans=Array.isArray(category.plans)?category.plans:[];
-   for(const plan of plans){
+   const add=document.createElement('button');add.type='button';add.className='btn secondary';add.textContent='إضافة باقة لهذه الخدمة';add.addEventListener('click',()=>openPlanForm(null,category.id));card.append(add);
+   for(const plan of (Array.isArray(category.plans)?category.plans:[])){
     const item=document.createElement('div');item.className='admin-catalog-plan';
+    const nameRow=document.createElement('div');nameRow.className='admin-plan-heading';
     const planTitle=document.createElement('strong');planTitle.textContent=plan.name?.ar||plan.slug||'باقة';
-    const planState=document.createElement('span');planState.className='admin-state '+(plan.active?'is-active':'is-inactive');planState.textContent=plan.active?'نشطة':'غير نشطة';
-    const nameRow=document.createElement('div');nameRow.className='admin-plan-heading';nameRow.append(planTitle,planState);item.append(nameRow);
-    const priceLines=document.createElement('div');priceLines.className='admin-plan-prices';
-    const currency=typeof plan.currency==='string'?plan.currency.trim():'';
-    const amounts=plan.amountsMinor||{};
+    const planState=document.createElement('span');planState.className='admin-state '+(plan.active?'is-active':'is-inactive');planState.textContent=plan.active?'نشطة':'غير نشطة';nameRow.append(planTitle,planState);item.append(nameRow);
+    const digits=currencyDigits(plan.currency||'EGP');const amounts=plan.amountsMinor||{};const priceLines=document.createElement('div');priceLines.className='admin-plan-prices';
     for(const [key,label] of [['setup','التأسيس'],['monthly','شهريًا'],['annual','سنويًا']]){
-     const amount=Number(amounts[key]);if(!Number.isFinite(amount)||!currency)continue;
-     let formatted='غير محدد';
-     try{const digits=new Intl.NumberFormat('en',{style:'currency',currency}).resolvedOptions().maximumFractionDigits;formatted=new Intl.NumberFormat('ar-EG',{style:'currency',currency,maximumFractionDigits:digits}).format(amount/(10**digits));}catch{}
+     const amount=Number(amounts[key]);if(!Number.isFinite(amount))continue;
+     let formatted=new Intl.NumberFormat('ar-EG',{style:'currency',currency:plan.currency||'EGP',maximumFractionDigits:digits}).format(amount/(10**digits));
      const line=document.createElement('span');line.textContent=label+': '+formatted;priceLines.append(line);
     }
     item.append(priceLines);
-    if(Array.isArray(plan.features)&&plan.features.length){const features=document.createElement('p');features.className='admin-feature-list';features.textContent=plan.features.filter(value=>typeof value==='string').join(' · ');item.append(features);}
-    card.append(item);
+    if(Array.isArray(plan.features)&&plan.features.length){const features=document.createElement('p');features.className='admin-feature-list';features.textContent=plan.features.join(' · ');item.append(features);}
+    const edit=document.createElement('button');edit.type='button';edit.className='btn secondary';edit.textContent='تعديل الباقة';edit.addEventListener('click',()=>openPlanForm({...plan,categoryId:category.id},category.id));item.append(edit);card.append(item);
    }
    root.append(card);
   }
- }catch{root.replaceChildren();const p=document.createElement('p');p.textContent='تعذر الاتصال بخدمة الكتالوج. لم يتم تعديل أي بيانات.';root.append(p);}
+ }catch{root.replaceChildren();const p=document.createElement('p');p.textContent='تعذر الاتصال بخدمة الكتالوج. لم يتم تأكيد أي تعديل.';root.append(p);}
 }
+const planForm=document.getElementById('adminPlanForm');
+const planMessage=document.getElementById('adminPlanMessage');
+const addPlanButton=document.getElementById('adminAddPlan');
+if(addPlanButton)addPlanButton.addEventListener('click',()=>openPlanForm());
+const cancelPlanButton=document.getElementById('adminCancelPlan');
+if(cancelPlanButton)cancelPlanButton.addEventListener('click',()=>{if(planForm)planForm.hidden=true;});
+if(planForm)planForm.addEventListener('submit',async event=>{
+ event.preventDefault();
+ const form=event.currentTarget;const value=name=>String(form.elements.namedItem(name)?.value||'').trim();
+ const currency=value('currency');const digits=currencyDigits(currency);const toMinor=name=>Math.round(Number(value(name))*10**digits);
+ const plan={
+  category_id:value('category_id'),slug:value('slug'),name_ar:value('name_ar'),name_en:value('name_en'),
+  description_ar:value('description_ar'),description_en:value('description_en'),currency,
+  setup_amount_minor:toMinor('setup_amount'),monthly_amount_minor:toMinor('monthly_amount'),annual_amount_minor:toMinor('annual_amount'),
+  features:value('features').split('\n').map(v=>v.trim()).filter(Boolean),active:form.elements.namedItem('active').checked,
+  sort_order:Number(value('sort_order'))
+ };
+ const id=value('id');if(id)plan.id=id;
+ const submit=form.querySelector('button[type="submit"]');if(submit)submit.disabled=true;
+ if(planMessage)planMessage.textContent='جارٍ حفظ الباقة…';
+ try{
+  const response=await fetch('/api/admin/catalog/plans',{method:'PUT',credentials:'same-origin',headers:{'content-type':'application/json','accept':'application/json','x-csrf-token':csrfToken},body:JSON.stringify({plan})});
+  const result=await response.json().catch(()=>({}));
+  if(!response.ok||!result.ok){if(planMessage)planMessage.textContent=response.status===403?'الحساب لا يملك صلاحية إدارة الباقات.':'تعذر حفظ الباقة؛ لم يتم تأكيد التغيير.';return;}
+  if(planMessage)planMessage.textContent='تم حفظ الباقة بنجاح.';
+  await loadCatalog();form.hidden=true;
+ }catch{if(planMessage)planMessage.textContent='تعذر الاتصال بخدمة الحفظ.';}
+ finally{if(submit)submit.disabled=false;}
+});
+
 async function loadLeads(){
  const root=document.getElementById('adminLeadsList');if(!root)return;
  root.replaceChildren();const pending=document.createElement('p');pending.textContent='جارٍ تحميل الطلبات…';root.append(pending);
