@@ -36,3 +36,42 @@ html[dir="ltr"] body{font-family:Manrope,"IBM Plex Sans Arabic",sans-serif}html[
 .hero-visual .chip-top{top:0!important;left:48%!important;right:auto!important}
 .hero-visual .chip-side{top:52%!important;right:0!important}
 @media(max-width:760px){.site-header .brand-mark{width:44px!important;height:44px!important;flex-basis:44px!important}.hero-visual{height:350px!important}.hero-visual .core-card{top:10px!important;left:4%!important}.hero-visual .orbit-outer{width:300px;height:220px}.hero-visual .chip-top{left:auto!important;right:0!important}}
+
+
+/* ATSH AI cinematic brand system — shared across all public pages. */
+:root{--bg:#080b12;--panel:#101725;--panel2:#151e2e;--gold:#24c8c0;--teal:#52e2d7;--line:rgba(183,204,228,.19)}
+body:before{opacity:.035;background-image:linear-gradient(rgba(255,255,255,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.04) 1px,transparent 1px),url('/images/atsh-hero.jpg');background-size:64px 64px,64px 64px,cover;background-position:center,center,center 12%;background-attachment:fixed}
+.site-header{background:rgba(7,10,17,.88);border-bottom-color:rgba(183,204,228,.18)}
+.site-header .header-inner{gap:24px}
+.site-header .brand{direction:rtl!important;gap:12px!important;display:inline-flex!important;align-items:center;flex-shrink:0}
+.site-header .brand-mark{width:48px!important;height:48px!important;flex:0 0 48px!important;background-image:url('/images/atsh-emblem.jpg')!important;background-repeat:no-repeat!important;background-position:center!important;background-size:cover!important;border:1px solid rgba(220,230,240,.5)!important;border-radius:50%!important;box-shadow:0 0 22px rgba(36,200,192,.16)!important}
+.site-header .brand-mark span{display:none!important}
+.site-header .brand-word{display:inline-block!important;font:800 21px Manrope,sans-serif!important;letter-spacing:-.8px!important;color:#f5f7fb!important;direction:ltr!important;white-space:nowrap}
+.site-header .brand-word span{font-size:0!important;color:var(--gold)!important;margin-inline-start:5px}
+.site-header .brand-word span:after{content:'ai';font-size:21px;letter-spacing:-.8px}
+.hero{min-height:650px;padding:0 0 24px;background:linear-gradient(270deg,rgba(8,11,18,.99) 0%,rgba(8,11,18,.94) 27%,rgba(8,11,18,.72) 46%,rgba(8,11,18,.12) 78%,rgba(8,11,18,.08) 100%),url('/images/atsh-hero.jpg') left center/cover no-repeat;border-bottom:1px solid var(--line)}
+.hero-grid{grid-template-columns:minmax(0,1fr);min-height:550px;align-items:center;gap:0}
+.hero-copy{max-width:620px;margin-inline-start:0;margin-inline-end:0;justify-self:end;padding:50px 0 30px}
+.hero-copy h1{font-size:clamp(44px,5.3vw,72px);line-height:1.2;letter-spacing:-1.5px;text-wrap:balance}
+.hero-description{color:#c6cfdd;max-width:580px}
+.hero-visual{display:none!important}
+.hero-note{margin-top:35px}
+.hero-bottom{position:relative;z-index:2;color:#c0c8d6}
+.button{border-radius:999px;min-height:50px;padding-inline:23px}
+.button-primary{background:var(--gold);color:#061014}
+.button-primary:hover{background:#52e2d7}
+.button-quiet{border-radius:999px;border-color:rgba(198,214,235,.35);background:rgba(5,8,14,.38)}
+.inner-hero{background:linear-gradient(270deg,rgba(8,11,18,.97),rgba(8,11,18,.82)),url('/images/atsh-hero.jpg') center 42%/cover no-repeat}
+@media(max-width:760px){
+ .site-header .header-inner{height:72px;gap:12px}
+ .site-header .brand{gap:8px!important}
+ .site-header .brand-mark{width:40px!important;height:40px!important;flex-basis:40px!important}
+ .site-header .brand-word,.site-header .brand-word span:after{font-size:18px!important}
+ .hero{min-height:620px;background-image:linear-gradient(270deg,rgba(8,11,18,.95),rgba(8,11,18,.80)),url('/images/atsh-hero.jpg');background-position:center,30% center}
+ .hero-grid{min-height:530px}
+ .hero-copy{max-width:100%;padding:65px 0 20px}
+ .hero-copy h1{font-size:clamp(40px,10vw,58px);letter-spacing:-1px}
+ .hero-description{font-size:14px}
+ .hero-note{margin-top:28px}
+}
+@media(max-width:390px){.site-header .brand-word{font-size:16px!important}.site-header .brand-mark{width:36px!important;height:36px!important;flex-basis:36px!important}.hero-copy h1{font-size:38px}}
