@@ -41,8 +41,14 @@ function makeReference(now = new Date()) {
   return 'ATSH-' + date + '-' + crypto.randomBytes(4).toString('hex').toUpperCase();
 }
 
-async function createProjectInquiry(config, input) {
+async function createProjectInquiry(config, input, idempotencyKey, ipHash) {
   const inquiry = validateInquiry(input);
+  if (typeof idempotencyKey !== 'string' || !/^[A-Za-z0-9._~-]{20,120}$/.test(idempotencyKey)) {
+    const error = new Error('A valid Idempotency-Key header is required');
+    error.code = 'VALIDATION_ERROR';
+    throw error;
+  }
+  const payloadHash = crypto.createHash('sha256').update(JSON.stringify(inquiry)).digest('hex');
   const pool = getPool(config);
   const client = await pool.connect();
   try {
@@ -54,6 +60,25 @@ async function createProjectInquiry(config, input) {
       throw error;
     }
     const organizationId = org.rows[0].id;
+    const reservation = await client.query(
+      'INSERT INTO public_request_idempotency (organization_id,request_key,payload_hash) VALUES ($1,$2,$3) ON CONFLICT (organization_id,request_key) DO NOTHING RETURNING request_key',
+      [organizationId,idempotencyKey,payloadHash]
+    );
+    if (!reservation.rowCount) {
+      const existing = await client.query('SELECT payload_hash,lead_id FROM public_request_idempotency WHERE organization_id=$1 AND request_key=$2 FOR UPDATE', [organizationId,idempotencyKey]);
+      if (!existing.rowCount || existing.rows[0].payload_hash !== payloadHash) {
+        const error = new Error('This idempotency key was already used for different request data');
+        error.code = 'IDEMPOTENCY_CONFLICT';
+        throw error;
+      }
+      if (existing.rows[0].lead_id) {
+        const previous = await client.query('SELECT reference FROM leads WHERE organization_id=$1 AND id=$2', [organizationId,existing.rows[0].lead_id]);
+        if (previous.rowCount) {
+          await client.query('COMMIT');
+          return { reference:previous.rows[0].reference, duplicate:true };
+        }
+      }
+    }
     let customer = await client.query(
       'SELECT id FROM customers WHERE organization_id = $1 AND lower(email) = $2 ORDER BY created_at ASC LIMIT 1 FOR UPDATE',
       [organizationId, inquiry.email]
@@ -68,9 +93,9 @@ async function createProjectInquiry(config, input) {
       );
       customerId = inserted.rows[0]?.id;
       if (!customerId) {
-        const existing = await client.query('SELECT id FROM customers WHERE organization_id = $1 AND lower(email) = $2 LIMIT 1', [organizationId, inquiry.email]);
-        if (!existing.rowCount) throw new Error('Could not resolve customer record after insert');
-        customerId = existing.rows[0].id;
+        const existingCustomer = await client.query('SELECT id FROM customers WHERE organization_id = $1 AND lower(email) = $2 LIMIT 1', [organizationId, inquiry.email]);
+        if (!existingCustomer.rowCount) throw new Error('Could not resolve customer record after insert');
+        customerId = existingCustomer.rows[0].id;
       }
     }
     const reference = makeReference();
@@ -83,12 +108,17 @@ async function createProjectInquiry(config, input) {
       hosting: inquiry.hosting,
       schema_version: 1
     };
-    await client.query(
-      "INSERT INTO leads (organization_id, customer_id, reference, status, source, project_goal, solution_type, brief, consent_at) VALUES ($1,$2,$3,'new','website',$4,$5,$6::jsonb,NOW())",
+    const lead = await client.query(
+      "INSERT INTO leads (organization_id, customer_id, reference, status, source, project_goal, solution_type, brief, consent_at) VALUES ($1,$2,$3,'new','website',$4,$5,$6::jsonb,NOW()) RETURNING id,reference",
       [organizationId, customerId, reference, inquiry.brief.slice(0, 240), inquiry.serviceType, JSON.stringify(brief)]
     );
+    await client.query('UPDATE public_request_idempotency SET lead_id=$3 WHERE organization_id=$1 AND request_key=$2', [organizationId,idempotencyKey,lead.rows[0].id]);
+    await client.query(
+      'INSERT INTO audit_logs (organization_id,actor_user_id,action,entity_type,entity_id,details,ip_hash) VALUES ($1,NULL,$2,$3,$4,$5::jsonb,$6)',
+      [organizationId,'lead.created','lead',String(lead.rows[0].id),JSON.stringify({reference,source:'website',solution_type:inquiry.serviceType}),ipHash||null]
+    );
     await client.query('COMMIT');
-    return { reference };
+    return { reference:lead.rows[0].reference, duplicate:false };
   } catch (error) {
     try { await client.query('ROLLBACK'); } catch {}
     throw error;
@@ -96,7 +126,6 @@ async function createProjectInquiry(config, input) {
     client.release();
   }
 }
-
 async function getPublicCatalog(config) {
   const pool = getPool(config);
   const org = await pool.query("SELECT id FROM organizations WHERE slug = $1 AND status = 'active' LIMIT 1", [config.organizationSlug]);
