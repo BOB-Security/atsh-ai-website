@@ -9,7 +9,7 @@
 - Health and readiness endpoints; protected, read-only PostgreSQL schema diagnostics.
 - Organization-scoped read-only public catalog API for active service categories and active plans, with schema compatibility checks and database-sourced prices only.
 - Public services and pricing pages now render active database-backed catalog entries when available, while keeping honest static fallback content when the catalog is not configured.
-- Automated smoke tests for health, database failure, schema access control, intake guard, consent validation, successful persistence response, and failure behavior.
+- Automated smoke tests for health, database failure, schema access control, intake guard, consent validation, successful persistence response, failure behavior, and database catalog tenant/schema gates.
 - Manual staging deployment workflow packages only `greenfield/`, requires a staging database secret, and runs no migrations or bootstrap steps.
 - Database compatibility and release gates documented in [DATABASE_COMPATIBILITY_AND_RELEASE_PLAN.md](docs/DATABASE_COMPATIBILITY_AND_RELEASE_PLAN.md).
 
