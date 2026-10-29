@@ -59,6 +59,78 @@ function createApp(overrides = {}) {
       return res.status(503).json({ error: 'schema_inspection_unavailable' });
     }
   });
+  app.get('/api/admin/password-recovery/status', (req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    return res.json({ ok: true, configured: Boolean(config.passwordRecoveryConfigured) });
+  });
+  app.post('/api/admin/password-recovery/request', rateLimit({ windowMs: 900000, limit: 5, standardHeaders: 'draft-8', legacyHeaders: false }), async (req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+    if (!email || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ ok: false, error: 'invalid_email', message: 'أدخل بريدًا إلكترونيًا صحيحًا.' });
+    }
+    if (!config.passwordRecoveryConfigured) {
+      return res.status(503).json({ ok: false, error: 'recovery_not_configured', message: 'استرجاع الحساب غير مفعّل بعد. يلزم إعداد خدمة البريد أولًا؛ يمكنك التواصل مع مسؤول النظام.' });
+    }
+    try {
+      const token = crypto.randomBytes(32).toString('base64url');
+      const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+      const ipHash = crypto.createHash('sha256').update(String(req.ip || req.socket?.remoteAddress || '')).digest('hex');
+      const user = await database.createAdminPasswordReset(email, tokenHash, { ipHash });
+      if (user) {
+        const base = config.publicBaseUrl.replace(/\/+$/, '');
+        const resetUrl = base + '/admin.html#reset=' + encodeURIComponent(token);
+        const safeName = String(user.full_name || 'فريق ATSH AI').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+        const mail = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: { authorization: 'Bearer ' + config.resendApiKey, 'content-type': 'application/json' },
+          body: JSON.stringify({
+            from: config.recoveryFromEmail,
+            to: [user.email],
+            subject: 'استرجاع حساب إدارة ATSH AI',
+            html: '<div dir="rtl" style="font-family:Arial,sans-serif;line-height:1.9;color:#17152d"><h2>استرجاع حساب الإدارة</h2><p>مرحبًا ' + safeName + '،</p><p>وصل طلب لإعادة تعيين كلمة مرور حسابك في ATSH AI. الرابط صالح لمدة 30 دقيقة ويُستخدم مرة واحدة.</p><p><a href="' + resetUrl + '" style="display:inline-block;padding:12px 20px;background:#8c7aff;color:#fff;border-radius:8px;text-decoration:none">تعيين كلمة مرور جديدة</a></p><p>إذا لم تطلب ذلك، تجاهل الرسالة. لن تتغير كلمة مرورك دون فتح الرابط وإكمال الخطوات.</p></div>'
+          })
+        });
+        if (!mail.ok) {
+          console.error('Admin recovery email delivery failed:', 'MAIL_PROVIDER_' + mail.status);
+        }
+      }
+      return res.json({ ok: true, message: 'إذا كان البريد مرتبطًا بحساب إدارة نشط، فستصلك رسالة بخطوات الاسترجاع. افحص البريد غير المرغوب فيه أيضًا.' });
+    } catch (error) {
+      console.error('Admin password recovery request failed:', error.code || 'unknown');
+      if (error.code === 'ADMIN_RECOVERY_SCHEMA_MISMATCH') {
+        return res.status(503).json({ ok: false, error: 'recovery_not_ready', message: 'ميزة الاسترجاع تحتاج إلى تهيئة قاعدة البيانات أولًا. لم يتم تغيير كلمة المرور.' });
+      }
+      return res.status(503).json({ ok: false, error: 'recovery_unavailable', message: 'تعذر بدء الاسترجاع الآن. لم يتم تغيير كلمة المرور؛ أعد المحاولة لاحقًا.' });
+    }
+  });
+  app.post('/api/admin/password-recovery/complete', rateLimit({ windowMs: 900000, limit: 10, standardHeaders: 'draft-8', legacyHeaders: false }), async (req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    const token = typeof req.body?.token === 'string' ? req.body.token : '';
+    const password = typeof req.body?.password === 'string' ? req.body.password : '';
+    if (!token || token.length > 256 || !password || password.length < 12 || password.length > 128) {
+      return res.status(400).json({ ok: false, error: 'invalid_reset_request', message: 'الرابط أو كلمة المرور غير صالحين. استخدم كلمة مرور من 12 حرفًا على الأقل.' });
+    }
+    if (!config.passwordRecoveryConfigured) {
+      return res.status(503).json({ ok: false, error: 'recovery_not_configured', message: 'استرجاع الحساب غير مفعّل حاليًا. لم يتم تغيير كلمة المرور.' });
+    }
+    try {
+      const salt = crypto.randomBytes(16).toString('hex');
+      const hash = await new Promise((resolve, reject) => crypto.scrypt(password, salt, 64, (error, key) => error ? reject(error) : resolve(key.toString('hex'))));
+      const passwordHash = 'scrypt' + String.fromCharCode(36) + salt + String.fromCharCode(36) + hash;
+      const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+      const ipHash = crypto.createHash('sha256').update(String(req.ip || req.socket?.remoteAddress || '')).digest('hex');
+      const changed = await database.completeAdminPasswordReset(tokenHash, passwordHash, { ipHash });
+      if (!changed) return res.status(400).json({ ok: false, error: 'invalid_or_expired_reset', message: 'الرابط غير صالح أو انتهت صلاحيته أو استُخدم من قبل. اطلب رابطًا جديدًا.' });
+      return res.json({ ok: true, message: 'تم تغيير كلمة المرور وإلغاء الجلسات السابقة. يمكنك الآن تسجيل الدخول بكلمة المرور الجديدة.' });
+    } catch (error) {
+      console.error('Admin password recovery completion failed:', error.code || 'unknown');
+      if (error.code === 'ADMIN_RECOVERY_SCHEMA_MISMATCH') {
+        return res.status(503).json({ ok: false, error: 'recovery_not_ready', message: 'ميزة الاسترجاع تحتاج إلى تهيئة قاعدة البيانات أولًا. لم يتم تغيير كلمة المرور.' });
+      }
+      return res.status(503).json({ ok: false, error: 'recovery_unavailable', message: 'تعذر إكمال الاسترجاع الآن. لم يتم تأكيد تغيير كلمة المرور.' });
+    }
+  });
   app.post('/api/admin/login', rateLimit({ windowMs: 900000, limit: 8, standardHeaders: 'draft-8', legacyHeaders: false }), async (req, res) => {
     const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
     const password = typeof req.body?.password === 'string' ? req.body.password : '';
