@@ -79,7 +79,7 @@ test('admin login uses rate-limited credentials and creates an HttpOnly session'
  const accepted=await fetch(base+'/api/admin/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:'owner@example.com',password:'correct horse battery staple'})});
  assert.equal(accepted.status,200);const result=await accepted.json();assert.equal(result.ok,true);assert.deepEqual(result.user.permissions,['dashboard.read','catalog.read']);assert.ok(created);
  const cookies=accepted.headers.getSetCookie().map(value=>value.split(';')[0]).join('; ');
- assert.match(accepted.headers.getSetCookie().find(value=>value.startsWith('atsh_admin_session='),)/HttpOnly/);
+ const sessionCookie=accepted.headers.getSetCookie().find(value=>value.startsWith('atsh_admin_session='));assert.match(sessionCookie,/HttpOnly/);
  const me=await fetch(base+'/api/admin/me',{headers:{cookie:cookies}});
  assert.equal(me.status,200);assert.equal((await me.json()).user.email,'owner@example.com');
 });
