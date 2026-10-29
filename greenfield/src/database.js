@@ -462,6 +462,12 @@ function createDatabase(config, dependencies = {}) {
     finally{client.release();}
   }
 
+  async function checkAdminPasswordRecoveryReady() {
+    try {
+      const result = await getPool().query("SELECT to_regclass('public.admin_password_resets') IS NOT NULL AS ready");
+      return result.rows[0]?.ready === true;
+    } catch { return false; }
+  }
   async function createAdminPasswordReset(email, tokenHash, metadata = {}) {
     const client = await getPool().connect();
     try {
@@ -537,6 +543,6 @@ function createDatabase(config, dependencies = {}) {
     finally { client.release(); }
   }
   async function close() { if (pool) { const current = pool; pool = undefined; await current.end(); } }
-  return { checkConnection, inspectSchema, createInquiry, listPublicCatalog, findAdminUser, createAdminSession, getAdminSession, deleteAdminSession, getAdminOverview, listAdminCatalog, saveAdminPlan, listAdminLeads, listAdminMembers, createAdminMember, createAdminPasswordReset, completeAdminPasswordReset, getSiteSettings, saveSiteSettings, close };
+  return { checkConnection, inspectSchema, createInquiry, listPublicCatalog, findAdminUser, createAdminSession, getAdminSession, deleteAdminSession, getAdminOverview, listAdminCatalog, saveAdminPlan, listAdminLeads, listAdminMembers, createAdminMember, checkAdminPasswordRecoveryReady, createAdminPasswordReset, completeAdminPasswordReset, getSiteSettings, saveSiteSettings, close };
 }
 module.exports = { createDatabase };
