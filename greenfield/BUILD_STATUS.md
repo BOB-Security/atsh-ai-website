@@ -7,6 +7,7 @@
 - Privacy consent requirement and a public inquiry submission UI that displays a reference only after a successful server response.
 - Guarded inquiry persistence: server-side validation, organization-scoped customer/lead writes in one transaction, consent timestamp, schema-column gate, and no false success on database failure.
 - Health and readiness endpoints; protected, read-only PostgreSQL schema diagnostics.
+- Organization-scoped read-only public catalog API for active service categories and active plans, with schema compatibility checks and database-sourced prices only.
 - Automated smoke tests for health, database failure, schema access control, intake guard, consent validation, successful persistence response, and failure behavior.
 - Manual staging deployment workflow packages only `greenfield/`, requires a staging database secret, and runs no migrations or bootstrap steps.
 - Database compatibility and release gates documented in [DATABASE_COMPATIBILITY_AND_RELEASE_PLAN.md](docs/DATABASE_COMPATIBILITY_AND_RELEASE_PLAN.md).
