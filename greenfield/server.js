@@ -22,7 +22,7 @@ function createApp(overrides = {}) {
       defaultSrc: ["'self'"], baseUri: ["'self'"], objectSrc: ["'none'"],
       frameAncestors: ["'none'"], formAction: ["'self'"], imgSrc: ["'self'", 'data:', 'https:'],
       styleSrc: ["'self'", 'https://fonts.googleapis.com'], fontSrc: ["'self'", 'https://fonts.gstatic.com'],
-      scriptSrc: ["'self'"], connectSrc: ["'self''],
+      scriptSrc: ["'self'"], connectSrc: ["'self'"],
       upgradeInsecureRequests: config.nodeEnv === 'production' ? [] : null
     } },
     crossOriginEmbedderPolicy: false,
