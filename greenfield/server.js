@@ -283,6 +283,21 @@ function createApp(overrides = {}) {
       return res.status(503).json({ error: 'admin_catalog_unavailable' });
     }
   });
+  app.put('/api/admin/catalog/plans', async (req,res) => {
+    try {
+      const auth=await getCurrentAdmin(req);
+      if(!auth)return res.status(401).json({error:'authentication_required'});
+      if(!auth.permissions.includes('*')&&!auth.permissions.includes('catalog.manage'))return res.status(403).json({error:'permission_denied'});
+      const p=req.body?.plan;
+      if(!p||typeof p!=='object'||Array.isArray(p))return res.status(400).json({error:'invalid_plan'});
+      for(const k of ['category_id','slug','name_ar','name_en','description_ar','description_en','currency'])if(typeof p[k]!=='string'||p[k].length>1200)return res.status(400).json({error:'invalid_plan'});
+      if(!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(p.slug)||!/^[A-Z]{3}$/.test(p.currency))return res.status(400).json({error:'invalid_plan'});
+      for(const k of ['setup_amount_minor','monthly_amount_minor','annual_amount_minor'])if(!Number.isSafeInteger(p[k])||p[k]<0)return res.status(400).json({error:'invalid_plan'});
+      if(!Array.isArray(p.features)||p.features.length>30||p.features.some(v=>typeof v!=='string'||v.length>240)||typeof p.active!=='boolean'||!Number.isInteger(p.sort_order)||p.sort_order<0)return res.status(400).json({error:'invalid_plan'});
+      const saved=await database.saveAdminPlan(auth.user.organization_id,auth.user.id,p);
+      return res.json({ok:true,id:saved.id});
+    }catch(error){console.error('Admin catalog save failed:',error.code||'unknown');return res.status(503).json({error:'admin_catalog_save_failed'});}
+  });
   app.get('/api/public/catalog', async (_req, res) => {
     try {
       const categories = await database.listPublicCatalog();
