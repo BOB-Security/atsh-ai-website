@@ -348,7 +348,43 @@ function createDatabase(config, dependencies = {}) {
     } finally { client.release(); }
   }
 
+
+  async function listAdminLeads(organizationId, limit = 50) {
+    if (!organizationId) { const error = new Error('Organization is missing.'); error.code = 'ADMIN_NOT_CONFIGURED'; throw error; }
+    const client = await getPool().connect();
+    try {
+      const schema = await client.query(
+        "SELECT table_name,column_name FROM information_schema.columns WHERE table_schema='public' AND table_name IN ('leads','customers')"
+      );
+      const found = new Map();
+      for (const row of schema.rows) {
+        if (!found.has(row.table_name)) found.set(row.table_name, new Set());
+        found.get(row.table_name).add(row.column_name);
+      }
+      const required = {
+        leads: ['id','organization_id','customer_id','reference','status','source','project_goal','solution_type','created_at'],
+        customers: ['id','organization_id','display_name','email','phone']
+      };
+      for (const [table, columns] of Object.entries(required)) {
+        if (!found.has(table) || columns.some(column => !found.get(table).has(column))) {
+          const error = new Error('Admin leads schema has not been verified.'); error.code = 'ADMIN_LEADS_SCHEMA_MISMATCH'; throw error;
+        }
+      }
+      const result = await client.query(
+        `SELECT l.id,l.reference,l.status,l.source,l.project_goal,l.solution_type,l.created_at,
+                c.display_name AS customer_name,c.email AS customer_email,c.phone AS customer_phone
+           FROM leads l
+           LEFT JOIN customers c ON c.id=l.customer_id AND c.organization_id=l.organization_id
+          WHERE l.organization_id=$1
+          ORDER BY l.created_at DESC
+          LIMIT $2`,
+        [organizationId, Math.max(1, Math.min(100, Number.isInteger(limit) ? limit : 50))]
+      );
+      return result.rows;
+    } finally { client.release(); }
+  }
+
   async function close() { if (pool) { const current = pool; pool = undefined; await current.end(); } }
-  return { checkConnection, inspectSchema, createInquiry, listPublicCatalog, findAdminUser, createAdminSession, getAdminSession, deleteAdminSession, getAdminOverview, listAdminCatalog, close };
+  return { checkConnection, inspectSchema, createInquiry, listPublicCatalog, findAdminUser, createAdminSession, getAdminSession, deleteAdminSession, getAdminOverview, listAdminCatalog, listAdminLeads, close };
 }
 module.exports = { createDatabase };
