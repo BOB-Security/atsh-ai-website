@@ -55,15 +55,17 @@ app.get('/api/public/catalog', async (_req, res) => {
     res.status(503).json({ error: error && error.code === 'ORGANIZATION_NOT_CONFIGURED' ? 'organization_not_configured' : 'catalog_unavailable', message: 'كتالوج الخدمات غير متاح مؤقتًا.' });
   }
 });
-app.post('/api/public/project-inquiries', async (req, res) => {
+app.post('/api/public/project-inquiries', sameOrigin, async (req, res) => {
   let inquiry;
   try { inquiry = validateInquiry(req.body); }
   catch (error) { return res.status(400).json({ error: 'invalid_request', message: error.message }); }
   try {
-    const result = await createProjectInquiry(config, inquiry);
+    const result = await createProjectInquiry(config, inquiry, req.get('idempotency-key'), requestIpHash(req));
     return res.status(201).json({ ok: true, reference: result.reference });
   } catch (error) {
     console.error('Project inquiry was not saved', { code: error && error.code || 'unknown', name: error && error.name || 'Error' });
+    if (error && error.code === 'IDEMPOTENCY_CONFLICT') return res.status(409).json({ error: 'idempotency_conflict', message: 'تغيرت بيانات الطلب. أعد الإرسال بمفتاح طلب جديد.' });
+    if (error && error.code === 'VALIDATION_ERROR') return res.status(400).json({ error: 'invalid_request', message: error.message });
     return res.status(503).json({
       error: error && error.code === 'ORGANIZATION_NOT_CONFIGURED' ? 'organization_not_configured' : 'intake_unavailable',
       message: 'تعذر حفظ الطلب حاليًا؛ لم يتم تأكيد الحفظ. حاول مرة أخرى لاحقًا.'
