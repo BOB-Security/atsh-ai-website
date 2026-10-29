@@ -1,4 +1,5 @@
 'use strict';
+// One-time metadata-only compatibility discovery; application rows are never selected.
 const { Pool } = require('pg');
 async function main() {
   if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is required');
