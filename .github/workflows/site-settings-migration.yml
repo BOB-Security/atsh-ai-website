@@ -1,0 +1,46 @@
+name: ATSH AI apply site settings migration
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_production_migration:
+        description: Confirm that this applies the additive site_settings table to the configured production database
+        required: true
+        type: choice
+        options:
+          - 'no'
+          - 'yes'
+        default: 'no'
+permissions:
+  contents: read
+concurrency:
+  group: atsh-ai-site-settings-migration
+  cancel-in-progress: false
+jobs:
+  migrate:
+    if: inputs.confirm_production_migration == 'yes'
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      PGSSLMODE: require
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Validate database configuration and prerequisites
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${DATABASE_URL:-}" ]; then
+            echo "::error::DATABASE_URL secret is missing; no changes made."
+            exit 1
+          fi
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -X -c "SELECT 1"
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -X -c "DO \$\$ BEGIN IF to_regclass('public.organizations') IS NULL THEN RAISE EXCEPTION 'Required table public.organizations is missing'; END IF; IF to_regclass('public.users') IS NULL THEN RAISE EXCEPTION 'Required table public.users is missing'; END IF; IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='organizations' AND column_name='id' AND data_type='uuid') THEN RAISE EXCEPTION 'organizations.id must exist and be uuid'; END IF; IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='users' AND column_name='id' AND data_type='uuid') THEN RAISE EXCEPTION 'users.id must exist and be uuid'; END IF; END \$\$;"
+      - name: Apply additive, idempotent migration
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -X -f greenfield/migrations/001_site_settings.sql
+      - name: Verify table and constraints
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -X -c "DO \$\$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='site_settings' AND column_name='organization_id') OR NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='site_settings' AND column_name='settings' AND data_type='jsonb') OR NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='site_settings' AND column_name='updated_by') OR NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='site_settings' AND column_name='updated_at') THEN RAISE EXCEPTION 'site_settings schema verification failed'; END IF; END \$\$;"
+          echo "site_settings migration applied and verified."
