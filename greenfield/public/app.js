@@ -118,3 +118,40 @@ if(pricingRoot){
   })
   .catch(()=>{});
 }
+
+const serviceCatalogRoot=document.getElementById('liveServiceCatalog');
+if(serviceCatalogRoot){
+ const staticCatalog=document.getElementById('staticServiceCatalog');
+ const escapeService=value=>String(value==null?'':value).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+ const serviceAmount=(minor,currency)=>{
+  const amount=Number(minor);
+  if(!Number.isFinite(amount)||amount<=0||!/^[A-Z]{3}$/.test(currency||''))return '';
+  try{
+   const digits=new Intl.NumberFormat('en',{style:'currency',currency}).resolvedOptions().maximumFractionDigits;
+   return new Intl.NumberFormat('ar-EG',{style:'currency',currency,maximumFractionDigits:digits}).format(amount/(10**digits));
+  }catch{return '';}
+ };
+ fetch('/api/public/catalog',{headers:{accept:'application/json'},credentials:'same-origin'})
+  .then(response=>{if(!response.ok)throw new Error('catalog unavailable');return response.json();})
+  .then(result=>{
+   if(result.ok!==true||!Array.isArray(result.categories)||!result.categories.length)return;
+   const categories=result.categories.filter(category=>category&&category.id);
+   if(!categories.length)return;
+   serviceCatalogRoot.innerHTML='<div class="service-catalog">'+categories.map(category=>{
+    const plans=Array.isArray(category.plans)?category.plans:[];
+    const planMarkup=plans.map(plan=>{
+     const currency=plan.currency||'';
+     const amounts=plan.amountsMinor||{};
+     const priceParts=[['التأسيس',amounts.setup],['شهريًا',amounts.monthly],['سنويًا',amounts.annual]].map(([label,value])=>{
+      const formatted=serviceAmount(value,currency);
+      return formatted?'<div class="live-price-line"><span>'+label+'</span><strong>'+escapeService(formatted)+'</strong></div>':'';
+     }).join('');
+     const features=Array.isArray(plan.features)?plan.features.filter(value=>typeof value==='string'&&value.trim()).map(value=>'<li>'+escapeService(value)+'</li>').join(''):'';
+     return '<div class="service-live-plan"><h3>'+escapeService(plan.name?.ar||'')+'</h3>'+(plan.description?.ar?'<p>'+escapeService(plan.description.ar)+'</p>':'')+'<div class="live-price-lines">'+(priceParts||'<div class="live-price-pending">السعر قيد التحديد بعد مراجعة النطاق.</div>')+'</div>'+(features?'<ul>'+features+'</ul>':'')+'</div>';
+    }).join('');
+    return '<article><small>'+escapeService(category.slug||'SERVICE')+'</small><h2>'+escapeService(category.name?.ar||'خدمات')+'</h2>'+(category.description?.ar?'<p>'+escapeService(category.description.ar)+'</p>':'')+(planMarkup||'<p>تواصل معنا لتحديد النطاق المناسب لهذه الخدمة.</p>')+'<a class="text-link" href="/#contact">ناقش احتياجك ←</a></article>';
+   }).join('')+'</div>';
+   if(staticCatalog)staticCatalog.hidden=true;
+  })
+  .catch(()=>{});
+}
