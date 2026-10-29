@@ -17,6 +17,7 @@ test('PostgreSQL customer portal queries isolate two customers across projects, 
     const customerB = (await db.query("INSERT INTO customers(organization_id,display_name,email) VALUES($1,$2,$3) RETURNING id", [org, 'Customer B', 'b-' + suffix + '@test.local'])).rows[0].id;
     const customerC = (await db.query("INSERT INTO customers(organization_id,display_name,email) VALUES($1,$2,$3) RETURNING id", [orgB, 'Customer C', 'c-' + suffix + '@test.local'])).rows[0].id;
     const projectC = (await db.query("INSERT INTO projects(organization_id,customer_id,reference,name) VALUES($1,$2,$3,$4) RETURNING id", [orgB, customerC, 'PR-C-' + suffix, 'Project C'])).rows[0].id;
+    const assetC = (await db.query("INSERT INTO hosting_assets(organization_id,customer_id,kind,provider,domain_name) VALUES($1,$2,'hosting','Tenant test provider','tenant-' || $3 || '.test.local') RETURNING id", [orgB, customerC, suffix])).rows[0].id;
     const projectA = (await db.query("INSERT INTO projects(organization_id,customer_id,reference,name) VALUES($1,$2,$3,$4) RETURNING id", [org, customerA, 'PR-A-' + suffix, 'Project A'])).rows[0].id;
     const projectB = (await db.query("INSERT INTO projects(organization_id,customer_id,reference,name) VALUES($1,$2,$3,$4) RETURNING id", [org, customerB, 'PR-B-' + suffix, 'Project B'])).rows[0].id;
     const quoteA = (await db.query("INSERT INTO quotes(organization_id,customer_id,reference,snapshot) VALUES($1,$2,$3,$4::jsonb) RETURNING id", [org, customerA, 'Q-A-' + suffix, JSON.stringify({ test: true })])).rows[0].id;
@@ -39,6 +40,16 @@ test('PostgreSQL customer portal queries isolate two customers across projects, 
     }
     await db.query('RELEASE SAVEPOINT invalid_change_request');
 
+    await db.query('SAVEPOINT invalid_backup_asset');
+    let invalidBackupAssetError = null;
+    try {
+      await db.query("INSERT INTO backup_runs(organization_id,hosting_asset_id,status,scope) VALUES($1,$2,'queued','{}'::jsonb)", [org, assetC]);
+    } catch (error) {
+      invalidBackupAssetError = error;
+      await db.query('ROLLBACK TO SAVEPOINT invalid_backup_asset');
+    }
+    await db.query('RELEASE SAVEPOINT invalid_backup_asset');
+
     const wrongOrganizationProject = await db.query('SELECT id FROM projects WHERE id=$1 AND organization_id=$2 AND customer_id=$3', [projectC, org, customerA]);
     const wrongProject = await db.query('SELECT id FROM projects WHERE id=$1 AND organization_id=$2 AND customer_id=$3', [projectB, org, customerA]);
     const wrongQuote = await db.query("UPDATE quotes SET status='accepted' WHERE id=$1 AND organization_id=$2 AND customer_id=$3 RETURNING id", [quoteB, org, customerA]);
@@ -49,6 +60,7 @@ test('PostgreSQL customer portal queries isolate two customers across projects, 
     assert.deepEqual(tickets.rows.map(x => x.id), [ticketA]);
     assert.deepEqual(messages.rows.map(x => x.body), ['customer A reply']);
     assert.equal(invalidChangeRequestError?.code, '23503', 'Database must reject change requests linked to another customer project');
+    assert.equal(invalidBackupAssetError?.code, '23503', 'Database must reject backup runs linked to another organization hosting asset');
     assert.equal(wrongOrganizationProject.rowCount, 0, 'Customer A must not read another organization project');
     assert.equal(wrongProject.rowCount, 0, 'Customer A must not read Customer B project');
     assert.equal(wrongQuote.rowCount, 0, 'Customer A must not mutate Customer B quote');
