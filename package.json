@@ -9,6 +9,6 @@
   "scripts": {
     "start": "node server.js",
     "build": "node --check server.js && node --check admin-core.js && node --check public/app.js && node --check public/admin/app.js && node --check public/site-cms.js && node --check public/staff/app.js && node scripts/check-site.js",
-    "test": "node --test"
+    "test": "node --test tests/server.test.js"
   }
 }
