@@ -198,7 +198,7 @@ function createDatabase(config, dependencies = {}) {
       found.get(row.table_name).add(row.column_name);
     }
     const required = {
-      users: ['id','organization_id','email','full_name','password_hash','status','last_login_at'],
+      users: ['id','organization_id','email','full_name','password_hash','status','last_login_at','updated_at'],
       organizations: ['id','status'],
       roles: ['id','organization_id','name','permissions'],
       user_roles: ['user_id','role_id'],
