@@ -64,10 +64,19 @@ function createDatabase(config) {
         customerId = existing.rows[0].id;
       } else {
         const createdCustomer = await client.query(
-          "INSERT INTO customers (organization_id, display_name, email, phone, preferred_locale, status, source) VALUES ($1,$2,$3,$4,'ar','lead','website') RETURNING id",
+          "INSERT INTO customers (organization_id, display_name, email, phone, preferred_locale, status, source) VALUES ($1,$2,$3,$4,'ar','lead','website') ON CONFLICT (organization_id, email) DO NOTHING RETURNING id",
           [config.publicOrganizationId, input.name, input.email, input.phone || null]
         );
-        customerId = createdCustomer.rows[0].id;
+        if (createdCustomer.rows[0]) {
+          customerId = createdCustomer.rows[0].id;
+        } else {
+          const raced = await client.query(
+            "SELECT id FROM customers WHERE organization_id = $1 AND lower(email) = lower($2) LIMIT 1",
+            [config.publicOrganizationId, input.email]
+          );
+          if (!raced.rows[0]) throw new Error('Customer could not be resolved after concurrent insert.');
+          customerId = raced.rows[0].id;
+        }
       }
 
       const reference = 'ATSH-' + new Date().toISOString().slice(0,10).replace(/-/g,'') + '-' + require('node:crypto').randomBytes(4).toString('hex').toUpperCase();
