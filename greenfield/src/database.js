@@ -6,12 +6,13 @@ const INQUIRY_COLUMNS = {
   leads: ['id','organization_id','customer_id','reference','status','source','project_goal','solution_type','brief','consent_at','created_at','updated_at']
 };
 
-function createDatabase(config) {
+function createDatabase(config, dependencies = {}) {
   let pool;
+  const poolFactory = dependencies.poolFactory || (options => new Pool(options));
   function getPool() {
     if (!config.databaseUrl) { const e = new Error('DATABASE_URL is not configured'); e.code = 'DATABASE_NOT_CONFIGURED'; throw e; }
     if (!pool) {
-      pool = new Pool({ connectionString: config.databaseUrl, max: 4, idleTimeoutMillis: 10000, connectionTimeoutMillis: 5000, application_name: 'atsh-ai-greenfield', ssl: config.pgSsl === 'disable' ? false : config.pgSsl === 'require' ? { rejectUnauthorized: true } : undefined });
+      pool = poolFactory({ connectionString: config.databaseUrl, max: 4, idleTimeoutMillis: 10000, connectionTimeoutMillis: 5000, application_name: 'atsh-ai-greenfield', ssl: config.pgSsl === 'disable' ? false : config.pgSsl === 'require' ? { rejectUnauthorized: true } : undefined });
       pool.on('error', error => console.error('PostgreSQL idle client error:', error.code || 'unknown'));
     }
     return pool;
