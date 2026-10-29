@@ -27,6 +27,18 @@ test('intake never claims an unsaved request succeeded',async t=>{const base=awa
 
 test('home exposes the eight-step project configurator and honest submission state',async t=>{const base=await withServer(t,config,{checkConnection:async()=>false,inspectSchema:async()=>[]});const html=await (await fetch(base+'/')).text();assert.match(html,/id="projectWizard"/);assert.match(html,/مهيئ المشروع/);assert.doesNotMatch(html,/<form[^>]*id="inquiryForm"/);const js=await (await fetch(base+'/app.js')).text();assert.match(js,/الخطوة/);assert.match(js,/submission-disabled/);assert.match(js,/لم يتم إرسال الطلب بعد/);assert.match(js,/لن تُرسل بياناتك إلا بعد موافقتك الصريحة/);assert.doesNotMatch(js,/هذه البيانات محلية في الصفحة فقط حاليًا/);});
 
+test('admin workspace shell is served without exposing private indexing',async t=>{
+ const base=await withServer(t,config,{checkConnection:async()=>false,inspectSchema:async()=>[]});
+ const response=await fetch(base+'/admin.html');
+ assert.equal(response.status,200);
+ const html=await response.text();
+ assert.match(html,/noindex,nofollow/);
+ assert.match(html,/id="adminLoginForm"/);
+ assert.match(html,/id="adminDashboard"/);
+ const js=await (await fetch(base+'/admin.js')).text();
+ assert.match(js,/\/api\/admin\/login/);
+ assert.match(js,/\/api\/admin\/overview/);
+});
 test('public service, pricing, about, FAQ and process pages are served',async t=>{const base=await withServer(t,config,{checkConnection:async()=>false,inspectSchema:async()=>[]});for(const path of ['/services.html','/pricing.html','/about.html','/faq.html','/process.html']){const r=await fetch(base+path);assert.equal(r.status,200,path);assert.match(r.headers.get('content-type'),/text\/html/);const html=await r.text();assert.match(html,/ATSH AI/);}});
 test('services page includes database-backed catalog with safe static fallback',async t=>{
  const base=await withServer(t,config,{checkConnection:async()=>false,inspectSchema:async()=>[]});
