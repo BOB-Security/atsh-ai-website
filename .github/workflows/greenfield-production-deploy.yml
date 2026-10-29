@@ -94,9 +94,11 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           ORGANIZATION_ID: ${{ secrets.DEFAULT_ORGANIZATION_ID }}
           DIAGNOSTICS_TOKEN: ${{ secrets.DB_DIAGNOSTICS_TOKEN }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          RECOVERY_FROM_EMAIL: ${{ secrets.ADMIN_RECOVERY_FROM_EMAIL }}
         run: |
           set -euo pipefail
-          az webapp config appsettings set --resource-group "$RG" --name atsh-ai-website --settings             NODE_ENV=production WEBSITE_NODE_DEFAULT_VERSION='~22' SCM_DO_BUILD_DURING_DEPLOYMENT=true ENABLE_ORYX_BUILD=true             DATABASE_URL="$DATABASE_URL" PUBLIC_ORGANIZATION_ID="$ORGANIZATION_ID" PGSSL=require             INQUIRY_INTAKE_ENABLED=false DB_DIAGNOSTICS_TOKEN="${DIAGNOSTICS_TOKEN:-}"             --output none
+          az webapp config appsettings set --resource-group "$RG" --name atsh-ai-website --settings             NODE_ENV=production WEBSITE_NODE_DEFAULT_VERSION='~22' SCM_DO_BUILD_DURING_DEPLOYMENT=true ENABLE_ORYX_BUILD=true             DATABASE_URL="$DATABASE_URL" PUBLIC_ORGANIZATION_ID="$ORGANIZATION_ID" PUBLIC_BASE_URL="https://atsh-ai-website-ewa4dcc8dygdhqdp.westus3-01.azurewebsites.net" RESEND_API_KEY="${RESEND_API_KEY:-}" ADMIN_RECOVERY_FROM_EMAIL="${RECOVERY_FROM_EMAIL:-}" PGSSL=require             INQUIRY_INTAKE_ENABLED=false DB_DIAGNOSTICS_TOKEN="${DIAGNOSTICS_TOKEN:-}"             --output none
           az webapp config set --resource-group "$RG" --name atsh-ai-website --startup-file "node server.js" --output none
           az webapp start --resource-group "$RG" --name atsh-ai-website
       - name: Deploy Greenfield app
