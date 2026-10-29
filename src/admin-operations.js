@@ -74,7 +74,7 @@ async function issueQuote(config,actor,id,ipHash){
   const result=await client.query("UPDATE quotes SET status='issued',issued_at=NOW(),valid_until=COALESCE(valid_until,CURRENT_DATE+14),response_token_hash=$3,response_token_expires_at=NOW()+INTERVAL '14 days',updated_at=NOW() WHERE organization_id=$1 AND id=$2 RETURNING id,reference,status,valid_until,currency,setup_total_minor,monthly_total_minor,annual_total_minor,lead_id",[oid,id,tokenHash]);
   if(quote.lead_id)await client.query("UPDATE leads SET status='quoted',updated_at=NOW() WHERE organization_id=$1 AND id=$2 AND status IN ('qualified','scoped')",[oid,quote.lead_id]);
   await audit(client,oid,actor.id,'quote.issued','quote',id,{reference:quote.reference,expires_in_days:14},ipHash);
-  return {quote:result.rows[0],token,url:config.publicBaseUrl.replace(/\/$/,'')+'/quote-response.html?token='+encodeURIComponent(token)};
+  return {quote:result.rows[0],token,url:config.publicBaseUrl.replace(/\/$/,'')+'/quote-response.html#token='+encodeURIComponent(token)};
  });
 }
 async function getPublicQuote(config,token){
