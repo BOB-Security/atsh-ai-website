@@ -1,7 +1,10 @@
 name: ATSH AI Platform Rebuild CI
 on:
   push:
-    branches: [rebuild/atsh-ai-from-scratch, release/port-mfa-to-rebuild]
+    branches:
+      - rebuild/atsh-ai-from-scratch
+      - release/port-mfa-to-rebuild
+      - hardening/migration-integrity-tests
     paths:
       - 'platform/**'
       - 'db/**'
@@ -9,7 +12,9 @@ on:
       - '.github/workflows/rebuild-platform-ci.yml'
       - '.github/workflows/platform-staging-deploy.yml'
   pull_request:
-    branches: [main]
+    branches:
+      - main
+      - rebuild/atsh-ai-from-scratch
     paths:
       - 'platform/**'
       - 'db/**'
