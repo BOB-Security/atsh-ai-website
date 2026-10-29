@@ -22,3 +22,39 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: npm test
+
+  migration-test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: atsh_test
+          POSTGRES_PASSWORD: atsh_test_password
+          POSTGRES_DB: atsh_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U atsh_test -d atsh_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Prepare isolated schema fixture
+        env:
+          PGPASSWORD: atsh_test_password
+        run: |
+          set -euo pipefail
+          psql "postgresql://atsh_test@127.0.0.1:5432/atsh_test" -v ON_ERROR_STOP=1 -c "CREATE TABLE users (id UUID PRIMARY KEY); CREATE TABLE schema_migrations (filename TEXT PRIMARY KEY, applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW());"
+      - name: Apply additive MFA migration twice to prove idempotency
+        env:
+          PGPASSWORD: atsh_test_password
+        run: |
+          set -euo pipefail
+          psql "postgresql://atsh_test@127.0.0.1:5432/atsh_test" -v ON_ERROR_STOP=1 -f db/migrations/20261029_001_mfa.sql
+          psql "postgresql://atsh_test@127.0.0.1:5432/atsh_test" -v ON_ERROR_STOP=1 -f db/migrations/20261029_001_mfa.sql
+          count=$(psql "postgresql://atsh_test@127.0.0.1:5432/atsh_test" -Atc "SELECT count(*) FROM schema_migrations WHERE filename='20261029_001_mfa.sql'")
+          [[ "$count" == "1" ]]
