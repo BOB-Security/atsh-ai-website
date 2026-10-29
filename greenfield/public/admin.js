@@ -40,12 +40,52 @@ async function loadOverview(){
  if(response.ok&&result.ok&&result.overview){renderStats(result.overview);return;}
  if(statsRoot){statsRoot.replaceChildren();const p=document.createElement('p');p.textContent=response.status===403?'هذا الحساب لا يملك صلاحية عرض الملخص.':'الملخص غير متاح حتى اكتمال إعداد جداول الإدارة في بيئة الاختبار.';statsRoot.append(p);}
 }
+async function loadCatalog(){
+ const root=document.getElementById('adminCatalogList');if(!root)return;
+ root.replaceChildren();
+ const pending=document.createElement('p');pending.textContent='جارٍ تحميل الكتالوج…';root.append(pending);
+ try{
+  const response=await fetch('/api/admin/catalog',{credentials:'same-origin',headers:{accept:'application/json'}});
+  const result=await response.json().catch(()=>({}));
+  root.replaceChildren();
+  if(!response.ok||!result.ok){const p=document.createElement('p');p.textContent=response.status===403?'لا يملك هذا الحساب صلاحية قراءة الكتالوج.':'الكتالوج غير متاح قبل التحقق من مخطط قاعدة البيانات والصلاحيات.';root.append(p);return;}
+  if(!Array.isArray(result.categories)||!result.categories.length){const p=document.createElement('p');p.textContent='لا توجد خدمات مسجلة في قاعدة البيانات حتى الآن.';root.append(p);return;}
+  for(const category of result.categories){
+   const card=document.createElement('article');card.className='admin-catalog-category';
+   const heading=document.createElement('div');heading.className='admin-catalog-heading';
+   const title=document.createElement('h3');title.textContent=category.name?.ar||category.slug||'خدمة';
+   const state=document.createElement('span');state.className='admin-state '+(category.active?'is-active':'is-inactive');state.textContent=category.active?'نشطة':'غير نشطة';
+   heading.append(title,state);card.append(heading);
+   const description=document.createElement('p');description.textContent=category.description?.ar||'';card.append(description);
+   const plans=Array.isArray(category.plans)?category.plans:[];
+   for(const plan of plans){
+    const item=document.createElement('div');item.className='admin-catalog-plan';
+    const planTitle=document.createElement('strong');planTitle.textContent=plan.name?.ar||plan.slug||'باقة';
+    const planState=document.createElement('span');planState.className='admin-state '+(plan.active?'is-active':'is-inactive');planState.textContent=plan.active?'نشطة':'غير نشطة';
+    const nameRow=document.createElement('div');nameRow.className='admin-plan-heading';nameRow.append(planTitle,planState);item.append(nameRow);
+    const priceLines=document.createElement('div');priceLines.className='admin-plan-prices';
+    const currency=typeof plan.currency==='string'?plan.currency.trim():'';
+    const amounts=plan.amountsMinor||{};
+    for(const [key,label] of [['setup','التأسيس'],['monthly','شهريًا'],['annual','سنويًا']]){
+     const amount=Number(amounts[key]);if(!Number.isFinite(amount)||!currency)continue;
+     let formatted='غير محدد';
+     try{const digits=new Intl.NumberFormat('en',{style:'currency',currency}).resolvedOptions().maximumFractionDigits;formatted=new Intl.NumberFormat('ar-EG',{style:'currency',currency,maximumFractionDigits:digits}).format(amount/(10**digits));}catch{}
+     const line=document.createElement('span');line.textContent=label+': '+formatted;priceLines.append(line);
+    }
+    item.append(priceLines);
+    if(Array.isArray(plan.features)&&plan.features.length){const features=document.createElement('p');features.className='admin-feature-list';features.textContent=plan.features.filter(value=>typeof value==='string').join(' · ');item.append(features);}
+    card.append(item);
+   }
+   root.append(card);
+  }
+ }catch{root.replaceChildren();const p=document.createElement('p');p.textContent='تعذر الاتصال بخدمة الكتالوج. لم يتم تعديل أي بيانات.';root.append(p);}
+}
 async function checkSession(){
  try{
   const response=await fetch('/api/admin/me',{credentials:'same-origin',headers:{accept:'application/json'}});
   if(!response.ok)return;
   const result=await response.json();
-  if(result.ok&&result.user){csrfToken=result.csrfToken||'';showSignedIn(result.user);await loadOverview();}
+  if(result.ok&&result.user){csrfToken=result.csrfToken||'';showSignedIn(result.user);await loadOverview();await loadCatalog();}
  }catch{}
 }
 if(loginForm)loginForm.addEventListener('submit',async event=>{
@@ -62,6 +102,7 @@ if(loginForm)loginForm.addEventListener('submit',async event=>{
  }catch{showMessage('تعذر الوصول إلى خدمة المصادقة. لم يتم تسجيل الدخول.','error');}
  finally{if(submit)submit.disabled=false;}
 });
+const reloadCatalog=document.getElementById('adminReloadCatalog');if(reloadCatalog)reloadCatalog.addEventListener('click',loadCatalog);
 const logout=document.getElementById('adminLogout');
 if(logout)logout.addEventListener('click',async()=>{
  try{
