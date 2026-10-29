@@ -25,7 +25,8 @@ function createDatabase(config, dependencies = {}) {
     const client = await getPool().connect();
     try {
       await client.query('BEGIN READ ONLY');
-      const result = await client.query("SELECT table_schema, table_name, column_name, data_type, is_nullable FROM information_schema.columns WHERE table_schema NOT IN ('pg_catalog', 'information_schema') ORDER BY table_schema, table_name, ordinal_position");
+      await client.query("SET LOCAL statement_timeout = '5000ms'");
+      const result = await client.query("SELECT table_schema, table_name, column_name, data_type, is_nullable FROM information_schema.columns WHERE table_schema = 'public' ORDER BY table_name, ordinal_position");
       await client.query('COMMIT');
       return result.rows;
     } catch (error) { try { await client.query('ROLLBACK'); } catch {} throw error; }
