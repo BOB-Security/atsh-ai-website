@@ -1,11 +1,7 @@
 name: Deploy ATSH AI Greenfield to Azure Production
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'greenfield/**'
-      - '.github/workflows/greenfield-production-deploy.yml'
+  # Production platform/greenfield deployments are manual until each has its own Azure App Service.
   workflow_dispatch:
 
 permissions:
