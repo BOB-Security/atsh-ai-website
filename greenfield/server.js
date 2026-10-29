@@ -212,7 +212,7 @@ function createApp(overrides = {}) {
     const input=req.body?.settings;const allowed=['hero_title','hero_description','logo_url','primary_color','accent_color','contact_email','page_content'];
     if(!input||typeof input!=='object'||Array.isArray(input)||Object.keys(input).some(key=>!allowed.includes(key)))return res.status(400).json({error:'invalid_settings'});
     const limits={hero_title:180,hero_description:1000,logo_url:1000,primary_color:7,accent_color:7,contact_email:254};const settings={};
-    for(const key of Object.keys(limits)){const value=input[key]==null?'':input[key];if(typeof value!=='string'||value.length>limits[key])return res.status(400).json({error:'invalid_settings'});settings[key]=value.trim();}
+    for(const key of Object.keys(limits)){if(!(key in input))continue;const value=input[key]==null?'':input[key];if(typeof value!=='string'||value.length>limits[key])return res.status(400).json({error:'invalid_settings'});settings[key]=value.trim();}
     if(input.page_content!==undefined){
       if(!input.page_content||typeof input.page_content!=='object'||Array.isArray(input.page_content)||Object.keys(input.page_content).some(key=>!['home','services','pricing','process','about','faq'].includes(key)))return res.status(400).json({error:'invalid_page_content'});
       settings.page_content={};
