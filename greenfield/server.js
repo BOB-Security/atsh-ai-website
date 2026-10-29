@@ -58,6 +58,40 @@ function createApp(overrides = {}) {
       return res.status(503).json({ error: 'schema_inspection_unavailable' });
     }
   });
+  app.post('/api/admin/login', rateLimit({ windowMs: 900000, limit: 8, standardHeaders: 'draft-8', legacyHeaders: false }), async (req, res) => {
+    const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+    const password = typeof req.body?.password === 'string' ? req.body.password : '';
+    if (!email || email.length > 254 || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email) || !password || password.length > 1024) {
+      return res.status(400).json({ error: 'invalid_credentials', message: 'أدخل البريد الإلكتروني وكلمة المرور.' });
+    }
+    try {
+      const user = await database.findAdminUser(email);
+      if (!user || user.status !== 'active' || user.organization_status !== 'active') return res.status(401).json({ error: 'invalid_credentials', message: 'بيانات الدخول غير صحيحة.' });
+      let record;
+      try { record = JSON.parse(user.password_hash || ''); } catch { record = null; }
+      if (!record || typeof record.salt !== 'string' || typeof record.hash !== 'string' || !/^[a-f0-9]{32,128}$/i.test(record.salt) || !/^[a-f0-9]{128}$/i.test(record.hash)) {
+        return res.status(503).json({ error: 'admin_credentials_format_unsupported', message: 'تنسيق بيانات المصادقة يحتاج إلى مراجعة قبل تفعيل الدخول.' });
+      }
+      const derived = await new Promise((resolve, reject) => crypto.scrypt(password, record.salt, 64, (error, key) => error ? reject(error) : resolve(key.toString('hex'))));
+      if (!safeEqual(derived, record.hash)) return res.status(401).json({ error: 'invalid_credentials', message: 'بيانات الدخول غير صحيحة.' });
+      const token = crypto.randomBytes(32).toString('base64url');
+      const csrf = crypto.randomBytes(32).toString('base64url');
+      const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+      await database.createAdminSession(user.id, tokenHash);
+      const secure = config.nodeEnv === 'production' ? '; Secure' : '';
+      res.setHeader('Set-Cookie', [
+        'atsh_admin_session=' + encodeURIComponent(token) + '; Path=/; HttpOnly; SameSite=Strict; Max-Age=28800' + secure,
+        'atsh_admin_csrf=' + encodeURIComponent(csrf) + '; Path=/; SameSite=Strict; Max-Age=28800' + secure
+      ]);
+      res.setHeader('Cache-Control', 'no-store');
+      const permissions = (Array.isArray(user.role_permission_sets) ? user.role_permission_sets : []).flat().filter(value => typeof value === 'string');
+      return res.json({ ok: true, user: { id: user.id, email: user.email, name: user.full_name, permissions }, csrfToken: csrf });
+    } catch (error) {
+      if (error.code === 'ADMIN_SCHEMA_MISMATCH') return res.status(503).json({ error: 'admin_not_ready', message: 'قاعدة البيانات غير جاهزة لتفعيل الإدارة.' });
+      console.error('Admin login unavailable:', error.code || 'unknown');
+      return res.status(503).json({ error: 'admin_unavailable', message: 'تعذر تسجيل الدخول الآن.' });
+    }
+  });
   app.get('/api/public/catalog', async (_req, res) => {
     try {
       const categories = await database.listPublicCatalog();
