@@ -53,6 +53,7 @@ async function login(config, email, password, secondFactor) {
     try { credential = await getCredential(config, user.id); }
     catch (error) { if (error && error.code === '42P01') { error.code = 'MFA_MIGRATION_REQUIRED'; } throw error; }
     if (!credential || !credential.enabled) return { requiresMfaSetup: true, user: { email:user.email, name:user.full_name } };
+    if (!secondFactor) return { requiresMfa: true, user: { email:user.email, name:user.full_name } };
     if (!await verifySecondFactor(config, user.id, secondFactor)) return null;
   }
   return createSession(config, user, roles);
