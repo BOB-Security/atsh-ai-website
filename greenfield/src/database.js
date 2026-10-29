@@ -462,6 +462,55 @@ function createDatabase(config, dependencies = {}) {
     finally{client.release();}
   }
 
+  async function createAdminPasswordReset(email, tokenHash, metadata = {}) {
+    const client = await getPool().connect();
+    try {
+      await client.query('BEGIN');
+      await assertAdminSchema(client);
+      const found = await client.query(
+        "SELECT u.id,u.organization_id,u.email,u.full_name FROM users u JOIN organizations o ON o.id=u.organization_id WHERE lower(u.email)=lower($1) AND u.status='active' AND o.status='active' LIMIT 1",
+        [email]
+      );
+      if (!found.rows[0]) { await client.query('COMMIT'); return null; }
+      const user = found.rows[0];
+      await client.query('DELETE FROM admin_password_resets WHERE user_id=$1 OR expires_at<=now() OR used_at IS NOT NULL', [user.id]);
+      await client.query("INSERT INTO admin_password_resets (token_hash,user_id,expires_at) VALUES ($1,$2,now()+interval '30 minutes')", [tokenHash,user.id]);
+      await client.query("INSERT INTO audit_logs (organization_id,actor_user_id,action,entity_type,entity_id,details,ip_hash) VALUES ($1,$2,'admin.password_recovery.request','user',$2,$3::jsonb,$4)",
+        [user.organization_id,user.id,JSON.stringify({outcome:'requested'}),typeof metadata.ipHash==='string'?metadata.ipHash:null]);
+      await client.query('COMMIT');
+      return { id:user.id,email:user.email,full_name:user.full_name };
+    } catch(error) {
+      try { await client.query('ROLLBACK'); } catch {}
+      if(error.code==='42P01'||error.code==='42703')error.code='ADMIN_RECOVERY_SCHEMA_MISMATCH';
+      throw error;
+    } finally { client.release(); }
+  }
+  async function completeAdminPasswordReset(tokenHash, passwordHash, metadata = {}) {
+    const client = await getPool().connect();
+    try {
+      await client.query('BEGIN');
+      await assertAdminSchema(client);
+      const found = await client.query(
+        "SELECT r.user_id,u.organization_id,u.status,o.status AS organization_status FROM admin_password_resets r JOIN users u ON u.id=r.user_id JOIN organizations o ON o.id=u.organization_id WHERE r.token_hash=$1 AND r.used_at IS NULL AND r.expires_at>now() FOR UPDATE OF r",
+        [tokenHash]
+      );
+      const reset=found.rows[0];
+      if(!reset||reset.status!=='active'||reset.organization_status!=='active') {
+        await client.query('ROLLBACK'); return false;
+      }
+      await client.query("UPDATE users SET password_hash=$2,updated_at=now() WHERE id=$1 AND status='active'",[reset.user_id,passwordHash]);
+      await client.query('DELETE FROM auth_sessions WHERE user_id=$1',[reset.user_id]);
+      await client.query('DELETE FROM admin_password_resets WHERE user_id=$1',[reset.user_id]);
+      await client.query("INSERT INTO audit_logs (organization_id,actor_user_id,action,entity_type,entity_id,details,ip_hash) VALUES ($1,$2,'admin.password_recovery.complete','user',$2,$3::jsonb,$4)",
+        [reset.organization_id,reset.user_id,JSON.stringify({outcome:'password_changed_sessions_revoked'}),typeof metadata.ipHash==='string'?metadata.ipHash:null]);
+      await client.query('COMMIT'); return true;
+    } catch(error) {
+      try { await client.query('ROLLBACK'); } catch {}
+      if(error.code==='42P01'||error.code==='42703')error.code='ADMIN_RECOVERY_SCHEMA_MISMATCH';
+      throw error;
+    } finally { client.release(); }
+  }
+
   async function getSiteSettings(organizationId) {
     if (!organizationId) { const error = new Error('Organization is missing.'); error.code = 'SITE_SETTINGS_NOT_CONFIGURED'; throw error; }
     const client = await getPool().connect();
@@ -488,6 +537,6 @@ function createDatabase(config, dependencies = {}) {
     finally { client.release(); }
   }
   async function close() { if (pool) { const current = pool; pool = undefined; await current.end(); } }
-  return { checkConnection, inspectSchema, createInquiry, listPublicCatalog, findAdminUser, createAdminSession, getAdminSession, deleteAdminSession, getAdminOverview, listAdminCatalog, saveAdminPlan, listAdminLeads, getSiteSettings, saveSiteSettings, close };
+  return { checkConnection, inspectSchema, createInquiry, listPublicCatalog, findAdminUser, createAdminSession, getAdminSession, deleteAdminSession, getAdminOverview, listAdminCatalog, saveAdminPlan, listAdminLeads, listAdminMembers, createAdminMember, createAdminPasswordReset, completeAdminPasswordReset, getSiteSettings, saveSiteSettings, close };
 }
 module.exports = { createDatabase };
