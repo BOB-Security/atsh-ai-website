@@ -12,3 +12,22 @@ test('home exposes the eight-step project configurator and honest submission sta
 
 test('public service, pricing, about, FAQ and process pages are served',async t=>{const base=await withServer(t,config,{checkConnection:async()=>false,inspectSchema:async()=>[]});for(const path of ['/services.html','/pricing.html','/about.html','/faq.html','/process.html']){const r=await fetch(base+path);assert.equal(r.status,200,path);assert.match(r.headers.get('content-type'),/text\/html/);const html=await r.text();assert.match(html,/ATSH AI/);}});
 test('pricing page does not publish invented amounts',async t=>{const base=await withServer(t,config,{checkConnection:async()=>false,inspectSchema:async()=>[]});const html=await (await fetch(base+'/pricing.html')).text();assert.match(html,/قائمة الأسعار غير مفعّلة/);assert.match(html,/لا تُعد هذه الصفحة عرضًا ماليًا/);});
+
+test('intake validates consent and reports persisted reference only after commit',async t=>{
+ const cfg={...config,intakeEnabled:true,publicOrganizationId:'11111111-1111-4111-8111-111111111111'};
+ let saved=0;
+ const db={checkConnection:async()=>true,inspectSchema:async()=>[],createInquiry:async input=>{saved++;assert.equal(input.email,'person@example.com');return {reference:'ATSH-20261029-AB12CD34',status:'new',created_at:'2026-10-29T10:00:00.000Z'};}};
+ const base=await withServer(t,cfg,db);
+ const payload={name:'Test Person',email:'person@example.com',service:'موقع أو منصة',goal:'أريد إنشاء موقع تعريفي احترافي للنشاط التجاري',consent:true,features:['لوحة إدارة']};
+ const denied=await fetch(base+'/api/public/inquiries',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({...payload,consent:false})});
+ assert.equal(denied.status,400);assert.equal(saved,0);
+ const accepted=await fetch(base+'/api/public/inquiries',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(payload)});
+ assert.equal(accepted.status,201);const result=await accepted.json();assert.equal(result.inquiry.reference,'ATSH-20261029-AB12CD34');assert.equal(saved,1);
+});
+test('intake never claims success when persistence fails',async t=>{
+ const cfg={...config,intakeEnabled:true,publicOrganizationId:'11111111-1111-4111-8111-111111111111'};
+ const db={checkConnection:async()=>true,inspectSchema:async()=>[],createInquiry:async()=>{const e=new Error('schema mismatch');e.code='INTAKE_SCHEMA_MISMATCH';throw e;}};
+ const base=await withServer(t,cfg,db);
+ const response=await fetch(base+'/api/public/inquiries',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name:'Test Person',email:'person@example.com',service:'موقع أو منصة',goal:'أريد إنشاء موقع تعريفي احترافي للنشاط التجاري',consent:true})});
+ assert.equal(response.status,503);const result=await response.json();assert.equal(result.error,'intake_not_ready');assert.doesNotMatch(result.message,/بنجاح/);
+});
