@@ -313,4 +313,90 @@ if(logout)logout.addEventListener('click',async()=>{
   if(dashboard)dashboard.hidden=true;if(loginPanel)loginPanel.hidden=false;showMessage('تم إنهاء جلسة الإدارة.');csrfToken='';
  }catch{showMessage('تعذر إنهاء الجلسة. أعد المحاولة.','error');}
 });
+
+/* Structured admin workspace: tabs, local preview, explicit save-and-publish labels. */
+function setupAdminWorkspace(){
+ const dashboard=document.getElementById('adminDashboard');
+ if(!dashboard||dashboard.dataset.workspaceReady)return;
+ dashboard.dataset.workspaceReady='1';
+ const welcome=dashboard.querySelector('.admin-welcome');
+ const tabDefs=[
+  {id:'overview',label:'نظرة عامة',icon:'◈',selectors:['#adminOverviewGrid','#adminSchemaReadiness']},
+  {id:'identity',label:'هوية الموقع',icon:'✦',selectors:['#adminSiteSettingsForm']},
+  {id:'pages',label:'محتوى الصفحات',icon:'▤',selectors:['#adminPageContentForm']},
+  {id:'plans',label:'الخدمات والباقات',icon:'◇',selectors:['#adminPlanForm','#adminCatalogList']},
+  {id:'leads',label:'الطلبات',icon:'▣',selectors:['#adminLeadsList']},
+  {id:'team',label:'فريق الإدارة',icon:'♙',selectors:['#adminMemberForm','#adminMembersList','#adminPermissionList']}
+ ];
+ const nav=document.createElement('nav');nav.className='admin-tabs';nav.setAttribute('aria-label','أقسام لوحة الإدارة');
+ const panes=document.createElement('div');panes.className='admin-tab-panes';
+ const originalNodes=new Map();
+ for(const def of tabDefs){
+  const button=document.createElement('button');button.type='button';button.className='admin-tab';button.dataset.tab=def.id;button.setAttribute('role','tab');button.setAttribute('aria-controls','admin-tab-'+def.id);button.innerHTML='<span aria-hidden="true">'+def.icon+'</span><span>'+def.label+'</span>';nav.append(button);
+  const pane=document.createElement('section');pane.className='admin-tab-pane';pane.id='admin-tab-'+def.id;pane.dataset.pane=def.id;pane.setAttribute('role','tabpanel');pane.setAttribute('aria-label',def.label);panes.append(pane);
+  for(const selector of def.selectors){
+   const target=dashboard.querySelector(selector);if(!target)continue;
+   let node=target;
+   if(selector==='#adminSiteSettingsForm'||selector==='#adminPageContentForm'||selector==='#adminPlanForm'||selector==='#adminMemberForm'){
+    node=target.closest('.admin-panel')||target;
+   }else if(selector==='#adminSchemaReadiness'){
+    node=target.closest('.admin-panel')||target;
+   }else if(selector==='#adminLeadsList'){
+    node=target.closest('.admin-panel')||target;
+   }else if(selector==='#adminMembersList'){
+    node=target.closest('.admin-panel')||target;
+   }else if(selector==='#adminCatalogList'){
+    node=target.closest('.admin-panel')||target;
+   }else if(selector==='#adminPermissionList'){
+    node=target.closest('.admin-panel')||target;
+   }
+   if(node&&!originalNodes.has(node)){originalNodes.set(node,true);pane.append(node);}
+  }
+ }
+ if(welcome)welcome.after(nav,panes);else dashboard.prepend(nav,panes);
+ function activate(id){
+  for(const button of nav.querySelectorAll('.admin-tab')){const active=button.dataset.tab===id;button.classList.toggle('is-active',active);button.setAttribute('aria-selected',String(active));button.tabIndex=active?0:-1;}
+  for(const pane of panes.children)pane.hidden=pane.dataset.pane!==id;
+ }
+ nav.addEventListener('click',event=>{const button=event.target.closest('.admin-tab');if(button)activate(button.dataset.tab);});
+ nav.addEventListener('keydown',event=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;const buttons=[...nav.querySelectorAll('.admin-tab')];const current=buttons.indexOf(document.activeElement);let next=current;if(event.key==='Home')next=0;else if(event.key==='End')next=buttons.length-1;else next=(current+(event.key==='ArrowRight'?1:-1)+buttons.length)%buttons.length;buttons[next].focus();activate(buttons[next].dataset.tab);event.preventDefault();});
+ activate('overview');
+ const preview=document.createElement('div');preview.className='admin-preview-overlay';preview.hidden=true;preview.innerHTML='<section class="admin-preview-dialog" role="dialog" aria-modal="true" aria-labelledby="adminPreviewTitle"><div class="admin-panel-heading"><div><small>معاينة قبل النشر</small><h2 id="adminPreviewTitle">معاينة التعديلات</h2></div><button type="button" class="btn secondary" data-preview-close>إغلاق</button></div><div class="admin-preview-body"></div><p class="admin-subtext">هذه معاينة محلية للقيم الحالية داخل النموذج. لا تُحفظ ولا تُنشر حتى تضغط زر الحفظ والنشر في النموذج.</p></section>';
+ dashboard.append(preview);
+ const previewBody=preview.querySelector('.admin-preview-body');
+ function addPreviewButton(form,type){
+  if(!form||form.querySelector('[data-preview-type="'+type+'"]'))return;
+  const submit=form.querySelector('button[type="submit"]');if(!submit)return;
+  submit.textContent=type==='pages'?'حفظ ونشر الصفحات':'حفظ ونشر إعدادات الموقع';
+  const button=document.createElement('button');button.type='button';button.className='btn secondary admin-preview-button';button.dataset.previewType=type;button.textContent='معاينة قبل النشر';
+  submit.before(button);
+  button.addEventListener('click',()=>{
+   previewBody.replaceChildren();
+   const card=document.createElement('article');card.className='admin-live-preview';
+   if(type==='identity'){
+    const title=form.elements.namedItem('hero_title')?.value||'عنوان الواجهة الرئيسية';
+    const description=form.elements.namedItem('hero_description')?.value||'وصف الواجهة الرئيسية';
+    const bg=form.elements.namedItem('hero_background_url')?.value||'';
+    if(bg){card.style.backgroundImage='linear-gradient(90deg,rgba(13,12,28,.9),rgba(13,12,28,.45)),url("'+bg.replace(/["\\]/g,'')+'")';}
+    const logo=form.elements.namedItem('logo_url')?.value||'';
+    if(logo){const img=document.createElement('img');img.src=logo;img.alt='معاينة الشعار';img.className='admin-preview-logo';img.onerror=()=>{img.alt='تعذر تحميل الشعار من الرابط الحالي';};card.append(img);}
+    const h=document.createElement('h2');h.textContent=title;const p=document.createElement('p');p.textContent=description;card.append(h,p);
+    const colors=document.createElement('div');colors.className='admin-preview-colors';
+    for(const [label,key] of [['اللون الأساسي','primary_color'],['لون التمييز','accent_color']]){const item=document.createElement('span');item.textContent=label;item.style.borderColor=form.elements.namedItem(key)?.value||'#8c7aff';colors.append(item);}card.append(colors);
+    const email=form.elements.namedItem('contact_email')?.value;if(email){const e=document.createElement('p');e.textContent='التواصل: '+email;card.append(e);}
+   }else{
+    const pages=[['الرئيسية','home'],['الخدمات','services'],['التسعير','pricing'],['آلية العمل','process'],['من نحن','about'],['الأسئلة الشائعة','faq']];
+    for(const [label,key] of pages){const block=document.createElement('section');block.className='admin-preview-page';const h=document.createElement('h3');h.textContent=form.elements.namedItem(key+'_title')?.value||label;const p=document.createElement('p');p.textContent=form.elements.namedItem(key+'_description')?.value||'لم يُدخل وصف جديد — سيبقى النص الأصلي للموقع.';block.append(h,p);card.append(block);}
+   }
+   previewBody.append(card);preview.hidden=false;const close=preview.querySelector('[data-preview-close]');if(close)close.focus();
+  });
+ }
+ addPreviewButton(document.getElementById('adminSiteSettingsForm'),'identity');
+ addPreviewButton(document.getElementById('adminPageContentForm'),'pages');
+ preview.addEventListener('click',event=>{if(event.target===preview||event.target.closest('[data-preview-close]'))preview.hidden=true;});
+ document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!preview.hidden)preview.hidden=true;});
+ const planSubmit=document.querySelector('#adminPlanForm button[type="submit"]');if(planSubmit)planSubmit.textContent='حفظ ونشر الباقة';
+}
+
+setupAdminWorkspace();
 checkSession();
