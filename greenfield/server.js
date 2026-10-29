@@ -209,9 +209,9 @@ function createApp(overrides = {}) {
   app.put('/api/admin/site-settings', async (req,res)=>{
     const csrfCookie=readCookie(req.headers.cookie,'atsh_admin_csrf');if(!csrfCookie||!safeEqual(csrfCookie,req.get('x-csrf-token')||''))return res.status(403).json({error:'csrf_validation_failed'});
     try{const auth=await getCurrentAdmin(req);if(!auth)return res.status(401).json({error:'authentication_required'});if(!auth.permissions.includes('*')&&!auth.permissions.includes('site.manage'))return res.status(403).json({error:'permission_denied'});
-    const input=req.body?.settings;const allowed=['hero_title','hero_description','logo_url','primary_color','accent_color','contact_email','page_content'];
+    const input=req.body?.settings;const allowed=['hero_title','hero_description','logo_url','hero_background_url','primary_color','accent_color','contact_email','page_content'];
     if(!input||typeof input!=='object'||Array.isArray(input)||Object.keys(input).some(key=>!allowed.includes(key)))return res.status(400).json({error:'invalid_settings'});
-    const limits={hero_title:180,hero_description:1000,logo_url:1000,primary_color:7,accent_color:7,contact_email:254};const settings={};
+    const limits={hero_title:180,hero_description:1000,logo_url:1000,hero_background_url:1000,primary_color:7,accent_color:7,contact_email:254};const settings={};
     for(const key of Object.keys(limits)){if(!(key in input))continue;const value=input[key]==null?'':input[key];if(typeof value!=='string'||value.length>limits[key])return res.status(400).json({error:'invalid_settings'});settings[key]=value.trim();}
     if(input.page_content!==undefined){
       if(!input.page_content||typeof input.page_content!=='object'||Array.isArray(input.page_content)||Object.keys(input.page_content).some(key=>!['home','services','pricing','process','about','faq'].includes(key)))return res.status(400).json({error:'invalid_page_content'});
@@ -224,6 +224,7 @@ function createApp(overrides = {}) {
     }
     for(const key of ['primary_color','accent_color'])if(settings[key]&&!/^#[0-9a-f]{6}$/i.test(settings[key]))return res.status(400).json({error:'invalid_settings',message:'صيغة اللون غير صحيحة.'});
     if(settings.logo_url&&!/^https:\/\//i.test(settings.logo_url))return res.status(400).json({error:'invalid_settings',message:'رابط الشعار يجب أن يبدأ بـ https.'});
+    if(settings.hero_background_url&& !(/^https:\/\//i.test(settings.hero_background_url)||(/^\/(?!\/)[A-Za-z0-9_./-]+$/.test(settings.hero_background_url)&&!settings.hero_background_url.split('/').includes('..'))))return res.status(400).json({error:'invalid_settings',message:'استخدم رابط HTTPS أو مسارًا محليًا يبدأ بشرطة واحدة.'});
     if(settings.contact_email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(settings.contact_email))return res.status(400).json({error:'invalid_settings',message:'البريد الإلكتروني غير صحيح.'});
     const previous=await database.getSiteSettings(auth.user.organization_id);
     const merged={...(previous.settings||{}),...settings,page_content:{...((previous.settings||{}).page_content||{}),...(settings.page_content||{})}};
