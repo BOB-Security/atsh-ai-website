@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
     inputs:
       confirm_production_migration:
-        description: Confirm that this applies the additive site_settings table to the configured production database
+        description: Confirm that this applies the additive site_settings and admin password recovery tables to the configured production database
         required: true
         type: choice
         options:
@@ -47,10 +47,20 @@ jobs:
             updated_by uuid NULL REFERENCES public.users(id) ON DELETE SET NULL,
             updated_at timestamptz NOT NULL DEFAULT now()
           );
+          CREATE TABLE IF NOT EXISTS public.admin_password_resets (
+            token_hash text PRIMARY KEY CHECK (length(token_hash) = 64),
+            user_id uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+            expires_at timestamptz NOT NULL,
+            used_at timestamptz NULL,
+            created_at timestamptz NOT NULL DEFAULT now()
+          );
+          CREATE INDEX IF NOT EXISTS admin_password_resets_user_id_idx ON public.admin_password_resets(user_id);
+          CREATE INDEX IF NOT EXISTS admin_password_resets_expiry_idx ON public.admin_password_resets(expires_at);
           SQL
       - name: Verify table and constraints
         shell: bash
         run: |
           set -euo pipefail
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -X -c "DO \$\$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='site_settings' AND column_name='organization_id') OR NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='site_settings' AND column_name='settings' AND data_type='jsonb') OR NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='site_settings' AND column_name='updated_by') OR NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='site_settings' AND column_name='updated_at') THEN RAISE EXCEPTION 'site_settings schema verification failed'; END IF; END \$\$;"
-          echo "site_settings migration applied and verified."
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -X -c "DO \\$\\$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='admin_password_resets' AND column_name='token_hash') OR NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='admin_password_resets' AND column_name='user_id') OR NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='admin_password_resets' AND column_name='expires_at') OR NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='admin_password_resets' AND column_name='used_at') THEN RAISE EXCEPTION 'admin_password_resets schema verification failed'; END IF; END \\$\\$;"
+          echo "site settings and admin password recovery migrations applied and verified."
