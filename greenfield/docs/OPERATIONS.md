@@ -16,6 +16,9 @@ This is a fresh application tree and does not import the legacy application. Do 
 ## Read-only database verification
 `GET /ready` runs only `SELECT 1`. `GET /api/diagnostics/database-schema` requires the diagnostics bearer token and reads `information_schema.columns` inside a read-only transaction. It returns table/column metadata only; it does not read customer rows or change schema/data.
 
+## Public service catalog
+`GET /api/public/catalog` returns only active `service_categories` and active `service_plans` belonging to the configured `PUBLIC_ORGANIZATION_ID`. The reader checks required columns before querying and fails closed with HTTP 503 if the organization or schema is not configured. Prices are returned exactly as stored in `*_amount_minor` fields plus the currency code; clients must format minor units correctly and must not infer or invent prices. This endpoint is read-only; catalog editing requires a separately authenticated and permission-checked admin feature.
+
 ## Inquiry persistence
 The public inquiry endpoint is implemented but deliberately gated. Unless `INQUIRY_INTAKE_ENABLED=true` and `PUBLIC_ORGANIZATION_ID` is a valid UUID, it returns HTTP 503 and does not write anything. When enabled, it verifies required `customers` and `leads` columns against `information_schema`, then inserts/locates the contact and creates a lead in one transaction. It records the customer's consent timestamp, validates the request server-side, scopes writes to the configured organization, and returns a reference only after commit. If the schema check fails or the transaction fails, it does not claim the request was saved.
 
