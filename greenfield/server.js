@@ -92,6 +92,66 @@ function createApp(overrides = {}) {
       return res.status(503).json({ error: 'admin_unavailable', message: 'تعذر تسجيل الدخول الآن.' });
     }
   });
+  const readCookie = (header, name) => {
+    const part = String(header || '').split(';').map(value => value.trim()).find(value => value.startsWith(name + '='));
+    if (!part) return '';
+    try { return decodeURIComponent(part.slice(name.length + 1)); } catch { return ''; }
+  };
+  const hashAdminToken = token => crypto.createHash('sha256').update(token).digest('hex');
+  const getCurrentAdmin = async req => {
+    const token = readCookie(req.headers.cookie, 'atsh_admin_session');
+    if (!token || token.length < 32 || token.length > 256) return null;
+    const user = await database.getAdminSession(hashAdminToken(token));
+    if (!user) return null;
+    const permissions = (Array.isArray(user.role_permission_sets) ? user.role_permission_sets : []).flat().filter(value => typeof value === 'string');
+    return { user, permissions };
+  };
+  app.get('/api/admin/me', async (req, res) => {
+    try {
+      const auth = await getCurrentAdmin(req);
+      if (!auth) return res.status(401).json({ error: 'authentication_required' });
+      res.setHeader('Cache-Control', 'no-store');
+      return res.json({ ok: true, user: { id: auth.user.id, email: auth.user.email, name: auth.user.full_name, permissions: auth.permissions }, csrfToken: readCookie(req.headers.cookie, 'atsh_admin_csrf') });
+    } catch (error) {
+      console.error('Admin session check failed:', error.code || 'unknown');
+      return res.status(503).json({ error: 'admin_unavailable' });
+    }
+  });
+  app.post('/api/admin/logout', async (req, res) => {
+    const cookieToken = readCookie(req.headers.cookie, 'atsh_admin_csrf');
+    const headerToken = req.get('x-csrf-token') || '';
+    if (!cookieToken || !safeEqual(cookieToken, headerToken)) return res.status(403).json({ error: 'csrf_validation_failed' });
+    try {
+      const token = readCookie(req.headers.cookie, 'atsh_admin_session');
+      if (token && token.length <= 256) await database.deleteAdminSession(hashAdminToken(token));
+      const secure = config.nodeEnv === 'production' ? '; Secure' : '';
+      res.setHeader('Set-Cookie', [
+        'atsh_admin_session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0' + secure,
+        'atsh_admin_csrf=; Path=/; SameSite=Strict; Max-Age=0' + secure
+      ]);
+      res.setHeader('Cache-Control', 'no-store');
+      return res.json({ ok: true });
+    } catch (error) {
+      console.error('Admin logout failed:', error.code || 'unknown');
+      return res.status(503).json({ error: 'admin_unavailable' });
+    }
+  });
+  app.get('/api/admin/overview', async (req, res) => {
+    try {
+      const auth = await getCurrentAdmin(req);
+      if (!auth) return res.status(401).json({ error: 'authentication_required' });
+      if (!auth.permissions.includes('*') && !auth.permissions.includes('dashboard.read') && !auth.permissions.includes('reports.read')) {
+        return res.status(403).json({ error: 'permission_denied' });
+      }
+      const overview = await database.getAdminOverview(auth.user.organization_id);
+      res.setHeader('Cache-Control', 'no-store');
+      return res.json({ ok: true, overview });
+    } catch (error) {
+      if (error.code === 'ADMIN_OVERVIEW_SCHEMA_MISMATCH') return res.status(503).json({ error: 'admin_overview_not_ready', message: 'بعض جداول لوحة الإدارة تحتاج إلى مراجعة توافق.' });
+      console.error('Admin overview failed:', error.code || 'unknown');
+      return res.status(503).json({ error: 'admin_overview_unavailable' });
+    }
+  });
   app.get('/api/public/catalog', async (_req, res) => {
     try {
       const categories = await database.listPublicCatalog();
