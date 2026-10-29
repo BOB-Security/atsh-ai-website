@@ -84,6 +84,46 @@ if(siteSettingsForm)siteSettingsForm.addEventListener('submit',async event=>{
  finally{if(submit)submit.disabled=false;}
 });
 const reloadSiteSettings=document.getElementById('adminReloadSiteSettings');if(reloadSiteSettings)reloadSiteSettings.addEventListener('click',loadSiteSettings);
+
+const pageContentForm=document.getElementById('adminPageContentForm');
+const pageContentMessage=(message,kind='info')=>{const root=document.getElementById('adminPageContentMessage');if(root){root.textContent=message;root.dataset.kind=kind;}};
+const pageFieldMap={home:{title:'home_title',description:'home_description'},services:{title:'services_title',description:'services_description'},pricing:{title:'pricing_title',description:'pricing_description'},process:{title:'process_title',description:'process_description'},about:{title:'about_title',description:'about_description'},faq:{title:'faq_title',description:'faq_description'}};
+async function loadPageContent(){
+ if(!pageContentForm)return;
+ pageContentMessage('جارٍ تحميل محتوى الصفحات…');
+ try{
+  const response=await fetch('/api/admin/site-settings',{credentials:'same-origin',headers:{accept:'application/json'}});
+  const result=await response.json().catch(()=>({}));
+  if(!response.ok||!result.ok){pageContentMessage(response.status===403?'لا يملك هذا الحساب صلاحية تعديل محتوى الصفحات.':'تعذر تحميل محتوى الصفحات؛ تحقق من جاهزية قاعدة البيانات.','error');return;}
+  const content=result.settings?.page_content||{};
+  for(const [page,fields] of Object.entries(pageFieldMap)){
+   for(const [key,name] of Object.entries(fields)){
+    const input=pageContentForm.elements.namedItem(name);
+    if(input)input.value=content[page]?.[key]||'';
+   }
+  }
+  pageContentMessage('تم تحميل محتوى الصفحات الحالي.','success');
+ }catch{pageContentMessage('تعذر الاتصال بمحتوى الصفحات.','error');}
+}
+if(pageContentForm)pageContentForm.addEventListener('submit',async event=>{
+ event.preventDefault();
+ const submit=pageContentForm.querySelector('button[type="submit"]');if(submit)submit.disabled=true;
+ const page_content={};
+ for(const [page,fields] of Object.entries(pageFieldMap)){
+  page_content[page]={};
+  for(const [key,name] of Object.entries(fields))page_content[page][key]=String(pageContentForm.elements.namedItem(name)?.value||'').trim();
+ }
+ pageContentMessage('جارٍ حفظ تعديلات الصفحات…');
+ try{
+  const response=await fetch('/api/admin/site-settings',{method:'PUT',credentials:'same-origin',headers:{'content-type':'application/json','accept':'application/json','x-csrf-token':csrfToken},body:JSON.stringify({settings:{page_content}})});
+  const result=await response.json().catch(()=>({}));
+  if(!response.ok||!result.ok){pageContentMessage(result.message||'تعذر حفظ تعديلات الصفحات. لم يتم تأكيد الحفظ.','error');return;}
+  pageContentMessage('تم حفظ تعديلات الصفحات. حدّث الصفحة العامة لرؤية النتيجة.','success');
+ }catch{pageContentMessage('تعذر الاتصال بخدمة الحفظ.','error');}
+ finally{if(submit)submit.disabled=false;}
+});
+const reloadPages=document.getElementById('adminReloadPages');if(reloadPages)reloadPages.addEventListener('click',loadPageContent);
+
 async function loadOverview(){
  const response=await fetch('/api/admin/overview',{credentials:'same-origin',headers:{accept:'application/json'}});
  const result=await response.json().catch(()=>({}));
@@ -157,7 +197,7 @@ async function checkSession(){
   const response=await fetch('/api/admin/me',{credentials:'same-origin',headers:{accept:'application/json'}});
   if(!response.ok)return;
   const result=await response.json();
-  if(result.ok&&result.user){csrfToken=result.csrfToken||'';showSignedIn(result.user);await loadOverview();await loadSchemaReadiness();await loadCatalog();await loadLeads();await loadSiteSettings();}
+  if(result.ok&&result.user){csrfToken=result.csrfToken||'';showSignedIn(result.user);await loadOverview();await loadSchemaReadiness();await loadCatalog();await loadLeads();await loadSiteSettings();await loadPageContent();}
  }catch{}
 }
 if(loginForm)loginForm.addEventListener('submit',async event=>{
@@ -170,7 +210,7 @@ if(loginForm)loginForm.addEventListener('submit',async event=>{
   const response=await fetch('/api/admin/login',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json','accept':'application/json'},body:JSON.stringify({email:formData.get('email'),password:formData.get('password')})});
   const result=await response.json().catch(()=>({}));
   if(!response.ok||!result.ok){showMessage(result.message||'لم يكتمل تسجيل الدخول. لم يتم إنشاء جلسة إدارة.','error');return;}
-  csrfToken=result.csrfToken||'';loginForm.reset();showSignedIn(result.user);await loadOverview();await loadSchemaReadiness();await loadCatalog();await loadLeads();
+  csrfToken=result.csrfToken||'';loginForm.reset();showSignedIn(result.user);await loadOverview();await loadSchemaReadiness();await loadCatalog();await loadLeads();await loadSiteSettings();await loadPageContent();
  }catch{showMessage('تعذر الوصول إلى خدمة المصادقة. لم يتم تسجيل الدخول.','error');}
  finally{if(submit)submit.disabled=false;}
 });
