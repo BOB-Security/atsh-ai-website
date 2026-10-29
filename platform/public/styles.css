@@ -20,3 +20,9 @@ html[dir="ltr"] body{font-family:Manrope,"IBM Plex Sans Arabic",sans-serif}html[
 
 /* Reserve clear space around the centered coin so navigation never collides with it */
 @media(min-width:951px){.header nav{flex:1;justify-content:space-evenly;gap:clamp(10px,1.4vw,22px);padding-inline:clamp(82px,8vw,118px)}.header nav a{white-space:nowrap}}
+
+/* ATSH metallic coin mark: clip the rectangular source to the coin only on every header. */
+.header .brand-emblem{width:64px;height:64px;flex:0 0 64px;display:block;border-radius:50%;overflow:hidden;background-image:url('/images/atsh-logo.jpg');background-repeat:no-repeat;background-position:center;background-size:auto 122%;border:0;padding:0}
+.header .brand-emblem img{display:none!important}
+.header .brand:not(.brand-emblem){width:56px;height:56px;flex:0 0 56px;display:block;overflow:hidden;border-radius:50%;font-size:0;letter-spacing:0;color:transparent;background-image:url('/images/atsh-logo.jpg');background-repeat:no-repeat;background-position:center;background-size:auto 122%}
+.header .brand:not(.brand-emblem) span{display:none}
