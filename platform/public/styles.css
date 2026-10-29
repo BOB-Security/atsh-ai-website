@@ -12,3 +12,8 @@ html[dir="ltr"] body{font-family:Manrope,"IBM Plex Sans Arabic",sans-serif}html[
 .brand{display:inline-flex;align-items:center;direction:ltr;white-space:nowrap;flex-shrink:0}.brand img{display:block;width:150px;height:auto;max-height:42px;object-fit:contain}.hero-art{overflow:hidden;border:1px solid #2b3b52;border-radius:24px;background:#05070b;box-shadow:0 24px 90px #0007}.hero-brand-image{display:block;width:100%;height:100%;min-height:390px;object-fit:cover;object-position:center}
 @media(max-width:950px){.hero-brand-image{min-height:260px}}
 @media(max-width:560px){.hero-brand-image{min-height:220px}}
+
+/* Centered circular ATSH coin mark in the primary navigation */
+.header{position:sticky;min-height:90px;padding-inline:clamp(14px,2.2vw,36px)}.header .brand-emblem{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:7;width:82px;height:82px;display:grid;place-items:center;border-radius:50%;overflow:hidden;border:2px solid #8f78ff;background:#080b12;box-shadow:0 0 0 3px #8f78ff18,0 0 22px #8f78ff45}.header .brand-emblem img{width:124%;height:124%;max-width:none;max-height:none;object-fit:cover;object-position:center;border-radius:50%}.header nav{margin-inline:auto}.header-actions{position:relative;z-index:8}
+@media(max-width:950px){.header{padding-top:14px;padding-bottom:14px}.header .brand-emblem{width:70px;height:70px}.header nav{padding-top:6px}}
+@media(max-width:560px){.header{min-height:82px;padding-inline:12px}.header .brand-emblem{width:60px;height:60px;top:42px}.header nav{padding-top:30px;gap:10px}.header-actions{gap:6px}.header-actions .button{padding:7px 10px}}
