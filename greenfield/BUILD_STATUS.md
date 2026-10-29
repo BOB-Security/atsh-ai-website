@@ -15,7 +15,7 @@
 
 ## Explicitly not complete
 - Inquiry intake remains disabled by default. It must not be enabled until the live staging schema, organization UUID, privacy notice, and end-to-end transaction behavior are verified.
-- Admin foundation now includes a login screen, rate-limited server-side credential verification, hashed database sessions, session inspection/logout with CSRF protection, and a permission-gated read-only overview API. A permission-gated, organization-scoped read-only catalog view is also wired into the dashboard. It is not production-ready until the live schema and stored password-hash format are verified; admin catalog/pricing CRUD, audit-backed mutations, role management, quote/order lifecycle, project operations, and customer portal remain incomplete.
+- Admin foundation now includes a login screen, rate-limited server-side credential verification, hashed database sessions, session inspection/logout with CSRF protection, and a permission-gated read-only overview API. A permission-gated, organization-scoped read-only catalog view is also wired into the dashboard. The dashboard also has a permission-gated, organization-scoped read-only view of the latest 50 leads. It is not production-ready until the live schema and stored password-hash format are verified; admin catalog/pricing CRUD, audit-backed mutations, role management, quote/order lifecycle, project operations, and customer portal remain incomplete.
 - Privacy and terms pages are drafts and require business/legal review.
 - Staging deployment has not been executed; the staging App Service, resource group, and required GitHub secrets must exist first.
 - Production `main` and the existing production App Service have not been replaced or deployed.
