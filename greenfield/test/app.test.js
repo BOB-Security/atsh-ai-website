@@ -172,3 +172,28 @@ test('admin login accepts the legacy scrypt$salt$hash format without rewriting s
  assert.ok(created);
  assert.equal(admin.password_hash,`scrypt$${salt}$${hash}`);
 });
+
+test('admin schema readiness is authenticated and read-only',async t=>{
+ const crypto=require('node:crypto');
+ const token='schema-readiness-session-token-long-enough-123456';
+ const tokenHash=crypto.createHash('sha256').update(token).digest('hex');
+ let inspected=false;
+ const db={
+  checkConnection:async()=>true,
+  inspectSchema:async()=>{inspected=true;return [
+   {table_schema:'public',table_name:'users',column_name:'id'},
+   {table_schema:'private',table_name:'projects',column_name:'organization_id'}
+  ];},
+  getAdminSession:async hash=>hash===tokenHash?{id:'user-1',organization_id:'org-1',email:'owner@example.com',full_name:'Owner',status:'active',organization_status:'active',role_permission_sets:[['dashboard.read']]}:null
+ };
+ const base=await withServer(t,config,db);
+ const denied=await fetch(base+'/api/admin/schema-readiness');
+ assert.equal(denied.status,401);
+ const response=await fetch(base+'/api/admin/schema-readiness',{headers:{cookie:'atsh_admin_session='+token}});
+ assert.equal(response.status,200);
+ const result=await response.json();
+ assert.equal(result.ok,true);assert.equal(result.readOnly,true);assert.equal(inspected,true);
+ assert.equal(result.groups.every(group=>group.ready===false),true);
+ assert.ok(result.groups[0].missing.some(item=>item.table==='users'));
+ assert.match(response.headers.get('cache-control'),/no-store/);
+});
