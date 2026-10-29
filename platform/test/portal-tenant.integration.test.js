@@ -50,6 +50,26 @@ test('PostgreSQL customer portal queries isolate two customers across projects, 
     }
     await db.query('RELEASE SAVEPOINT invalid_backup_asset');
 
+    await db.query('SAVEPOINT invalid_hosting_customer');
+    let invalidHostingCustomerError = null;
+    try {
+      await db.query("INSERT INTO hosting_assets(organization_id,customer_id,kind,provider) VALUES($1,$2,'hosting','Invalid cross-tenant provider')", [org, customerC]);
+    } catch (error) {
+      invalidHostingCustomerError = error;
+      await db.query('ROLLBACK TO SAVEPOINT invalid_hosting_customer');
+    }
+    await db.query('RELEASE SAVEPOINT invalid_hosting_customer');
+
+    await db.query('SAVEPOINT invalid_hosting_project');
+    let invalidHostingProjectError = null;
+    try {
+      await db.query("INSERT INTO hosting_assets(organization_id,customer_id,project_id,kind,provider) VALUES($1,$2,$3,'hosting','Invalid cross-customer project provider')", [org, customerA, projectB]);
+    } catch (error) {
+      invalidHostingProjectError = error;
+      await db.query('ROLLBACK TO SAVEPOINT invalid_hosting_project');
+    }
+    await db.query('RELEASE SAVEPOINT invalid_hosting_project');
+
     const wrongOrganizationProject = await db.query('SELECT id FROM projects WHERE id=$1 AND organization_id=$2 AND customer_id=$3', [projectC, org, customerA]);
     const wrongProject = await db.query('SELECT id FROM projects WHERE id=$1 AND organization_id=$2 AND customer_id=$3', [projectB, org, customerA]);
     const wrongQuote = await db.query("UPDATE quotes SET status='accepted' WHERE id=$1 AND organization_id=$2 AND customer_id=$3 RETURNING id", [quoteB, org, customerA]);
@@ -61,6 +81,8 @@ test('PostgreSQL customer portal queries isolate two customers across projects, 
     assert.deepEqual(messages.rows.map(x => x.body), ['customer A reply']);
     assert.equal(invalidChangeRequestError?.code, '23503', 'Database must reject change requests linked to another customer project');
     assert.equal(invalidBackupAssetError?.code, '23503', 'Database must reject backup runs linked to another organization hosting asset');
+    assert.equal(invalidHostingCustomerError?.code, '23503', 'Database must reject hosting assets linked to another organization customer');
+    assert.equal(invalidHostingProjectError?.code, '23503', 'Database must reject hosting assets linked to another customer project');
     assert.equal(wrongOrganizationProject.rowCount, 0, 'Customer A must not read another organization project');
     assert.equal(wrongProject.rowCount, 0, 'Customer A must not read Customer B project');
     assert.equal(wrongQuote.rowCount, 0, 'Customer A must not mutate Customer B quote');
