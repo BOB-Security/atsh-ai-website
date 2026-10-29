@@ -29,6 +29,16 @@ test('PostgreSQL customer portal queries isolate two customers across projects, 
     const quotes = await db.query('SELECT id FROM quotes WHERE organization_id=$1 AND customer_id=$2', [org, customerA]);
     const tickets = await db.query('SELECT id FROM support_tickets WHERE organization_id=$1 AND customer_id=$2', [org, customerA]);
     const messages = await db.query("SELECT m.body FROM support_ticket_messages m JOIN support_tickets t ON t.id=m.ticket_id WHERE t.id=$1 AND t.organization_id=$2 AND t.customer_id=$3 AND m.visibility='customer' ORDER BY m.body", [ticketA, org, customerA]);
+    await db.query('SAVEPOINT invalid_change_request');
+    let invalidChangeRequestError = null;
+    try {
+      await db.query("INSERT INTO project_change_requests(organization_id,project_id,customer_id,reference,title,description) VALUES($1,$2,$3,$4,$5,$6)", [org, projectB, customerA, 'CR-X-' + suffix, 'Invalid owner link', 'This must fail because the project belongs to Customer B']);
+    } catch (error) {
+      invalidChangeRequestError = error;
+      await db.query('ROLLBACK TO SAVEPOINT invalid_change_request');
+    }
+    await db.query('RELEASE SAVEPOINT invalid_change_request');
+
     const wrongOrganizationProject = await db.query('SELECT id FROM projects WHERE id=$1 AND organization_id=$2 AND customer_id=$3', [projectC, org, customerA]);
     const wrongProject = await db.query('SELECT id FROM projects WHERE id=$1 AND organization_id=$2 AND customer_id=$3', [projectB, org, customerA]);
     const wrongQuote = await db.query("UPDATE quotes SET status='accepted' WHERE id=$1 AND organization_id=$2 AND customer_id=$3 RETURNING id", [quoteB, org, customerA]);
@@ -38,7 +48,7 @@ test('PostgreSQL customer portal queries isolate two customers across projects, 
     assert.deepEqual(quotes.rows.map(x => x.id), [quoteA]);
     assert.deepEqual(tickets.rows.map(x => x.id), [ticketA]);
     assert.deepEqual(messages.rows.map(x => x.body), ['customer A reply']);
-    assert.equal(wrongOrganizationProject.rowCount, 0, 'Customer A must not read another organization project');
+    assert.equal(invalidChangeRequestError?.code, '23503', 'Database must reject change requests linked to another customer project');\n    assert.equal(wrongOrganizationProject.rowCount, 0, 'Customer A must not read another organization project');
     assert.equal(wrongProject.rowCount, 0, 'Customer A must not read Customer B project');
     assert.equal(wrongQuote.rowCount, 0, 'Customer A must not mutate Customer B quote');
     assert.equal(wrongTicket.rowCount, 0, 'Customer A must not read Customer B ticket');
