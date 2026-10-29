@@ -95,3 +95,18 @@
 .consent-row a{color:var(--lilac);text-decoration:underline;text-underline-offset:3px}
 #submissionStatus{min-height:64px}
 #submissionStatus strong{color:var(--gold)}
+
+
+.live-pricing-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;margin:28px 0}
+.live-plan-card{padding:24px;border:1px solid var(--line);border-radius:18px;background:linear-gradient(155deg,#211e3b,#17152b)}
+.live-plan-card>small{color:var(--lilac);font-size:11px}
+.live-plan-card h2{font-size:23px;margin:8px 0}
+.live-plan-card p{font-size:12px;color:var(--muted);min-height:42px}
+.live-price-lines{border-block:1px solid var(--line);padding:12px 0;margin:16px 0}
+.live-price-line{display:flex;justify-content:space-between;gap:12px;padding:5px 0;font-size:12px}
+.live-price-line span{color:var(--muted)}
+.live-price-line strong{direction:ltr;text-align:left;font-family:Manrope,Cairo,sans-serif}
+.live-price-pending{font-size:12px;color:var(--gold)}
+.live-plan-card ul{padding-inline-start:20px;color:var(--muted);font-size:12px}
+.pricing-notice[hidden]{display:none}
+@media(max-width:620px){.live-pricing-grid{grid-template-columns:1fr}.live-plan-card{padding:19px}}
