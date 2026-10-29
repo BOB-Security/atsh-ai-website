@@ -2,7 +2,7 @@
 const crypto = require('node:crypto');
 const { getPool } = require('./db');
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const LEAD_TRANSITIONS = { new:['qualified','spam','lost'], qualified:['scoped','quoted','lost','spam'], scoped:['quoted','lost','spam'], quoted:['won','lost'], won:[], lost:[], spam:[] };
+const LEAD_TRANSITIONS = { new:['qualified','spam','lost'], qualified:['scoped','quoted','lost','spam'], scoped:['quoted','lost','spam'], quoted:['won','lost','scoped'], won:[], lost:[], spam:[] };
 function sha256(value){return crypto.createHash('sha256').update(value).digest('hex');}
 function ref(prefix){return 'ATSH-'+prefix+'-'+new Date().toISOString().slice(0,10).replace(/-/g,'')+'-'+crypto.randomBytes(4).toString('hex').toUpperCase();}
 function minor(value,field){if(!Number.isSafeInteger(value)||value<0||value>9000000000000)throw new Error(field+' must be a non-negative integer in minor units');return value;}
@@ -81,14 +81,14 @@ async function getPublicQuote(config,token){
  if(typeof token!=='string'||token.length<20||token.length>120)return null;const pool=getPool(config);const result=await pool.query("SELECT id,reference,status,currency,snapshot,setup_total_minor,monthly_total_minor,annual_total_minor,valid_until,response_token_expires_at FROM quotes WHERE response_token_hash=$1 AND status='issued' AND response_token_expires_at>NOW() LIMIT 1",[sha256(token)]);
  if(!result.rowCount)return null;const quote=result.rows[0];if(quote.valid_until&&new Date(quote.valid_until+'T23:59:59Z')<new Date())return {expired:true,reference:quote.reference};return {reference:quote.reference,status:quote.status,currency:String(quote.currency).trim(),snapshot:quote.snapshot,setup_total_minor:quote.setup_total_minor,monthly_total_minor:quote.monthly_total_minor,annual_total_minor:quote.annual_total_minor,valid_until:quote.valid_until};
 }
-async function respondToQuote(config,token,decision){
+async function respondToQuote(config,token,decision,ipHash){
  if(!['accepted','rejected'].includes(decision))throw new Error('Decision must be accepted or rejected');if(typeof token!=='string'||token.length<20||token.length>120){const e=new Error('Invalid quote token');e.code='NOT_FOUND';throw e;}
  return transact(config,async client=>{
   const oid=await organizationId(client,config.organizationSlug);const current=await client.query("SELECT * FROM quotes WHERE organization_id=$1 AND response_token_hash=$2 AND status='issued' AND response_token_expires_at>NOW() FOR UPDATE",[oid,sha256(token)]);if(!current.rowCount){const e=new Error('Quote response token is invalid or expired');e.code='NOT_FOUND';throw e;}const quote=current.rows[0];
   if(quote.valid_until&&new Date(quote.valid_until+'T23:59:59Z')<new Date()){await client.query("UPDATE quotes SET status='expired',response_token_hash=NULL,response_token_expires_at=NULL,updated_at=NOW() WHERE id=$1",[quote.id]);await audit(client,oid,null,'quote.expired','quote',quote.id,{reference:quote.reference},null);return {expired:true,reference:quote.reference};}
   const result=await client.query("UPDATE quotes SET status=$3,accepted_at=CASE WHEN $3='accepted' THEN NOW() ELSE accepted_at END,response_token_hash=NULL,response_token_expires_at=NULL,updated_at=NOW() WHERE organization_id=$1 AND id=$2 RETURNING reference,status",[oid,quote.id,decision]);
   if(decision==='accepted'&&quote.lead_id)await client.query("UPDATE leads SET status='won',updated_at=NOW() WHERE organization_id=$1 AND id=$2 AND status='quoted'",[oid,quote.lead_id]);
-  await audit(client,oid,null,'quote.customer_response','quote',quote.id,{reference:quote.reference,decision},null);return result.rows[0];
+  await audit(client,oid,null,'quote.customer_response','quote',quote.id,{reference:quote.reference,decision},ipHash);return result.rows[0];
  });
 }
 module.exports={listLeads,updateLead,createQuote,listQuotes,issueQuote,getPublicQuote,respondToQuote,normalizeQuoteItems};
