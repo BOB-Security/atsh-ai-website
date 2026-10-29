@@ -1,5 +1,8 @@
 name: ATSH AI clean rebuild — staging deploy
 on:
+  push:
+    branches: ['rebuild/atsh-ai-clean-v2']
+    paths: ['.github/workflows/staging-deploy.yml']
   workflow_dispatch:
     inputs:
       resource_group:
@@ -24,14 +27,16 @@ jobs:
           node-version: '22.x'
       - name: Validate staging target and secrets
         env:
-          APP_NAME: ${{ inputs.app_name }}
-          RESOURCE_GROUP: ${{ inputs.resource_group }}
+          APP_NAME: ${{ inputs.app_name || secrets.STAGING_APP_NAME }}
+          RESOURCE_GROUP: ${{ inputs.resource_group || secrets.STAGING_RESOURCE_GROUP }}
           DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
           MFA_KEY: ${{ secrets.STAGING_MFA_ENCRYPTION_KEY }}
           BOOTSTRAP_TOKEN: ${{ secrets.STAGING_ADMIN_MFA_BOOTSTRAP_TOKEN }}
           BACKUP_VERIFIED: ${{ secrets.STAGING_DB_BACKUP_VERIFIED }}
+          DEPLOY_ENABLED: ${{ secrets.STAGING_DEPLOY_ENABLED }}
         run: |
           set -euo pipefail
+          [[ "$DEPLOY_ENABLED" == "yes" ]] || { echo "Staging deployment is disabled; set STAGING_DEPLOY_ENABLED=yes only when the staging target is approved"; exit 1; }
           [[ "$APP_NAME" == *-staging ]] || { echo "Refusing deployment: app_name must end in -staging"; exit 1; }
           [[ -n "$RESOURCE_GROUP" && -n "$DATABASE_URL" && -n "$MFA_KEY" && -n "$BOOTSTRAP_TOKEN" ]] || { echo "Configure staging-only database and MFA secrets"; exit 1; }
           [[ "$MFA_KEY" =~ ^[A-Fa-f0-9]{64}$ ]] || { echo "MFA encryption key must be 64 hexadecimal characters"; exit 1; }
