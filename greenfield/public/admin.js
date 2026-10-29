@@ -38,7 +38,11 @@ async function loadSchemaReadiness(){
  const root=document.getElementById('adminSchemaReadiness');if(!root)return;
  root.replaceChildren();const pending=document.createElement('p');pending.textContent='جارٍ فحص توافق الجداول والأعمدة…';root.append(pending);
  try{
-  const response=await fetch('/api/admin/schema-readiness',{credentials:'same-origin',headers:{accept:'application/json'}});
+  const controller=new AbortController();
+  const timeout=setTimeout(()=>controller.abort(),10000);
+  let response;
+  try{response=await fetch('/api/admin/schema-readiness',{credentials:'same-origin',headers:{accept:'application/json'},signal:controller.signal});}
+  finally{clearTimeout(timeout);}
   const result=await response.json().catch(()=>({}));root.replaceChildren();
   if(!response.ok||!result.ok){const p=document.createElement('p');p.textContent=response.status===403?'حسابك لا يملك صلاحية فحص الجاهزية.':'تعذر فحص مخطط قاعدة البيانات؛ لم يتم تغيير أي بيانات.';root.append(p);return;}
   for(const group of result.groups||[]){
@@ -48,7 +52,7 @@ async function loadSchemaReadiness(){
    else for(const item of group.missing||[]){const p=document.createElement('p');p.textContent=item.table+': الأعمدة الناقصة '+(item.missingColumns||[]).join('، ');section.append(p);}
    root.append(section);
   }
- }catch{root.replaceChildren();const p=document.createElement('p');p.textContent='تعذر الاتصال بخدمة فحص الجاهزية.';root.append(p);}
+ }catch(error){root.replaceChildren();const p=document.createElement('p');p.textContent=error?.name==='AbortError'?'استغرق فحص قاعدة البيانات وقتًا أطول من المسموح. أعد الفحص أو راجع اتصال قاعدة البيانات.':'تعذر الاتصال بخدمة فحص الجاهزية.';root.append(p);}
 }
 async function loadOverview(){
  const response=await fetch('/api/admin/overview',{credentials:'same-origin',headers:{accept:'application/json'}});
