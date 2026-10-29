@@ -9,6 +9,7 @@
 - Health and readiness endpoints; protected, read-only PostgreSQL schema diagnostics.
 - Automated smoke tests for health, database failure, schema access control, intake guard, and configurator presence.
 - Manual staging deployment workflow packages only `greenfield/`, requires a staging database secret, and runs no migrations or bootstrap steps.
+- Database compatibility and release gates documented in [DATABASE_COMPATIBILITY_AND_RELEASE_PLAN.md](docs/DATABASE_COMPATIBILITY_AND_RELEASE_PLAN.md). The document distinguishes code-referenced schema names from the target database's not-yet-verified live schema.
 
 ## Explicitly not complete
 - The configurator does not submit or persist inquiries yet. It must remain disabled until the actual database schema and a safe staging copy are verified.
