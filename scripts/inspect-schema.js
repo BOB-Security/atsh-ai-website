@@ -11,6 +11,11 @@ async function main() {
   const client = await pool.connect();
   try {
     await client.query('BEGIN TRANSACTION READ ONLY');
+    const organizationMetadata = (await client.query(`SELECT o.slug, o.status,
+      (SELECT count(*)::integer FROM service_categories c WHERE c.organization_id = o.id) AS category_count,
+      (SELECT count(*)::integer FROM service_plans p WHERE p.organization_id = o.id) AS plan_count,
+      (SELECT count(*)::integer FROM service_addons a WHERE a.organization_id = o.id) AS addon_count
+      FROM organizations o WHERE o.slug = $1`, [process.env.DEFAULT_ORGANIZATION_SLUG || 'atsh-ai'])).rows;
     const tables = (await client.query(`SELECT table_schema, table_name, table_type
       FROM information_schema.tables
       WHERE table_schema NOT IN ('pg_catalog','information_schema')
@@ -35,7 +40,7 @@ async function main() {
     const indexes = (await client.query(`SELECT schemaname AS schema_name, tablename AS table_name, indexname, indexdef
       FROM pg_indexes WHERE schemaname NOT IN ('pg_catalog','information_schema')
       ORDER BY schemaname, tablename, indexname`)).rows;
-    const inventory = { generatedAt: new Date().toISOString(), scope: 'metadata-only; no application rows selected', tables, columns, constraints, indexes };
+    const inventory = { generatedAt: new Date().toISOString(), scope: 'metadata-only; no customer rows selected', organizationMetadata, tables, columns, constraints, indexes };
     process.stdout.write(JSON.stringify(inventory, null, 2) + '\n');
     await client.query('ROLLBACK');
   } finally {
