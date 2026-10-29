@@ -212,3 +212,14 @@
 .admin-preview-page p{margin:0;line-height:1.9;color:#d4d0e9;font-size:13px}
 @keyframes adminPaneIn{from{opacity:.45;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
 @media(max-width:700px){.admin-tabs{margin-inline:-4px;padding:7px}.admin-tab{padding:10px 12px;font-size:11px}.admin-preview-dialog{padding:15px}.admin-preview-button{margin:8px 0 0}.admin-tab-pane .admin-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+
+.admin-recovery-actions{display:flex;justify-content:flex-start;margin-top:14px}
+.admin-recovery-actions .text-link{border:0;background:none;cursor:pointer;font:inherit;font-size:12px;color:var(--gold);text-decoration:underline;text-underline-offset:4px}
+.admin-recovery-panel{margin-top:20px;padding:18px;border:1px solid var(--line);border-radius:14px;background:#11102080}
+.admin-recovery-panel[hidden]{display:none!important}
+.admin-recovery-panel h3{margin:0;font-size:16px}
+.admin-recovery-panel .admin-panel-heading{align-items:flex-start;flex-wrap:wrap}
+.admin-recovery-panel .admin-form{margin-top:14px}
+.admin-recovery-panel .admin-subtext[data-kind="warning"]{color:var(--gold)}
+.admin-recovery-panel .admin-subtext[data-kind="success"]{color:var(--green)}
