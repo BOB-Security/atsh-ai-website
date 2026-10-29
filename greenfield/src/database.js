@@ -418,7 +418,7 @@ function createDatabase(config, dependencies = {}) {
       const roles=await client.query('SELECT id,name,permissions FROM roles WHERE organization_id=$1 ORDER BY name',[organizationId]);
       const users=await client.query(`SELECT u.id,u.email,u.full_name,u.status,u.last_login_at,COALESCE(jsonb_agg(DISTINCT jsonb_build_object('id',r.id,'name',r.name)) FILTER (WHERE r.id IS NOT NULL),'[]'::jsonb) AS roles
         FROM users u LEFT JOIN user_roles ur ON ur.user_id=u.id LEFT JOIN roles r ON r.id=ur.role_id AND r.organization_id=u.organization_id
-        WHERE u.organization_id=$1 GROUP BY u.id ORDER BY u.created_at DESC LIMIT 200`,[organizationId]);
+        WHERE u.organization_id=$1 GROUP BY u.id ORDER BY u.updated_at DESC LIMIT 200`,[organizationId]);
       return {roles:roles.rows,members:users.rows};
     } finally {client.release();}
   }
