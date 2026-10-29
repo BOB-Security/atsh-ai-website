@@ -119,3 +119,36 @@ test('admin session creation and audit event commit in one transaction',async()=
  assert.equal(audit.params[4],'ip-hash');
  await db.close();
 });
+
+test('admin session query groups organization status to avoid PostgreSQL 42803',async()=>{
+ const authSchema={
+  users:['id','organization_id','email','full_name','password_hash','status','last_login_at','updated_at'],
+  organizations:['id','status'],
+  roles:['id','organization_id','name','permissions'],
+  user_roles:['user_id','role_id'],
+  auth_sessions:['id','user_id','token_hash','expires_at','last_seen_at','created_at'],
+  audit_logs:['id','organization_id','actor_user_id','action','entity_type','entity_id','details','ip_hash','created_at']
+ };
+ const calls=[];
+ const tokenHash='session-token-hash';
+ const expectedUser={id:'user-1',organization_id:orgId,email:'owner@example.com',full_name:'Owner',status:'active',organization_status:'active',expires_at:'2099-01-01T00:00:00.000Z',role_permission_sets:[['dashboard.read']]};
+ const client={
+  async query(sql,params=[]){
+   calls.push({sql,params});
+   if(sql.includes('information_schema.columns'))return {rows:schemaRows(authSchema)};
+   if(sql.includes('FROM auth_sessions s'))return {rows:[expectedUser]};
+   if(sql.includes('UPDATE auth_sessions SET last_seen_at'))return {rows:[]};
+   throw new Error('Unexpected SQL in admin session test: '+sql);
+  },
+  release(){}
+ };
+ const pool={on(){},async connect(){return client;},async end(){}};
+ const db=createDatabase(config,{poolFactory:()=>pool});
+ const session=await db.getAdminSession(tokenHash);
+ assert.equal(session.id,'user-1');
+ const sessionQuery=calls.find(call=>call.sql.includes('FROM auth_sessions s'));
+ assert.ok(sessionQuery);
+ assert.match(sessionQuery.sql,/GROUP BY u\.id,\s*o\.status,\s*s\.expires_at/);
+ assert.equal(sessionQuery.params[0],tokenHash);
+ await db.close();
+});
