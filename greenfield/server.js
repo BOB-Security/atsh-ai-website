@@ -201,6 +201,47 @@ function createApp(overrides = {}) {
       return res.status(503).json({ error: 'admin_unavailable' });
     }
   });
+  app.get('/api/admin/members', async (req,res)=>{
+    try{
+      const auth=await getCurrentAdmin(req);
+      if(!auth)return res.status(401).json({error:'authentication_required'});
+      if(!auth.permissions.includes('*')&&!auth.permissions.includes('admin.manage'))return res.status(403).json({error:'permission_denied'});
+      const data=await database.listAdminMembers(auth.user.organization_id);
+      res.setHeader('Cache-Control','no-store');
+      return res.json({ok:true,...data});
+    }catch(error){
+      console.error('Admin member list failed:',error.code||'unknown');
+      return res.status(503).json({error:'admin_members_unavailable'});
+    }
+  });
+  app.post('/api/admin/members', async (req,res)=>{
+    const csrfCookie=readCookie(req.headers.cookie,'atsh_admin_csrf');
+    if(!csrfCookie||!safeEqual(csrfCookie,req.get('x-csrf-token')||''))return res.status(403).json({error:'csrf_validation_failed'});
+    try{
+      const auth=await getCurrentAdmin(req);
+      if(!auth)return res.status(401).json({error:'authentication_required'});
+      if(!auth.permissions.includes('*')&&!auth.permissions.includes('admin.manage'))return res.status(403).json({error:'permission_denied'});
+      const input=req.body?.member;
+      if(!input||typeof input!=='object'||Array.isArray(input))return res.status(400).json({error:'invalid_member'});
+      const email=typeof input.email==='string'?input.email.trim().toLowerCase():'';
+      const full_name=typeof input.full_name==='string'?input.full_name.trim():'';
+      const password=typeof input.password==='string'?input.password:'';
+      const role_id=typeof input.role_id==='string'?input.role_id:'';
+      if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)||email.length>254||full_name.length<2||full_name.length>160||password.length<12||password.length>128||!role_id){
+        return res.status(400).json({error:'invalid_member',message:'أدخل اسمًا وبريدًا صحيحًا وكلمة مرور مؤقتة لا تقل عن 12 حرفًا وحدد الدور.'});
+      }
+      const salt=crypto.randomBytes(16).toString('hex');
+      const hash=await new Promise((resolve,reject)=>crypto.scrypt(password,salt,64,(error,key)=>error?reject(error):resolve(key.toString('hex'))));
+      const member=await database.createAdminMember(auth.user.organization_id,auth.user.id,{email,full_name,role_id,password_hash:'scrypt'+'$'+salt+'$'+hash});
+      res.setHeader('Cache-Control','no-store');
+      return res.status(201).json({ok:true,member});
+    }catch(error){
+      if(error.code==='ADMIN_ROLE_NOT_FOUND')return res.status(400).json({error:'invalid_role'});
+      if(error.code==='ADMIN_MEMBER_EMAIL_EXISTS')return res.status(409).json({error:'email_exists',message:'يوجد حساب بهذا البريد الإلكتروني بالفعل.'});
+      console.error('Admin member create failed:',error.code||'unknown');
+      return res.status(503).json({error:'admin_member_create_failed'});
+    }
+  });
   app.get('/api/admin/site-settings', async (req,res)=>{
     try{const auth=await getCurrentAdmin(req);if(!auth)return res.status(401).json({error:'authentication_required'});if(!auth.permissions.includes('*')&&!auth.permissions.includes('site.manage'))return res.status(403).json({error:'permission_denied'});
     const result=await database.getSiteSettings(auth.user.organization_id);res.setHeader('Cache-Control','no-store');return res.json({ok:true,settings:result.settings||{},updatedAt:result.updated_at||null});

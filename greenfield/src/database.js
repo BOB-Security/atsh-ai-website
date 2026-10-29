@@ -435,6 +435,33 @@ function createDatabase(config, dependencies = {}) {
     } finally { client.release(); }
   }
 
+  async function listAdminMembers(organizationId) {
+    const client=await getPool().connect();
+    try {
+      const roles=await client.query('SELECT id,name,permissions FROM roles WHERE organization_id=$1 ORDER BY name',[organizationId]);
+      const users=await client.query(`SELECT u.id,u.email,u.full_name,u.status,u.last_login_at,COALESCE(jsonb_agg(DISTINCT jsonb_build_object('id',r.id,'name',r.name)) FILTER (WHERE r.id IS NOT NULL),'[]'::jsonb) AS roles
+        FROM users u LEFT JOIN user_roles ur ON ur.user_id=u.id LEFT JOIN roles r ON r.id=ur.role_id AND r.organization_id=u.organization_id
+        WHERE u.organization_id=$1 GROUP BY u.id ORDER BY u.updated_at DESC LIMIT 200`,[organizationId]);
+      return {roles:roles.rows,members:users.rows};
+    } finally {client.release();}
+  }
+  async function createAdminMember(organizationId,actorId,input) {
+    const client=await getPool().connect();
+    try {
+      await client.query('BEGIN');
+      const role=await client.query('SELECT id FROM roles WHERE id=$1 AND organization_id=$2',[input.role_id,organizationId]);
+      if(!role.rows.length){const error=new Error('Role not found.');error.code='ADMIN_ROLE_NOT_FOUND';throw error;}
+      const inserted=await client.query("INSERT INTO users (organization_id,email,full_name,password_hash,status,updated_at) VALUES ($1,lower($2),$3,$4,'active',now()) RETURNING id,email,full_name,status",
+        [organizationId,input.email,input.full_name,input.password_hash]);
+      const user=inserted.rows[0];
+      await client.query('INSERT INTO user_roles (user_id,role_id) VALUES ($1,$2)',[user.id,input.role_id]);
+      await client.query("INSERT INTO audit_logs (organization_id,actor_user_id,action,entity_type,entity_id,details,ip_hash) VALUES ($1,$2,'admin.member.create','user',$3,$4::jsonb,NULL)",
+        [organizationId,actorId,user.id,JSON.stringify({email:user.email,role_id:input.role_id})]);
+      await client.query('COMMIT');return user;
+    } catch(error){try{await client.query('ROLLBACK');}catch{}if(error.code==='23505')error.code='ADMIN_MEMBER_EMAIL_EXISTS';throw error;}
+    finally{client.release();}
+  }
+
   async function getSiteSettings(organizationId) {
     if (!organizationId) { const error = new Error('Organization is missing.'); error.code = 'SITE_SETTINGS_NOT_CONFIGURED'; throw error; }
     const client = await getPool().connect();
