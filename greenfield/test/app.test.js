@@ -197,3 +197,28 @@ test('admin schema readiness is authenticated and read-only',async t=>{
  assert.ok(result.groups[0].missing.some(item=>item.table==='users'));
  assert.match(response.headers.get('cache-control'),/no-store/);
 });
+
+
+test('admin recovery status clearly reports disabled delivery when mail is not configured',async t=>{
+ const base=await withServer(t,config,{checkConnection:async()=>true,inspectSchema:async()=>[]});
+ const status=await fetch(base+'/api/admin/password-recovery/status');
+ assert.equal(status.status,200);assert.deepEqual(await status.json(),{ok:true,configured:false});
+ const request=await fetch(base+'/api/admin/password-recovery/request',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:'owner@example.com'})});
+ assert.equal(request.status,503);assert.equal((await request.json()).error,'recovery_not_configured');
+});
+test('admin recovery request does not reveal whether an email belongs to an account',async t=>{
+ const recoveryConfig={...config,passwordRecoveryConfigured:true,resendApiKey:'test-key',recoveryFromEmail:'security@example.com',publicBaseUrl:'https://example.com'};
+ const base=await withServer(t,recoveryConfig,{createAdminPasswordReset:async()=>null});
+ const response=await fetch(base+'/api/admin/password-recovery/request',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:'unknown@example.com'})});
+ assert.equal(response.status,200);
+ const result=await response.json();assert.equal(result.ok,true);assert.match(result.message,/إذا كان البريد/);
+});
+test('admin password recovery validates token and password before changing credentials',async t=>{
+ let called=false;
+ const recoveryConfig={...config,passwordRecoveryConfigured:true,resendApiKey:'test-key',recoveryFromEmail:'security@example.com',publicBaseUrl:'https://example.com'};
+ const base=await withServer(t,recoveryConfig,{completeAdminPasswordReset:async(tokenHash,passwordHash)=>{called=true;assert.match(tokenHash,/^[a-f0-9]{64}$/);assert.match(passwordHash,/^scrypt\\$[a-f0-9]{32}\\$[a-f0-9]{128}$/);return true;}});
+ const invalid=await fetch(base+'/api/admin/password-recovery/complete',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({token:'short',password:'short'})});
+ assert.equal(invalid.status,400);assert.equal(called,false);
+ const valid=await fetch(base+'/api/admin/password-recovery/complete',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({token:'valid-token-from-email-link-0123456789',password:'Secure-New-Password-2026!'})});
+ assert.equal(valid.status,200);assert.equal((await valid.json()).ok,true);assert.equal(called,true);
+});
