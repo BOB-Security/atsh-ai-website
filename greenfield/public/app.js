@@ -18,7 +18,7 @@ if(wizard){
   {title:'الهدف والقيود',intro:'أضف ما يساعد على فهم النجاح المطلوب والقيود المهمة.',key:'details',type:'fields',fields:[{key:'goal',label:'ما الهدف أو المشكلة التي تريد حلها؟',kind:'textarea',required:true,placeholder:'صف الهدف والنتيجة المتوقعة (20 حرفًا على الأقل).'},{key:'audience',label:'من سيستخدم الحل؟',kind:'text',placeholder:'العملاء، الموظفون، شركاء العمل...'},{key:'integrations',label:'أنظمة أو تكاملات محددة (إن وجدت)',kind:'text',placeholder:'أسماء الأنظمة أو الروابط المتاحة'},{key:'deadline',label:'الموعد المستهدف (إن وجد)',kind:'text',placeholder:'مثال: خلال 6 أسابيع'},{key:'constraints',label:'قيود أو متطلبات خاصة (اختياري)',kind:'textarea',placeholder:'الميزانية التقريبية، متطلبات الأمان، أو أمور يجب تجنبها'}]},
   {title:'مراجعة الملخص',intro:'راجع المعلومات قبل اعتمادها. لا توجد أسعار أو إرسال طلب في هذه النسخة.',key:'review',type:'review'}
  ];
- const data={features:[]};let current=0;
+ const data={features:[],consent:false};let current=0;
  const body=document.getElementById('wizardBody'),title=document.getElementById('wizardTitle'),label=document.getElementById('wizardStepLabel'),percent=document.getElementById('wizardPercent'),fill=document.getElementById('wizardProgressFill'),progress=document.getElementById('wizardProgress'),back=document.getElementById('wizardBack'),next=document.getElementById('wizardNext'),error=document.getElementById('wizardError'),footnote=document.getElementById('wizardFootnote');
  const esc=v=>String(v==null?'':v).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
  const digits=['٠','١','٢','٣','٤','٥','٦','٧','٨','٩'];const arnum=n=>String(n).replace(/\d/g,d=>digits[Number(d)]);
@@ -45,8 +45,28 @@ if(wizard){
    body.innerHTML='<p class="wizard-intro">'+esc(step.intro)+'</p><div class="field-grid">'+step.fields.map(fieldMarkup).join('')+'</div>';
    body.querySelectorAll('[data-field]').forEach(i=>{i.addEventListener('input',()=>{data[i.dataset.field]=i.value;});i.addEventListener('change',()=>{data[i.dataset.field]=i.value;});});
   }else{
-   body.innerHTML='<p class="wizard-intro">'+esc(step.intro)+'</p>'+summaryRows()+'<div class="review-actions"><button type="button" class="text-link" id="editContact">تعديل بيانات التواصل</button><button type="button" class="text-link" id="editDetails">تعديل الهدف والقيود</button></div><div class="submission-disabled" role="status"><strong>الإرسال غير مفعّل بعد</strong><span>لن نعرض رسالة نجاح وهمية. بعد توافق قاعدة البيانات سنربط الإرسال ونختبر حفظ الطلب ورقمه المرجعي.</span></div>';
+   body.innerHTML='<p class="wizard-intro">'+esc(step.intro)+'</p>'+summaryRows()+'<div class="review-actions"><button type="button" class="text-link" id="editContact">تعديل بيانات التواصل</button><button type="button" class="text-link" id="editDetails">تعديل الهدف والقيود</button></div><label class="consent-row"><input id="inquiryConsent" type="checkbox"'+(data.consent?' checked':'')+'><span>أوافق على استخدام بياناتي للرد على الطلب وفق <a href="/privacy.html" target="_blank" rel="noopener">سياسة الخصوصية</a>.</span></label><div class="actions" style="margin-top:14px"><button type="button" class="btn primary" id="submitInquiry">إرسال طلب المشروع</button></div><div id="submissionStatus" class="submission-disabled" role="status" aria-live="polite"><strong>لم يتم إرسال الطلب بعد</strong><span>لن نعرض رسالة نجاح إلا بعد تأكيد حفظ الطلب من الخادم.</span></div>';
    document.getElementById('editContact').addEventListener('click',()=>{current=5;render();});document.getElementById('editDetails').addEventListener('click',()=>{current=6;render();});
+   document.getElementById('inquiryConsent').addEventListener('change',event=>{data.consent=event.target.checked;});
+   document.getElementById('submitInquiry').addEventListener('click',submitInquiry);
+  }
+ }
+ async function submitInquiry(){
+  const button=document.getElementById('submitInquiry'),status=document.getElementById('submissionStatus');
+  if(!data.consent){status.innerHTML='<strong>الموافقة مطلوبة</strong><span>وافق على سياسة الخصوصية قبل إرسال بيانات الطلب.</span>';return;}
+  const contact=['name','email','service','goal'];
+  if(contact.some(key=>!String(data[key]||'').trim())){status.innerHTML='<strong>بيانات غير مكتملة</strong><span>ارجع إلى بيانات التواصل والهدف وأكمل الحقول المطلوبة.</span>';return;}
+  button.disabled=true;button.textContent='جارٍ إرسال الطلب…';status.innerHTML='<strong>جارٍ التحقق من الحفظ</strong><span>انتظر رد الخادم قبل إغلاق الصفحة.</span>';
+  const payload={...data,features:Array.isArray(data.features)?data.features:[],consent:true};
+  try{
+   const response=await fetch('/api/public/inquiries',{method:'POST',headers:{'content-type':'application/json','accept':'application/json'},body:JSON.stringify(payload),credentials:'same-origin'});
+   const result=await response.json().catch(()=>({}));
+   if(!response.ok||result.ok!==true||!result.inquiry||!result.inquiry.reference)throw new Error(result.message||'تعذر تأكيد حفظ الطلب. لم يتم تأكيد التسجيل.');
+   status.innerHTML='<strong>تم حفظ الطلب بنجاح</strong><span>رقم طلبك: '+esc(result.inquiry.reference)+' — احتفظ به عند التواصل معنا.</span>';
+   button.textContent='تم إرسال الطلب';button.disabled=true;
+  }catch(error){
+   status.innerHTML='<strong>لم يتم تأكيد حفظ الطلب</strong><span>'+esc(error.message||'تعذر الاتصال بالخادم. حاول لاحقًا.')+'</span>';
+   button.disabled=false;button.textContent='إعادة محاولة الإرسال';
   }
  }
  function valid(){
