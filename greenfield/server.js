@@ -77,7 +77,8 @@ function createApp(overrides = {}) {
       const token = crypto.randomBytes(32).toString('base64url');
       const csrf = crypto.randomBytes(32).toString('base64url');
       const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
-      await database.createAdminSession(user.id, tokenHash);
+      const ipHash = crypto.createHash('sha256').update(String(req.ip || req.socket?.remoteAddress || '')).digest('hex');
+      await database.createAdminSession(user.id, tokenHash, { ipHash });
       const secure = config.nodeEnv === 'production' ? '; Secure' : '';
       res.setHeader('Set-Cookie', [
         'atsh_admin_session=' + encodeURIComponent(token) + '; Path=/; HttpOnly; SameSite=Strict; Max-Age=28800' + secure,
@@ -123,7 +124,10 @@ function createApp(overrides = {}) {
     if (!cookieToken || !safeEqual(cookieToken, headerToken)) return res.status(403).json({ error: 'csrf_validation_failed' });
     try {
       const token = readCookie(req.headers.cookie, 'atsh_admin_session');
-      if (token && token.length <= 256) await database.deleteAdminSession(hashAdminToken(token));
+      if (token && token.length <= 256) {
+        const ipHash = crypto.createHash('sha256').update(String(req.ip || req.socket?.remoteAddress || '')).digest('hex');
+        await database.deleteAdminSession(hashAdminToken(token), { ipHash });
+      }
       const secure = config.nodeEnv === 'production' ? '; Secure' : '';
       res.setHeader('Set-Cookie', [
         'atsh_admin_session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0' + secure,
