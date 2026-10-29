@@ -101,3 +101,31 @@ test('admin logout rejects a missing CSRF token',async t=>{
  assert.equal(response.status,403);
  assert.equal((await response.json()).error,'csrf_validation_failed');
 });
+
+
+test('admin catalog is organization-scoped and permission-gated',async t=>{
+ const crypto=require('node:crypto');
+ const token='test-session-token-that-is-long-enough-1234567890';
+ const tokenHash=crypto.createHash('sha256').update(token).digest('hex');
+ const categoryData=[{id:'cat-1',name:{ar:'المواقع'},active:true,plans:[]}];
+ let requestedOrganization='';
+ const db={checkConnection:async()=>true,inspectSchema:async()=>[],getAdminSession:async hash=>hash===tokenHash?{id:'user-1',organization_id:'org-verified',email:'owner@example.com',full_name:'Owner',role_permission_sets:[['catalog.read']]}:null,listAdminCatalog:async organizationId=>{requestedOrganization=organizationId;return categoryData;}};
+ const base=await withServer(t,config,db);
+ const anonymous=await fetch(base+'/api/admin/catalog');
+ assert.equal(anonymous.status,401);
+ const response=await fetch(base+'/api/admin/catalog',{headers:{cookie:'atsh_admin_session='+encodeURIComponent(token)}});
+ assert.equal(response.status,200);
+ assert.deepEqual((await response.json()).categories,categoryData);
+ assert.equal(requestedOrganization,'org-verified');
+});
+test('admin catalog denies a session without catalog permissions',async t=>{
+ const crypto=require('node:crypto');
+ const token='test-session-token-that-is-long-enough-0987654321';
+ const tokenHash=crypto.createHash('sha256').update(token).digest('hex');
+ let readCount=0;
+ const db={checkConnection:async()=>true,inspectSchema:async()=>[],getAdminSession:async hash=>hash===tokenHash?{id:'user-2',organization_id:'org-verified',email:'staff@example.com',full_name:'Staff',role_permission_sets:[['reports.read']]}:null,listAdminCatalog:async()=>{readCount++;return [];}};
+ const base=await withServer(t,config,db);
+ const response=await fetch(base+'/api/admin/catalog',{headers:{cookie:'atsh_admin_session='+encodeURIComponent(token)}});
+ assert.equal(response.status,403);
+ assert.equal(readCount,0);
+});
