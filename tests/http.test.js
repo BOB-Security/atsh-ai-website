@@ -51,3 +51,16 @@ test('MFA bootstrap is disabled unless a protected deployment token is configure
   const response = await fetch(base + '/api/admin/mfa/setup', { method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({email:'owner@example.com',password:'not-a-real-password',bootstrapToken:''}) });
   assert.equal(response.status, 403);
 });
+
+test('lead and quote administration APIs require an authenticated session', async () => {
+  const leads=await fetch(base+'/api/admin/leads');
+  const quotes=await fetch(base+'/api/admin/quotes');
+  assert.equal(leads.status,401);
+  assert.equal(quotes.status,401);
+});
+test('public quote response requires a valid opaque token and never accepts an empty token', async () => {
+  const lookup=await fetch(base+'/api/public/quotes/lookup',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({token:''})});
+  assert.equal(lookup.status,404);
+  const response=await fetch(base+'/api/public/quotes/respond',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({token:'',decision:'accepted'})});
+  assert.equal(response.status,404);
+});
