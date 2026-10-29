@@ -152,6 +152,22 @@ function createApp(overrides = {}) {
       return res.status(503).json({ error: 'admin_overview_unavailable' });
     }
   });
+  app.get('/api/admin/catalog', async (req, res) => {
+    try {
+      const auth = await getCurrentAdmin(req);
+      if (!auth) return res.status(401).json({ error: 'authentication_required' });
+      if (!auth.permissions.includes('*') && !auth.permissions.includes('catalog.read') && !auth.permissions.includes('catalog.manage')) {
+        return res.status(403).json({ error: 'permission_denied' });
+      }
+      const categories = await database.listAdminCatalog(auth.user.organization_id);
+      res.setHeader('Cache-Control', 'no-store');
+      return res.json({ ok: true, categories });
+    } catch (error) {
+      if (error.code === 'ADMIN_CATALOG_SCHEMA_MISMATCH') return res.status(503).json({ error: 'admin_catalog_not_ready', message: 'كتالوج الإدارة يحتاج إلى مراجعة توافق قاعدة البيانات.' });
+      console.error('Admin catalog read failed:', error.code || 'unknown');
+      return res.status(503).json({ error: 'admin_catalog_unavailable' });
+    }
+  });
   app.get('/api/public/catalog', async (_req, res) => {
     try {
       const categories = await database.listPublicCatalog();
