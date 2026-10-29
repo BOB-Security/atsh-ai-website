@@ -25,13 +25,13 @@ test('readiness fails closed when the database is not configured', async () => {
 test('catalog does not invent services or prices before database mapping', async () => {
   const response = await fetch(base + '/api/public/catalog');
   assert.equal(response.status, 503);
-  assert.equal((await response.json()).error, 'catalog_not_configured');
+  assert.equal((await response.json()).error, 'catalog_unavailable');
 });
 test('project intake never reports success before persistence is configured', async () => {
   const response = await fetch(base + '/api/public/project-inquiries', {
     method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ name: 'Test', email: 'test@example.com', brief: 'test' })
+    body: JSON.stringify({ name: 'Test', email: 'test@example.com', brief: 'A sufficiently long project brief', serviceType: 'website', scope: 'small', brand: 'ready', hosting: 'later', languages: ['ar'], addons: [], consent: true })
   });
   assert.equal(response.status, 503);
-  assert.equal((await response.json()).error, 'intake_not_configured');
+  assert.equal((await response.json()).error, 'intake_unavailable');
 });
