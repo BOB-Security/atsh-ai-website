@@ -27,10 +27,16 @@ jobs:
           APP_NAME: ${{ inputs.app_name }}
           RESOURCE_GROUP: ${{ inputs.resource_group }}
           DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+          MFA_KEY: ${{ secrets.STAGING_MFA_ENCRYPTION_KEY }}
+          BOOTSTRAP_TOKEN: ${{ secrets.STAGING_ADMIN_MFA_BOOTSTRAP_TOKEN }}
+          BACKUP_VERIFIED: ${{ secrets.STAGING_DB_BACKUP_VERIFIED }}
         run: |
           set -euo pipefail
           [[ "$APP_NAME" == *-staging ]] || { echo "Refusing deployment: app_name must end in -staging"; exit 1; }
-          [[ -n "$RESOURCE_GROUP" && -n "$DATABASE_URL" ]] || { echo "Configure staging-only target and database secret"; exit 1; }
+          [[ -n "$RESOURCE_GROUP" && -n "$DATABASE_URL" && -n "$MFA_KEY" && -n "$BOOTSTRAP_TOKEN" ]] || { echo "Configure staging-only database and MFA secrets"; exit 1; }
+          [[ "$MFA_KEY" =~ ^[A-Fa-f0-9]{64}$ ]] || { echo "MFA encryption key must be 64 hexadecimal characters"; exit 1; }
+          [[ "${#BOOTSTRAP_TOKEN}" -ge 32 ]] || { echo "MFA bootstrap token must be at least 32 characters"; exit 1; }
+          [[ "$BACKUP_VERIFIED" == "yes" ]] || { echo "Set STAGING_DB_BACKUP_VERIFIED=yes only after verifying an external staging database backup"; exit 1; }
       - run: npm install --package-lock-only
       - run: npm ci
       - run: npm run build
@@ -50,14 +56,25 @@ jobs:
           set -euo pipefail
           state=$(az webapp show --name "$APP_NAME" --resource-group "$RESOURCE_GROUP" --query state -o tsv)
           [[ "$state" == "Running" ]] || { echo "Staging App Service must exist and be Running"; exit 1; }
+      - name: Apply additive MFA migration to the verified staging database only
+        env:
+          DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+          PGSSLMODE: require
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f db/migrations/20261029_001_mfa.sql
       - name: Configure staging runtime (staging database only)
         env:
           APP_NAME: ${{ inputs.app_name }}
           RESOURCE_GROUP: ${{ inputs.resource_group }}
           DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+          MFA_KEY: ${{ secrets.STAGING_MFA_ENCRYPTION_KEY }}
+          BOOTSTRAP_TOKEN: ${{ secrets.STAGING_ADMIN_MFA_BOOTSTRAP_TOKEN }}
         run: |
           set -euo pipefail
-          az webapp config appsettings set --name "$APP_NAME" --resource-group "$RESOURCE_GROUP" --settings NODE_ENV=production PORT=8080 PGSSL=require DEFAULT_ORGANIZATION_SLUG=atsh-ai PUBLIC_BASE_URL="https://$APP_NAME.azurewebsites.net" DATABASE_URL="$DATABASE_URL" WEBSITE_NODE_DEFAULT_VERSION='~22' SCM_DO_BUILD_DURING_DEPLOYMENT=true --output none
+          az webapp config appsettings set --name "$APP_NAME" --resource-group "$RESOURCE_GROUP" --settings NODE_ENV=production PORT=8080 PGSSL=require DEFAULT_ORGANIZATION_SLUG=atsh-ai CATALOG_PUBLICATION_APPROVED=false MFA_ENCRYPTION_KEY="$MFA_KEY" ADMIN_MFA_BOOTSTRAP_TOKEN="$BOOTSTRAP_TOKEN" PUBLIC_BASE_URL="https://$APP_NAME.azurewebsites.net" DATABASE_URL="$DATABASE_URL" WEBSITE_NODE_DEFAULT_VERSION='~22' SCM_DO_BUILD_DURING_DEPLOYMENT=true --output none
           az webapp config set --name "$APP_NAME" --resource-group "$RESOURCE_GROUP" --startup-file "npm start" --output none
       - uses: azure/webapps-deploy@v3
         with:
