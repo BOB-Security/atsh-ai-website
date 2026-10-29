@@ -120,7 +120,7 @@ if(loginForm)loginForm.addEventListener('submit',async event=>{
   const response=await fetch('/api/admin/login',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json','accept':'application/json'},body:JSON.stringify({email:formData.get('email'),password:formData.get('password')})});
   const result=await response.json().catch(()=>({}));
   if(!response.ok||!result.ok){showMessage(result.message||'لم يكتمل تسجيل الدخول. لم يتم إنشاء جلسة إدارة.','error');return;}
-  csrfToken=result.csrfToken||'';loginForm.reset();showSignedIn(result.user);await loadOverview();await loadCatalog();
+  csrfToken=result.csrfToken||'';loginForm.reset();showSignedIn(result.user);await loadOverview();await loadCatalog();await loadLeads();
  }catch{showMessage('تعذر الوصول إلى خدمة المصادقة. لم يتم تسجيل الدخول.','error');}
  finally{if(submit)submit.disabled=false;}
 });
