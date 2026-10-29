@@ -27,3 +27,17 @@ test('scrypt password verification supports the existing stored hash format', as
   assert.equal(await verifyPassword(password, stored), true);
   assert.equal(await verifyPassword('wrong password', stored), false);
 });
+
+const { normalizeQuoteItems } = require('../src/admin-operations');
+test('quote line items calculate every billing period on the server', () => {
+  const quote=normalizeQuoteItems([{description:'Website delivery',quantity:2,unit_setup_minor:15000,unit_monthly_minor:1000,unit_annual_minor:10000}]);
+  assert.equal(quote.setupTotal,30000);
+  assert.equal(quote.monthlyTotal,2000);
+  assert.equal(quote.annualTotal,20000);
+  assert.equal(quote.items[0].setup_total_minor,30000);
+});
+test('quote calculation rejects empty, zero-price and invalid-quantity quotes', () => {
+  assert.throws(()=>normalizeQuoteItems([]),/between 1 and 50/);
+  assert.throws(()=>normalizeQuoteItems([{description:'Free',quantity:1}]),/non-zero amount/);
+  assert.throws(()=>normalizeQuoteItems([{description:'Bad',quantity:0,unit_setup_minor:100}]),/quantity/);
+});
