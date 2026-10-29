@@ -216,7 +216,7 @@ test('admin recovery request does not reveal whether an email belongs to an acco
 test('admin password recovery validates token and password before changing credentials',async t=>{
  let called=false;
  const recoveryConfig={...config,passwordRecoveryConfigured:true,resendApiKey:'test-key',recoveryFromEmail:'security@example.com',publicBaseUrl:'https://example.com'};
- const base=await withServer(t,recoveryConfig,{completeAdminPasswordReset:async(tokenHash,passwordHash)=>{called=true;assert.match(tokenHash,/^[a-f0-9]{64}$/);assert.match(passwordHash,/^scrypt\\$[a-f0-9]{32}\\$[a-f0-9]{128}$/);return true;}});
+ const base=await withServer(t,recoveryConfig,{completeAdminPasswordReset:async(tokenHash,passwordHash)=>{called=true;assert.match(tokenHash,/^[a-f0-9]{64}$/);assert.match(passwordHash,/^scrypt\$[a-f0-9]{32}\$[a-f0-9]{128}$/);return true;}});
  const invalid=await fetch(base+'/api/admin/password-recovery/complete',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({token:'short',password:'short'})});
  assert.equal(invalid.status,400);assert.equal(called,false);
  const valid=await fetch(base+'/api/admin/password-recovery/complete',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({token:'valid-token-from-email-link-0123456789',password:'Secure-New-Password-2026!'})});
