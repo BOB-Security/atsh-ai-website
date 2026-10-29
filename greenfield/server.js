@@ -116,6 +116,56 @@ function createApp(overrides = {}) {
     const permissions = (Array.isArray(user.role_permission_sets) ? user.role_permission_sets : []).flat().filter(value => typeof value === 'string');
     return { user, permissions };
   };
+  app.get('/api/admin/schema-readiness', async (req, res) => {
+    try {
+      const auth = await getCurrentAdmin(req);
+      if (!auth) return res.status(401).json({ error: 'authentication_required' });
+      if (!auth.permissions.includes('*') && !auth.permissions.includes('dashboard.read') && !auth.permissions.includes('reports.read')) {
+        return res.status(403).json({ error: 'permission_denied' });
+      }
+      const columns = await database.inspectSchema();
+      const present = new Map();
+      for (const column of columns) {
+        if (!column || column.table_schema !== 'public' || typeof column.table_name !== 'string' || typeof column.column_name !== 'string') continue;
+        if (!present.has(column.table_name)) present.set(column.table_name, new Set());
+        present.get(column.table_name).add(column.column_name);
+      }
+      const groups = {
+        'المصادقة والصلاحيات': {
+          users: ['id','organization_id','email','full_name','password_hash','status','last_login_at','updated_at'],
+          organizations: ['id','status'], roles: ['id','organization_id','name','permissions'],
+          user_roles: ['user_id','role_id'], auth_sessions: ['id','user_id','token_hash','expires_at','last_seen_at','created_at'],
+          audit_logs: ['id','organization_id','actor_user_id','action','entity_type','entity_id','details','ip_hash','created_at']
+        },
+        'ملخص الإدارة': {
+          leads: ['organization_id','status'], projects: ['organization_id'], support_tickets: ['organization_id','status'],
+          service_categories: ['organization_id','active'], service_plans: ['organization_id','active']
+        },
+        'طلبات العملاء': {
+          leads: ['id','organization_id','customer_id','reference','status','source','project_goal','solution_type','created_at'],
+          customers: ['id','organization_id','display_name','email','phone']
+        },
+        'الخدمات والباقات': {
+          service_categories: ['id','organization_id','slug','name_ar','name_en','description_ar','description_en','active','sort_order'],
+          service_plans: ['id','organization_id','category_id','slug','name_ar','name_en','description_ar','description_en','setup_amount_minor','monthly_amount_minor','annual_amount_minor','currency','features','active','sort_order']
+        }
+      };
+      const report = Object.entries(groups).map(([name, tables]) => {
+        const missing = [];
+        for (const [table, required] of Object.entries(tables)) {
+          const actual = present.get(table) || new Set();
+          const absent = required.filter(column => !actual.has(column));
+          if (absent.length) missing.push({ table, missingColumns: absent });
+        }
+        return { name, ready: missing.length === 0, missing };
+      });
+      res.setHeader('Cache-Control', 'no-store');
+      return res.json({ ok: true, readOnly: true, groups: report });
+    } catch (error) {
+      console.error('Admin schema readiness failed:', error.code || 'unknown');
+      return res.status(503).json({ error: 'schema_readiness_unavailable' });
+    }
+  });
   app.get('/api/admin/me', async (req, res) => {
     try {
       const auth = await getCurrentAdmin(req);
