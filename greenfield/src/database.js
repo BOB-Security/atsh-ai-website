@@ -377,6 +377,7 @@ function createDatabase(config, dependencies = {}) {
   }
 
 
+  // Catalog plan mutation methods are added in this branch.
   async function listAdminLeads(organizationId, limit = 50) {
     if (!organizationId) { const error = new Error('Organization is missing.'); error.code = 'ADMIN_NOT_CONFIGURED'; throw error; }
     const client = await getPool().connect();
