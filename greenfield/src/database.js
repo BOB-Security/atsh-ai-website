@@ -273,7 +273,7 @@ function createDatabase(config, dependencies = {}) {
            LEFT JOIN user_roles ur ON ur.user_id=u.id
            LEFT JOIN roles r ON r.id=ur.role_id AND (r.organization_id=u.organization_id OR r.organization_id IS NULL)
           WHERE s.token_hash=$1 AND s.expires_at>now() AND u.status='active' AND o.status='active'
-          GROUP BY u.id, s.expires_at
+          GROUP BY u.id, o.status, s.expires_at
           LIMIT 1`,
         [tokenHash]
       );
