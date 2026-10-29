@@ -180,7 +180,7 @@ const server = http.createServer(async (req, res) => {
     if (path.extname(resolved) === '.html' && !url.pathname.startsWith('/admin') && !url.pathname.startsWith('/staff')) {
       let html = await fs.promises.readFile(resolved, 'utf8');
       // Version the primary stylesheet on every HTML response so browsers cannot keep a stale layout.
-      html = html.replace(/href="\\/styles\\.css(?:\\?[^"]*)?"/g, 'href="/styles.css?v=cinematic-20261029-2"');
+      html = html.replace('href="/styles.css"', 'href="/styles.css?v=cinematic-20261029-2');
       if (!html.includes('href="/cms.css"')) html = html.replace('</head>', '<link rel="stylesheet" href="/cms.css"></head>');
       if (!html.includes('src="/site-cms.js"')) html = html.replace('</body>', '<script src="/site-cms.js" defer></script></body>');
       return res.end(html);
