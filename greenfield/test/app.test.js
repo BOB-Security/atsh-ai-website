@@ -57,3 +57,35 @@ test('intake never claims success when persistence fails',async t=>{
  const response=await fetch(base+'/api/public/inquiries',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name:'Test Person',email:'person@example.com',service:'موقع أو منصة',goal:'أريد إنشاء موقع تعريفي احترافي للنشاط التجاري',consent:true})});
  assert.equal(response.status,503);const result=await response.json();assert.equal(result.error,'intake_not_ready');assert.doesNotMatch(result.message,/بنجاح/);
 });
+
+
+test('admin overview requires an authenticated session',async t=>{
+ let reads=0;
+ const base=await withServer(t,config,{checkConnection:async()=>false,inspectSchema:async()=>[],getAdminSession:async()=>{reads++;return null;}});
+ const response=await fetch(base+'/api/admin/overview');
+ assert.equal(response.status,401);
+ assert.equal(reads,1);
+});
+test('admin login uses rate-limited credentials and creates an HttpOnly session',async t=>{
+ const crypto=require('node:crypto');
+ const salt=crypto.randomBytes(16).toString('hex');
+ const hash=crypto.scryptSync('correct horse battery staple',salt,64).toString('hex');
+ let created=null;
+ const admin={id:'user-1',organization_id:'org-1',email:'owner@example.com',full_name:'Owner',password_hash:JSON.stringify({salt,hash}),status:'active',organization_status:'active',role_permission_sets:[['dashboard.read','catalog.read']]};
+ const db={checkConnection:async()=>true,inspectSchema:async()=>[],findAdminUser:async email=>email==='owner@example.com'?admin:null,createAdminSession:async(id,tokenHash)=>{created={id,tokenHash};return {id:'session-1'};},getAdminSession:async tokenHash=>created&&tokenHash===created.tokenHash?{...admin,expires_at:'2099-01-01T00:00:00.000Z'}:null};
+ const base=await withServer(t,config,db);
+ const denied=await fetch(base+'/api/admin/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:'owner@example.com',password:'wrong password'})});
+ assert.equal(denied.status,401);assert.equal(created,null);
+ const accepted=await fetch(base+'/api/admin/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:'owner@example.com',password:'correct horse battery staple'})});
+ assert.equal(accepted.status,200);const result=await accepted.json();assert.equal(result.ok,true);assert.deepEqual(result.user.permissions,['dashboard.read','catalog.read']);assert.ok(created);
+ const cookies=accepted.headers.getSetCookie().map(value=>value.split(';')[0]).join('; ');
+ assert.match(accepted.headers.getSetCookie().find(value=>value.startsWith('atsh_admin_session='),)/HttpOnly/);
+ const me=await fetch(base+'/api/admin/me',{headers:{cookie:cookies}});
+ assert.equal(me.status,200);assert.equal((await me.json()).user.email,'owner@example.com');
+});
+test('admin logout rejects a missing CSRF token',async t=>{
+ const base=await withServer(t,config,{checkConnection:async()=>false,inspectSchema:async()=>[]});
+ const response=await fetch(base+'/api/admin/logout',{method:'POST'});
+ assert.equal(response.status,403);
+ assert.equal((await response.json()).error,'csrf_validation_failed');
+});
