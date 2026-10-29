@@ -106,7 +106,8 @@ async function getPublicCatalog(config) {
     throw error;
   }
   const organizationId = org.rows[0].id;
-  const approved = config.catalogPublicationApproved === true;
+  const settingsResult = await pool.query('SELECT settings FROM site_settings WHERE organization_id=$1 LIMIT 1', [organizationId]);
+  const approved = config.catalogPublicationApproved === true && settingsResult.rows[0]?.settings?.catalog_publication_approved === true;
   const categories = await pool.query(
     `SELECT c.id, c.slug, c.name_ar, c.name_en, c.description_ar, c.description_en, c.sort_order,
       COALESCE(jsonb_agg(jsonb_build_object(
