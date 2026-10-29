@@ -152,6 +152,22 @@ function createApp(overrides = {}) {
       return res.status(503).json({ error: 'admin_overview_unavailable' });
     }
   });
+  app.get('/api/admin/leads', async (req, res) => {
+    try {
+      const auth = await getCurrentAdmin(req);
+      if (!auth) return res.status(401).json({ error: 'authentication_required' });
+      if (!auth.permissions.includes('*') && !auth.permissions.includes('leads.read') && !auth.permissions.includes('sales.read')) {
+        return res.status(403).json({ error: 'permission_denied' });
+      }
+      const leads = await database.listAdminLeads(auth.user.organization_id, 50);
+      res.setHeader('Cache-Control', 'no-store');
+      return res.json({ ok: true, leads });
+    } catch (error) {
+      if (error.code === 'ADMIN_LEADS_SCHEMA_MISMATCH') return res.status(503).json({ error: 'admin_leads_not_ready', message: 'بيانات الطلبات تحتاج إلى مراجعة توافق قاعدة البيانات.' });
+      console.error('Admin leads read failed:', error.code || 'unknown');
+      return res.status(503).json({ error: 'admin_leads_unavailable' });
+    }
+  });
   app.get('/api/admin/catalog', async (req, res) => {
     try {
       const auth = await getCurrentAdmin(req);
