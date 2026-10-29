@@ -69,10 +69,10 @@ function createApp(overrides = {}) {
       const user = await database.findAdminUser(email);
       if (!user || user.status !== 'active' || user.organization_status !== 'active') return res.status(401).json({ error: 'invalid_credentials', message: 'بيانات الدخول غير صحيحة.' });
       let record;
-      let storedFormat = 'json';
       try {
         const stored = user.password_hash || '';
-        if (stored.startsWith('scrypt
+        if (stored.startsWith('scrypt' + 'const derived = await new Promise((resolve, reject) => crypto.scrypt(password, record.salt, 64, (error, key) => error ? reject(error) : resolve(key.toString('hex'))));
+      if (!safeEqual(derived, record.hash)) return res.status(401).json({ error: 'invalid_credentials', message: 'بيانات الدخول غير صحيحة.' });
       const token = crypto.randomBytes(32).toString('base64url');
       const csrf = crypto.randomBytes(32).toString('base64url');
       const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
@@ -283,7 +283,8 @@ if (require.main === module) {
 }
 module.exports = { createApp };
 )) {
-          const parts = stored.split('
+          const parts = stored.split('const derived = await new Promise((resolve, reject) => crypto.scrypt(password, record.salt, 64, (error, key) => error ? reject(error) : resolve(key.toString('hex'))));
+      if (!safeEqual(derived, record.hash)) return res.status(401).json({ error: 'invalid_credentials', message: 'بيانات الدخول غير صحيحة.' });
       const token = crypto.randomBytes(32).toString('base64url');
       const csrf = crypto.randomBytes(32).toString('base64url');
       const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
@@ -495,7 +496,6 @@ if (require.main === module) {
 module.exports = { createApp };
 );
           if (parts.length === 3) record = { salt: parts[1], hash: parts[2] };
-          storedFormat = 'legacy-scrypt';
         } else {
           record = JSON.parse(stored);
         }
@@ -505,8 +505,6 @@ module.exports = { createApp };
       }
       const derived = await new Promise((resolve, reject) => crypto.scrypt(password, record.salt, 64, (error, key) => error ? reject(error) : resolve(key.toString('hex'))));
       if (!safeEqual(derived, record.hash)) return res.status(401).json({ error: 'invalid_credentials', message: 'بيانات الدخول غير صحيحة.' });
-      // Both the current JSON record and the legacy scrypt$salt$hash format use
-      // the same scrypt parameters. Keep the stored value unchanged at login.
       const token = crypto.randomBytes(32).toString('base64url');
       const csrf = crypto.randomBytes(32).toString('base64url');
       const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
