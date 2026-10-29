@@ -1,6 +1,8 @@
 'use strict';
 document.addEventListener('change', event => {
-  if (typeof current !== 'number' || current !== 4 || !event.target.matches('input[name^="opt-"]')) return;
-  data.hosting = event.target.value;
+  if (!event.target.matches('input[name="choice"]')) return;
+  if (typeof current !== 'number') return;
+  if (current === 1) data.pages = event.target.value;
+  if (current === 4) data.hosting = event.target.value;
   updateSummary();
 });
