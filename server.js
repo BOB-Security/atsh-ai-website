@@ -4,10 +4,12 @@ const helmet = require('helmet');
 const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 const path = require('node:path');
+const crypto = require('node:crypto');
 const { loadConfig } = require('./src/config');
 const { checkDatabase, closePool } = require('./src/db');
 const { validateInquiry, createProjectInquiry, getPublicCatalog } = require('./src/intake');
 const { login, beginMfaSetup, completeMfaSetup, getSession, logout, cookieHeader, clearCookieHeader, readCookie, hasPermission } = require('./src/auth');
+const { listCatalog, createCategory, updateCategory, createPlan, updatePlan, createAddon, updateAddon, setCatalogApproval } = require('./src/admin-catalog');
 const config = loadConfig();
 const app = express();
 app.disable('x-powered-by');
@@ -95,6 +97,79 @@ app.post('/api/admin/logout', sameOrigin, async (req, res) => {
   try { await logout(config, readCookie(req)); } catch (error) { console.error('Logout cleanup failed', { code: error && error.code || 'unknown' }); }
   res.setHeader('Set-Cookie', clearCookieHeader(config.nodeEnv === 'production'));
   res.json({ ok: true });
+});
+function requestIpHash(req) { return crypto.createHash('sha256').update(String(req.ip || req.socket.remoteAddress || '')).digest('hex'); }
+async function requirePermission(req, res, permission) {
+  const session = await loadAdminSession(req, res);
+  if (!session) return null;
+  if (!hasPermission(session, permission)) { res.status(403).json({ error: 'permission_denied' }); return null; }
+  return session;
+}
+function catalogError(res, error) {
+  console.error('Catalog operation failed', { code: error && error.code || 'validation_or_unknown' });
+  if (error && error.code === 'NOT_FOUND') return res.status(404).json({ error: 'not_found', message: 'العنصر المطلوب غير موجود.' });
+  if (error && error.code === '23505') return res.status(409).json({ error: 'duplicate_slug', message: 'هذا المعرّف مستخدم بالفعل.' });
+  if (error && error.code === 'ORGANIZATION_NOT_CONFIGURED') return res.status(503).json({ error: 'organization_not_configured' });
+  if (error && ['ECONNREFUSED','ETIMEDOUT','ENOTFOUND','42P01','42703','23503'].includes(error.code)) return res.status(503).json({ error: 'catalog_unavailable', message: 'كتالوج الإدارة غير متاح مؤقتًا.' });
+  return res.status(400).json({ error: 'invalid_catalog_input', message: error && error.message || 'راجع البيانات المدخلة.' });
+}
+app.get('/api/admin/catalog', async (req, res) => {
+  const session = await requirePermission(req, res, 'catalog.read');
+  if (!session) return;
+  try { res.json({ ok: true, ...(await listCatalog(config)) }); }
+  catch (error) { catalogError(res, error); }
+});
+app.post('/api/admin/catalog/categories', sameOrigin, async (req, res) => {
+  const session = await requirePermission(req, res, 'catalog.write');
+  if (!session) return;
+  try { const row = await createCategory(config, session, req.body || {}, requestIpHash(req)); res.status(201).json({ ok: true, category: row }); }
+  catch (error) { catalogError(res, error); }
+});
+app.patch('/api/admin/catalog/categories/:id', sameOrigin, async (req, res) => {
+  const session = await requirePermission(req, res, 'catalog.write');
+  if (!session) return;
+  if (req.body && req.body.active === true && !hasPermission(session, 'catalog.publish')) return res.status(403).json({ error: 'publish_permission_required' });
+  try { res.json({ ok: true, category: await updateCategory(config, session, req.params.id, req.body || {}, requestIpHash(req)) }); }
+  catch (error) { catalogError(res, error); }
+});
+app.post('/api/admin/catalog/plans', sameOrigin, async (req, res) => {
+  const session = await requirePermission(req, res, 'catalog.write');
+  if (!session) return;
+  if (!hasPermission(session, 'pricing.write')) return res.status(403).json({ error: 'pricing_permission_required' });
+  try { res.status(201).json({ ok: true, plan: await createPlan(config, session, req.body || {}, requestIpHash(req)) }); }
+  catch (error) { catalogError(res, error); }
+});
+app.patch('/api/admin/catalog/plans/:id', sameOrigin, async (req, res) => {
+  const session = await requirePermission(req, res, 'catalog.write');
+  if (!session) return;
+  const body = req.body || {};
+  if (['setup_amount_minor','monthly_amount_minor','annual_amount_minor','currency'].some(key => Object.prototype.hasOwnProperty.call(body,key)) && !hasPermission(session, 'pricing.write')) return res.status(403).json({ error: 'pricing_permission_required' });
+  if (body.active === true && !hasPermission(session, 'catalog.publish')) return res.status(403).json({ error: 'publish_permission_required' });
+  try { res.json({ ok: true, plan: await updatePlan(config, session, req.params.id, body, requestIpHash(req)) }); }
+  catch (error) { catalogError(res, error); }
+});
+app.post('/api/admin/catalog/addons', sameOrigin, async (req, res) => {
+  const session = await requirePermission(req, res, 'catalog.write');
+  if (!session) return;
+  if (!hasPermission(session, 'pricing.write')) return res.status(403).json({ error: 'pricing_permission_required' });
+  try { res.status(201).json({ ok: true, addon: await createAddon(config, session, req.body || {}, requestIpHash(req)) }); }
+  catch (error) { catalogError(res, error); }
+});
+app.patch('/api/admin/catalog/addons/:id', sameOrigin, async (req, res) => {
+  const session = await requirePermission(req, res, 'catalog.write');
+  if (!session) return;
+  const body = req.body || {};
+  if (['setup_amount_minor','monthly_amount_minor','annual_amount_minor','currency'].some(key => Object.prototype.hasOwnProperty.call(body,key)) && !hasPermission(session, 'pricing.write')) return res.status(403).json({ error: 'pricing_permission_required' });
+  if (body.active === true && !hasPermission(session, 'catalog.publish')) return res.status(403).json({ error: 'publish_permission_required' });
+  try { res.json({ ok: true, addon: await updateAddon(config, session, req.params.id, body, requestIpHash(req)) }); }
+  catch (error) { catalogError(res, error); }
+});
+app.post('/api/admin/catalog/publication', sameOrigin, async (req, res) => {
+  const session = await loadAdminSession(req, res);
+  if (!session) return;
+  if (!session.roles.includes('Owner')) return res.status(403).json({ error: 'owner_required' });
+  try { res.json({ ok: true, ...(await setCatalogApproval(config, session, req.body && req.body.approved, requestIpHash(req)) ) }); }
+  catch (error) { catalogError(res, error); }
 });
 app.get('/api/admin/overview', async (req, res) => {
   const session = await loadAdminSession(req, res);
