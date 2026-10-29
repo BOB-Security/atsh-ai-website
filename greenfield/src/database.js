@@ -377,6 +377,29 @@ function createDatabase(config, dependencies = {}) {
   }
 
 
+  async function saveAdminPlan(organizationId, userId, input) {
+    const client = await getPool().connect();
+    try {
+      await client.query('BEGIN');
+      const category = await client.query('SELECT id FROM service_categories WHERE id=$1 AND organization_id=$2', [input.category_id, organizationId]);
+      if (!category.rows.length) { const error = new Error('Category not found.'); error.code = 'ADMIN_CATALOG_CATEGORY_NOT_FOUND'; throw error; }
+      let result;
+      const values = [organizationId,input.category_id,input.slug,input.name_ar,input.name_en,input.description_ar,input.description_en,input.setup_amount_minor,input.monthly_amount_minor,input.annual_amount_minor,input.currency,JSON.stringify(input.features),input.active,input.sort_order];
+      if (input.id) {
+        result = await client.query('UPDATE service_plans SET category_id=$3,slug=$4,name_ar=$5,name_en=$6,description_ar=$7,description_en=$8,setup_amount_minor=$9,monthly_amount_minor=$10,annual_amount_minor=$11,currency=$12,features=$13::jsonb,active=$14,sort_order=$15 WHERE id=$1 AND organization_id=$2 RETURNING id',
+          [input.id, ...values]);
+      } else {
+        result = await client.query('INSERT INTO service_plans (organization_id,category_id,slug,name_ar,name_en,description_ar,description_en,setup_amount_minor,monthly_amount_minor,annual_amount_minor,currency,features,active,sort_order) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb,$13,$14) RETURNING id', values);
+      }
+      if (!result.rows.length) { const error = new Error('Plan not found.'); error.code = 'ADMIN_CATALOG_PLAN_NOT_FOUND'; throw error; }
+      await client.query("INSERT INTO audit_logs (organization_id,actor_user_id,action,entity_type,entity_id,details,ip_hash) VALUES ($1,$2,$3,'service_plan',$4,$5::jsonb,NULL)",
+        [organizationId,userId,input.id?'catalog.plan.update':'catalog.plan.create',result.rows[0].id,JSON.stringify({slug:input.slug,active:input.active})]);
+      await client.query('COMMIT');
+      return {id:result.rows[0].id};
+    } catch(error) { try { await client.query('ROLLBACK'); } catch {} throw error; }
+    finally { client.release(); }
+  }
+
   async function listAdminLeads(organizationId, limit = 50) {
     if (!organizationId) { const error = new Error('Organization is missing.'); error.code = 'ADMIN_NOT_CONFIGURED'; throw error; }
     const client = await getPool().connect();
@@ -438,6 +461,6 @@ function createDatabase(config, dependencies = {}) {
     finally { client.release(); }
   }
   async function close() { if (pool) { const current = pool; pool = undefined; await current.end(); } }
-  return { checkConnection, inspectSchema, createInquiry, listPublicCatalog, findAdminUser, createAdminSession, getAdminSession, deleteAdminSession, getAdminOverview, listAdminCatalog, listAdminLeads, getSiteSettings, saveSiteSettings, close };
+  return { checkConnection, inspectSchema, createInquiry, listPublicCatalog, findAdminUser, createAdminSession, getAdminSession, deleteAdminSession, getAdminOverview, listAdminCatalog, saveAdminPlan, listAdminLeads, getSiteSettings, saveSiteSettings, close };
 }
 module.exports = { createDatabase };
