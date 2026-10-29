@@ -17,8 +17,8 @@
    if(description)description.textContent=page.description.trim();
   }
   const root=document.documentElement;
-  if(typeof settings.hero_background_url==='string'&&settings.hero_background_url.trim()){
-   const value=settings.hero_background_url.trim();
+  if(true){
+   const value=typeof settings.hero_background_url==='string'&&settings.hero_background_url.trim()?settings.hero_background_url.trim():'https://raw.githubusercontent.com/BOB-Security/atsh-ai-website/main/platform/public/images/atsh-hero.jpg';
    const safe=/^https:\/\//i.test(value)||(/^\/(?!\/)[A-Za-z0-9_./-]+$/.test(value)&&!value.split('/').includes('..'));
    const hero=document.querySelector('.hero, .page-hero');
    if(safe&&hero){
@@ -36,10 +36,11 @@
    const description=document.querySelector('.hero .lead, .page-hero>p:not(.eyebrow)');
    if(description)description.textContent=settings.hero_description.trim();
   }
-  if(typeof settings.logo_url==='string'&&/^https:\/\//i.test(settings.logo_url)){
+  const logoUrl=typeof settings.logo_url==='string'&&/^https:\/\//i.test(settings.logo_url)?settings.logo_url:'https://raw.githubusercontent.com/BOB-Security/atsh-ai-website/main/platform/public/images/atsh-logo.jpg';
+  if(logoUrl){
    for(const brand of document.querySelectorAll('.brand')){
     const mark=brand.querySelector('.brand-mark,.mark');
-    if(mark){const image=document.createElement('img');image.src=settings.logo_url;image.alt='ATSH AI';image.loading='lazy';image.style.cssText='width:100%;height:100%;object-fit:contain';mark.replaceChildren(image);}
+    if(mark){const image=document.createElement('img');image.src=logoUrl;image.alt='ATSH AI';image.loading='lazy';image.style.cssText='width:100%;height:100%;object-fit:contain';mark.replaceChildren(image);}
    }
   }
   if(typeof settings.contact_email==='string'&&/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(settings.contact_email)){
