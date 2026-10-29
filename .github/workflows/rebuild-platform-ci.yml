@@ -9,7 +9,7 @@ on:
       - '.github/workflows/rebuild-platform-ci.yml'
       - '.github/workflows/platform-staging-deploy.yml'
   pull_request:
-    branches: [main]
+    branches: [main, rebuild/atsh-ai-from-scratch]
     paths:
       - 'platform/**'
       - 'db/**'
