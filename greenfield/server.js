@@ -162,8 +162,9 @@ function createApp(overrides = {}) {
       res.setHeader('Cache-Control', 'no-store');
       return res.json({ ok: true, readOnly: true, groups: report });
     } catch (error) {
-      console.error('Admin schema readiness failed:', error.code || 'unknown');
-      return res.status(503).json({ error: 'schema_readiness_unavailable' });
+      const code = typeof error?.code === 'string' && /^[0-9A-Z]{5}$/.test(error.code) ? error.code : 'unknown';
+      console.error('Admin schema readiness failed:', code);
+      return res.status(503).json({ error: 'schema_readiness_unavailable', diagnosticCode: code });
     }
   });
   app.get('/api/admin/me', async (req, res) => {
