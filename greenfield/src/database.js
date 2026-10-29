@@ -487,7 +487,7 @@ function createDatabase(config, dependencies = {}) {
       return { id:user.id,email:user.email,full_name:user.full_name };
     } catch(error) {
       try { await client.query('ROLLBACK'); } catch {}
-      if(error.code==='42P01'||error.code==='42703')error.code='ADMIN_RECOVERY_SCHEMA_MISMATCH';
+      if(error.code==='42P01'||error.code==='42703'||error.code==='ADMIN_SCHEMA_MISMATCH')error.code='ADMIN_RECOVERY_SCHEMA_MISMATCH';
       throw error;
     } finally { client.release(); }
   }
