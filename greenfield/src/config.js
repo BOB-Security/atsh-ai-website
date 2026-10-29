@@ -13,7 +13,7 @@ function loadConfig(env = process.env) {
     diagnosticsToken: String(env.DB_DIAGNOSTICS_TOKEN || ''),
     resendApiKey: String(env.RESEND_API_KEY || '').trim(),
     recoveryFromEmail: String(env.ADMIN_RECOVERY_FROM_EMAIL || '').trim(),
-    passwordRecoveryConfigured: Boolean(String(env.RESEND_API_KEY || '').trim() && /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(String(env.ADMIN_RECOVERY_FROM_EMAIL || '').trim()) && /^https:\\/\\//i.test(String(env.PUBLIC_BASE_URL || '').trim())),
+    passwordRecoveryConfigured: Boolean(String(env.RESEND_API_KEY || '').trim() && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(env.ADMIN_RECOVERY_FROM_EMAIL || '').trim()) && /^https:\/\//i.test(String(env.PUBLIC_BASE_URL || '').trim())),
     intakeEnabled: String(env.INQUIRY_INTAKE_ENABLED || '').trim().toLowerCase() === 'true',
     publicOrganizationId: validOrganizationId ? organizationId : ''
   });
