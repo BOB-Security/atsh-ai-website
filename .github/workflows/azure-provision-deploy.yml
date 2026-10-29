@@ -1,12 +1,7 @@
 name: Deploy ATSH AI Platform to Azure
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'platform/**'
-      - 'db/**'
-      - '.github/workflows/azure-provision-deploy.yml'
+  # Production platform/greenfield deployments are manual until each has its own Azure App Service.
   workflow_dispatch:
 
 permissions:
