@@ -70,6 +70,36 @@ test('PostgreSQL customer portal queries isolate two customers across projects, 
     }
     await db.query('RELEASE SAVEPOINT invalid_hosting_project');
 
+    await db.query('SAVEPOINT invalid_ticket_customer');
+    let invalidTicketCustomerError = null;
+    try {
+      await db.query("INSERT INTO support_tickets(organization_id,customer_id,reference,subject) VALUES($1,$2,$3,$4)", [org, customerC, 'T-XC-' + suffix, 'Cross-tenant customer ticket']);
+    } catch (error) {
+      invalidTicketCustomerError = error;
+      await db.query('ROLLBACK TO SAVEPOINT invalid_ticket_customer');
+    }
+    await db.query('RELEASE SAVEPOINT invalid_ticket_customer');
+
+    await db.query('SAVEPOINT invalid_ticket_project');
+    let invalidTicketProjectError = null;
+    try {
+      await db.query("INSERT INTO support_tickets(organization_id,customer_id,project_id,reference,subject) VALUES($1,$2,$3,$4,$5)", [org, customerA, projectB, 'T-XP-' + suffix, 'Cross-customer project ticket']);
+    } catch (error) {
+      invalidTicketProjectError = error;
+      await db.query('ROLLBACK TO SAVEPOINT invalid_ticket_project');
+    }
+    await db.query('RELEASE SAVEPOINT invalid_ticket_project');
+
+    await db.query('SAVEPOINT invalid_ticket_without_customer');
+    let invalidTicketWithoutCustomerError = null;
+    try {
+      await db.query("INSERT INTO support_tickets(organization_id,project_id,reference,subject) VALUES($1,$2,$3,$4)", [org, projectA, 'T-XN-' + suffix, 'Project ticket without customer']);
+    } catch (error) {
+      invalidTicketWithoutCustomerError = error;
+      await db.query('ROLLBACK TO SAVEPOINT invalid_ticket_without_customer');
+    }
+    await db.query('RELEASE SAVEPOINT invalid_ticket_without_customer');
+
     const wrongOrganizationProject = await db.query('SELECT id FROM projects WHERE id=$1 AND organization_id=$2 AND customer_id=$3', [projectC, org, customerA]);
     const wrongProject = await db.query('SELECT id FROM projects WHERE id=$1 AND organization_id=$2 AND customer_id=$3', [projectB, org, customerA]);
     const wrongQuote = await db.query("UPDATE quotes SET status='accepted' WHERE id=$1 AND organization_id=$2 AND customer_id=$3 RETURNING id", [quoteB, org, customerA]);
@@ -83,6 +113,9 @@ test('PostgreSQL customer portal queries isolate two customers across projects, 
     assert.equal(invalidBackupAssetError?.code, '23503', 'Database must reject backup runs linked to another organization hosting asset');
     assert.equal(invalidHostingCustomerError?.code, '23503', 'Database must reject hosting assets linked to another organization customer');
     assert.equal(invalidHostingProjectError?.code, '23503', 'Database must reject hosting assets linked to another customer project');
+    assert.equal(invalidTicketCustomerError?.code, '23503', 'Database must reject support tickets linked to another organization customer');
+    assert.equal(invalidTicketProjectError?.code, '23503', 'Database must reject support tickets linked to another customer project');
+    assert.equal(invalidTicketWithoutCustomerError?.code, '23514', 'Database must reject project tickets without an associated customer');
     assert.equal(wrongOrganizationProject.rowCount, 0, 'Customer A must not read another organization project');
     assert.equal(wrongProject.rowCount, 0, 'Customer A must not read Customer B project');
     assert.equal(wrongQuote.rowCount, 0, 'Customer A must not mutate Customer B quote');
