@@ -71,7 +71,17 @@ function createApp(overrides = {}) {
       let record;
       try {
         const stored = user.password_hash || '';
-        if (stored.startsWith('scrypt' + 'const derived = await new Promise((resolve, reject) => crypto.scrypt(password, record.salt, 64, (error, key) => error ? reject(error) : resolve(key.toString('hex'))));
+        if (stored.startsWith('scrypt' + String.fromCharCode(36))) {
+          const parts = stored.split(String.fromCharCode(36));
+          if (parts.length === 3) record = { salt: parts[1], hash: parts[2] };
+        } else {
+          record = JSON.parse(stored);
+        }
+      } catch { record = null; }
+      if (!record || typeof record.salt !== 'string' || typeof record.hash !== 'string' || !/^[a-f0-9]{32,128}$/i.test(record.salt) || !/^[a-f0-9]{128}$/i.test(record.hash)) {
+        return res.status(503).json({ error: 'admin_credentials_format_unsupported', message: 'تنسيق بيانات المصادقة يحتاج إلى مراجعة قبل تفعيل الدخول.' });
+      }
+      const derived = await new Promise((resolve, reject) => crypto.scrypt(password, record.salt, 64, (error, key) => error ? reject(error) : resolve(key.toString('hex'))));
       if (!safeEqual(derived, record.hash)) return res.status(401).json({ error: 'invalid_credentials', message: 'بيانات الدخول غير صحيحة.' });
       const token = crypto.randomBytes(32).toString('base64url');
       const csrf = crypto.randomBytes(32).toString('base64url');
