@@ -190,7 +190,7 @@ function createDatabase(config, dependencies = {}) {
 
   async function assertAdminSchema(client) {
     const result = await client.query(
-      "SELECT table_name, column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name IN ('users','organizations','roles','user_roles','auth_sessions')"
+      "SELECT table_name, column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name IN ('users','organizations','roles','user_roles','auth_sessions','audit_logs')"
     );
     const found = new Map();
     for (const row of result.rows) {
@@ -202,7 +202,8 @@ function createDatabase(config, dependencies = {}) {
       organizations: ['id','status'],
       roles: ['id','organization_id','name','permissions'],
       user_roles: ['user_id','role_id'],
-      auth_sessions: ['id','user_id','token_hash','expires_at','last_seen_at','created_at']
+      auth_sessions: ['id','user_id','token_hash','expires_at','last_seen_at','created_at'],
+      audit_logs: ['id','organization_id','actor_user_id','action','entity_type','entity_id','details','ip_hash','created_at']
     };
     for (const [table, columns] of Object.entries(required)) {
       if (!found.has(table) || columns.some(column => !found.get(table).has(column))) {
@@ -232,17 +233,29 @@ function createDatabase(config, dependencies = {}) {
       return result.rows[0] || null;
     } finally { client.release(); }
   }
-  async function createAdminSession(userId, tokenHash) {
+  async function createAdminSession(userId, tokenHash, metadata = {}) {
     const client = await getPool().connect();
     try {
       await assertAdminSchema(client);
+      await client.query('BEGIN');
       const result = await client.query(
         "INSERT INTO auth_sessions (user_id, token_hash, expires_at) SELECT $1,$2,now() + interval '8 hours' WHERE EXISTS (SELECT 1 FROM users u JOIN organizations o ON o.id=u.organization_id WHERE u.id=$1 AND u.status='active' AND o.status='active') RETURNING id, expires_at",
         [userId, tokenHash]
       );
       if (!result.rows[0]) { const error = new Error('Admin account is no longer active.'); error.code = 'ADMIN_NOT_ACTIVE'; throw error; }
+      const actor = await client.query("SELECT organization_id FROM users WHERE id=$1 AND status='active'", [userId]);
+      if (!actor.rows[0]) { const error = new Error('Admin account is no longer active.'); error.code = 'ADMIN_NOT_ACTIVE'; throw error; }
       await client.query("UPDATE users SET last_login_at=now(), updated_at=now() WHERE id=$1", [userId]);
+      await client.query(
+        "INSERT INTO audit_logs (organization_id, actor_user_id, action, entity_type, entity_id, details, ip_hash) VALUES ($1,$2,'admin.login','auth_session',$3,$4::jsonb,$5)",
+        [actor.rows[0].organization_id, userId, result.rows[0].id, JSON.stringify({ outcome: 'success' }), typeof metadata.ipHash === 'string' ? metadata.ipHash : null]
+      );
+      await client.query('COMMIT');
       return result.rows[0];
+    } catch (error) {
+      try { await client.query('ROLLBACK'); } catch {}
+      if (error.code === '42P01' || error.code === '42703') error.code = 'ADMIN_SCHEMA_MISMATCH';
+      throw error;
     } finally { client.release(); }
   }
   async function getAdminSession(tokenHash) {
@@ -268,11 +281,25 @@ function createDatabase(config, dependencies = {}) {
       return result.rows[0];
     } finally { client.release(); }
   }
-  async function deleteAdminSession(tokenHash) {
+  async function deleteAdminSession(tokenHash, metadata = {}) {
     const client = await getPool().connect();
     try {
       await assertAdminSchema(client);
-      await client.query("DELETE FROM auth_sessions WHERE token_hash=$1", [tokenHash]);
+      await client.query('BEGIN');
+      const session = await client.query(
+        "SELECT s.id AS session_id,u.id AS user_id,u.organization_id FROM auth_sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=$1",
+        [tokenHash]
+      );
+      if (session.rows[0]) {
+        await client.query("INSERT INTO audit_logs (organization_id,actor_user_id,action,entity_type,entity_id,details,ip_hash) VALUES ($1,$2,'admin.logout','auth_session',$3,$4::jsonb,$5)",
+          [session.rows[0].organization_id,session.rows[0].user_id,session.rows[0].session_id,JSON.stringify({ outcome: 'success' }),typeof metadata.ipHash === 'string' ? metadata.ipHash : null]);
+        await client.query("DELETE FROM auth_sessions WHERE token_hash=$1", [tokenHash]);
+      }
+      await client.query('COMMIT');
+    } catch (error) {
+      try { await client.query('ROLLBACK'); } catch {}
+      if (error.code === '42P01' || error.code === '42703') error.code = 'ADMIN_SCHEMA_MISMATCH';
+      throw error;
     } finally { client.release(); }
   }
   async function getAdminOverview(organizationId) {
