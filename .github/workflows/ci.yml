@@ -47,3 +47,9 @@ jobs:
         run: npm run build
       - name: Server smoke tests
         run: npm test
+      - name: Platform build and tests
+        working-directory: platform
+        run: |
+          npm install
+          npm run build
+          npm test
