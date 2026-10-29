@@ -1,0 +1,112 @@
+name: ATSH AI Greenfield staging deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      resource_group:
+        description: Existing Azure resource group containing staging
+        required: true
+        type: string
+      app_name:
+        description: Existing staging App Service name; must end with -staging
+        required: true
+        type: string
+permissions:
+  contents: read
+  id-token: write
+concurrency:
+  group: atsh-ai-greenfield-staging
+  cancel-in-progress: false
+jobs:
+  verify-and-package:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: greenfield
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install
+      - run: npm run build
+      - run: npm test
+      - name: Package only the greenfield application
+        run: zip -r ../atsh-ai-greenfield.zip . -x 'node_modules/*' '*.log' '.env'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: atsh-ai-greenfield
+          path: atsh-ai-greenfield.zip
+          if-no-files-found: error
+  deploy-staging:
+    runs-on: ubuntu-latest
+    needs: verify-and-package
+    environment: staging
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: atsh-ai-greenfield
+      - name: Validate target and staging-only secrets
+        env:
+          APP_NAME: ${ inputs.app_name }
+          RESOURCE_GROUP: ${ inputs.resource_group }
+          DATABASE_URL: ${ secrets.STAGING_DATABASE_URL }
+          DB_DIAGNOSTICS_TOKEN: ${ secrets.DB_DIAGNOSTICS_TOKEN }
+        run: |
+          set -euo pipefail
+          [[ "$APP_NAME" == *-staging ]] || { echo "::error::App name must end in -staging."; exit 1; }
+          [[ -n "$RESOURCE_GROUP" ]] || { echo "::error::resource_group is required."; exit 1; }
+          [[ -n "$DATABASE_URL" ]] || { echo "::error::Missing STAGING_DATABASE_URL; use a staging database, not production."; exit 1; }
+          [[ -n "$DB_DIAGNOSTICS_TOKEN" ]] || { echo "::error::Missing DB_DIAGNOSTICS_TOKEN."; exit 1; }
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${ secrets.AZURE_CLIENT_ID }
+          tenant-id: ${ secrets.AZURE_TENANT_ID }
+          subscription-id: ${ secrets.AZURE_SUBSCRIPTION_ID }
+      - name: Confirm existing staging app
+        env:
+          APP_NAME: ${ inputs.app_name }
+          RESOURCE_GROUP: ${ inputs.resource_group }
+        run: |
+          set -euo pipefail
+          az webapp show --resource-group "$RESOURCE_GROUP" --name "$APP_NAME" --query "{name:name,state:state,host:defaultHostName}" -o json
+      - name: Configure staging runtime without schema changes
+        env:
+          APP_NAME: ${ inputs.app_name }
+          RESOURCE_GROUP: ${ inputs.resource_group }
+          DATABASE_URL: ${ secrets.STAGING_DATABASE_URL }
+          DB_DIAGNOSTICS_TOKEN: ${ secrets.DB_DIAGNOSTICS_TOKEN }
+        run: |
+          set -euo pipefail
+          az webapp config appsettings set --resource-group "$RESOURCE_GROUP" --name "$APP_NAME" --settings \
+            NODE_ENV=production WEBSITE_NODE_DEFAULT_VERSION='~22' SCM_DO_BUILD_DURING_DEPLOYMENT=true \
+            DATABASE_URL="$DATABASE_URL" PGSSL=require DB_DIAGNOSTICS_TOKEN="$DB_DIAGNOSTICS_TOKEN" --output none
+          az webapp config set --resource-group "$RESOURCE_GROUP" --name "$APP_NAME" --startup-file "npm start" --output none
+      - name: Deploy greenfield package
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${ inputs.app_name }
+          package: atsh-ai-greenfield.zip
+      - name: Verify live health and staging database readiness
+        env:
+          APP_NAME: ${ inputs.app_name }
+        run: |
+          set -euo pipefail
+          HOST="$APP_NAME.azurewebsites.net"
+          code=000
+          for i in $(seq 1 18); do
+            code=$(curl -sS -o /tmp/health.json -w '%{http_code}' "https://$HOST/health" || true)
+            if [[ "$code" == "200" ]]; then break; fi
+            sleep 10
+          done
+          [[ "$code" == "200" ]] || { cat /tmp/health.json || true; echo "::error::Staging health check failed."; exit 1; }
+          ready=000
+          for i in $(seq 1 12); do
+            ready=$(curl -sS -o /tmp/ready.json -w '%{http_code}' "https://$HOST/ready" || true)
+            if [[ "$ready" == "200" ]]; then cat /tmp/health.json; cat /tmp/ready.json; exit 0; fi
+            sleep 10
+          done
+          cat /tmp/ready.json || true
+          echo "::error::Staging app or staging database is not ready. Production was not touched."
+          exit 1
