@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><meta name="theme-color" content="#17152d">
+<title>الإدارة الداخلية | ATSH AI</title><link rel="stylesheet" href="/styles.css">
+<script src="/admin.js" defer></script>
+</head>
+<body class="admin-page">
+<header class="header"><a class="brand" href="/" aria-label="ATSH AI"><span class="brand-mark">A</span><span>ATSH <b>AI</b><small>الإدارة الداخلية</small></span></a><a class="text-link" href="/">العودة للموقع ↗</a></header>
+<main class="wrap admin-wrap">
+<section class="page-hero admin-hero"><div class="eyebrow"><span></span> مساحة العمل الداخلية</div><h1>لوحة إدارة <em>ATSH AI</em></h1><p>واجهة داخلية لإدارة الخدمات والطلبات والعملاء وفق الصلاحيات المعتمدة.</p></section>
+<section id="adminLoginPanel" class="admin-panel">
+<div class="admin-panel-heading"><div><small>دخول آمن</small><h2>تسجيل دخول الفريق</h2></div><span class="admin-lock">⌑</span></div>
+<form id="adminLoginForm" class="admin-form">
+<label for="adminEmail">البريد الإلكتروني</label><input id="adminEmail" name="email" type="email" autocomplete="username" required maxlength="254" placeholder="name@company.com">
+<label for="adminPassword">كلمة المرور</label><input id="adminPassword" name="password" type="password" autocomplete="current-password" required maxlength="1024" placeholder="أدخل كلمة المرور">
+<p id="adminLoginMessage" class="admin-message" role="status" aria-live="polite">لن تُفعّل جلسة الإدارة حتى يكتمل ربط خدمة المصادقة والتحقق من قاعدة البيانات.</p>
+<button class="btn primary" type="submit">محاولة تسجيل الدخول <span>←</span></button>
+</form>
+</section>
+<section id="adminDashboard" class="admin-dashboard" hidden>
+<div class="admin-welcome"><div><small>نظرة عامة</small><h2 id="adminWelcomeTitle">مرحبًا</h2></div><button id="adminLogout" class="btn secondary" type="button">تسجيل الخروج</button></div>
+<div id="adminOverviewGrid" class="admin-stats"></div>
+<div class="admin-panel"><h2>الوصول حسب الصلاحيات</h2><p>ستظهر هنا وحدات إدارة الخدمات والباقات والعملاء والطلبات بعد تفعيل واجهات الخادم والتحقق من الصلاحيات.</p><div id="adminPermissionList" class="admin-permissions"></div></div>
+</section>
+</main>
+<footer class="footer"><div class="wrap"><span>© <span id="adminYear"></span> ATSH AI</span><span>وصول داخلي · لا تشارك بيانات الدخول</span></div></footer>
+</body></html>
