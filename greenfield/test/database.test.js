@@ -83,3 +83,39 @@ test('admin authentication fails closed when audit log schema is absent',async()
  assert.equal(fake.released,1);
  await db.close();
 });
+
+test('admin session creation and audit event commit in one transaction',async()=>{
+ const authSchema={
+  users:['id','organization_id','email','full_name','password_hash','status','last_login_at','updated_at'],
+  organizations:['id','status'],
+  roles:['id','organization_id','name','permissions'],
+  user_roles:['user_id','role_id'],
+  auth_sessions:['id','user_id','token_hash','expires_at','last_seen_at','created_at'],
+  audit_logs:['id','organization_id','actor_user_id','action','entity_type','entity_id','details','ip_hash','created_at']
+ };
+ const calls=[];
+ const rows=schemaRows(authSchema);
+ const client={
+  async query(sql,params=[]){
+   calls.push({sql,params});
+   if(sql.includes('information_schema.columns'))return {rows};
+   if(sql.startsWith('INSERT INTO auth_sessions'))return {rows:[{id:'session-1',expires_at:'2099-01-01T00:00:00.000Z'}]};
+   if(sql.startsWith('SELECT organization_id FROM users'))return {rows:[{organization_id:orgId}]};
+   return {rows:[]};
+  },
+  release(){}
+ };
+ const pool={on(){},async connect(){return client;},async end(){}};
+ const db=createDatabase(config,{poolFactory:()=>pool});
+ const session=await db.createAdminSession('user-1','token-hash',{ipHash:'ip-hash'});
+ assert.equal(session.id,'session-1');
+ assert.ok(calls.some(call=>call.sql==='BEGIN'));
+ assert.ok(calls.some(call=>call.sql==='COMMIT'));
+ const audit=calls.find(call=>call.sql.includes('INSERT INTO audit_logs'));
+ assert.ok(audit);
+ assert.equal(audit.params[0],orgId);
+ assert.equal(audit.params[1],'user-1');
+ assert.equal(audit.params[2],'session-1');
+ assert.equal(audit.params[4],'ip-hash');
+ await db.close();
+});
