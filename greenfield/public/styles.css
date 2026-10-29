@@ -110,3 +110,11 @@
 .live-plan-card ul{padding-inline-start:20px;color:var(--muted);font-size:12px}
 .pricing-notice[hidden]{display:none}
 @media(max-width:620px){.live-pricing-grid{grid-template-columns:1fr}.live-plan-card{padding:19px}}
+
+
+.service-live-plan{margin-top:18px;padding-top:14px;border-top:1px solid var(--line)}
+.service-live-plan h3{font-size:15px;margin:0}
+.service-live-plan p{margin:6px 0}
+.service-live-plan .live-price-lines{margin:10px 0;padding:8px 0}
+.service-live-plan ul{margin:8px 0}
+#staticServiceCatalog[hidden]{display:none}
