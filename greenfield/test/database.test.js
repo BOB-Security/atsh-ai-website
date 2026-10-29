@@ -25,7 +25,7 @@ function fakePool({schema=schemaRows(),catalogRows=[]}={}){
   },
   release(){released++;}
  };
- const pool={async connect(){return client;},async end(){}};
+ const pool={on(){},async connect(){return client;},async end(){}};
  return {poolFactory:()=>pool,calls,get released(){return released;}};
 }
 test('public catalog is organization-scoped and read-only',async()=>{
