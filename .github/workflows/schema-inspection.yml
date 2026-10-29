@@ -1,0 +1,32 @@
+name: ATSH read-only production schema inventory
+on:
+  push:
+    branches: ['rebuild/atsh-ai-clean-v2']
+    paths:
+      - 'scripts/inspect-schema.js'
+      - '.github/workflows/schema-inspection.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      PGSSL: require
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+      - name: Fail closed if production database connection is unavailable
+        run: |
+          if [ -z "${DATABASE_URL:-}" ]; then
+            echo "::error::DATABASE_URL repository secret is not configured."
+            exit 1
+          fi
+      - run: npm install --package-lock-only
+      - run: npm ci
+      - name: Read metadata in a read-only transaction
+        run: node scripts/inspect-schema.js
