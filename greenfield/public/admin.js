@@ -80,12 +80,34 @@ async function loadCatalog(){
   }
  }catch{root.replaceChildren();const p=document.createElement('p');p.textContent='تعذر الاتصال بخدمة الكتالوج. لم يتم تعديل أي بيانات.';root.append(p);}
 }
+async function loadLeads(){
+ const root=document.getElementById('adminLeadsList');if(!root)return;
+ root.replaceChildren();const pending=document.createElement('p');pending.textContent='جارٍ تحميل الطلبات…';root.append(pending);
+ try{
+  const response=await fetch('/api/admin/leads',{credentials:'same-origin',headers:{accept:'application/json'}});
+  const result=await response.json().catch(()=>({}));root.replaceChildren();
+  if(!response.ok||!result.ok){const p=document.createElement('p');p.textContent=response.status===403?'لا يملك هذا الحساب صلاحية عرض الطلبات.':'قائمة الطلبات غير متاحة قبل التحقق من مخطط البيانات والصلاحيات.';root.append(p);return;}
+  if(!Array.isArray(result.leads)||!result.leads.length){const p=document.createElement('p');p.textContent='لا توجد طلبات مسجلة حتى الآن.';root.append(p);return;}
+  for(const lead of result.leads){
+   const card=document.createElement('article');card.className='admin-lead-card';
+   const heading=document.createElement('div');heading.className='admin-lead-heading';
+   const reference=document.createElement('strong');reference.textContent=lead.reference||'طلب بدون مرجع';
+   const status=document.createElement('span');status.className='admin-state '+(lead.status==='new'?'is-active':'is-inactive');status.textContent=lead.status||'غير محدد';heading.append(reference,status);card.append(heading);
+   const name=document.createElement('h3');name.textContent=lead.customer_name||'عميل غير محدد';card.append(name);
+   const details=document.createElement('p');details.textContent=[lead.solution_type,lead.source].filter(Boolean).join(' · ');card.append(details);
+   if(lead.project_goal){const goal=document.createElement('p');goal.className='admin-lead-goal';goal.textContent=lead.project_goal;card.append(goal);}
+   const contact=document.createElement('p');contact.className='admin-lead-contact';contact.textContent=[lead.customer_email,lead.customer_phone].filter(Boolean).join(' · ');card.append(contact);
+   const date=document.createElement('small');const parsed=Date.parse(lead.created_at||'');date.textContent=Number.isFinite(parsed)?new Date(parsed).toLocaleString('ar-EG'):'تاريخ غير متاح';card.append(date);
+   root.append(card);
+  }
+ }catch{root.replaceChildren();const p=document.createElement('p');p.textContent='تعذر الاتصال بخدمة الطلبات. لم يتم تعديل أي بيانات.';root.append(p);}
+}
 async function checkSession(){
  try{
   const response=await fetch('/api/admin/me',{credentials:'same-origin',headers:{accept:'application/json'}});
   if(!response.ok)return;
   const result=await response.json();
-  if(result.ok&&result.user){csrfToken=result.csrfToken||'';showSignedIn(result.user);await loadOverview();await loadCatalog();}
+  if(result.ok&&result.user){csrfToken=result.csrfToken||'';showSignedIn(result.user);await loadOverview();await loadCatalog();await loadLeads();}
  }catch{}
 }
 if(loginForm)loginForm.addEventListener('submit',async event=>{
@@ -103,6 +125,7 @@ if(loginForm)loginForm.addEventListener('submit',async event=>{
  finally{if(submit)submit.disabled=false;}
 });
 const reloadCatalog=document.getElementById('adminReloadCatalog');if(reloadCatalog)reloadCatalog.addEventListener('click',loadCatalog);
+const reloadLeads=document.getElementById('adminReloadLeads');if(reloadLeads)reloadLeads.addEventListener('click',loadLeads);
 const logout=document.getElementById('adminLogout');
 if(logout)logout.addEventListener('click',async()=>{
  try{
