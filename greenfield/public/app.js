@@ -83,3 +83,38 @@ if(wizard){
  const queryServices={web:'موقع أو منصة',software:'تطبيق أو نظام',ai:'ذكاء اصطناعي أو أتمتة',integration:'تكامل أو دعم تقني',consult:'أحتاج إلى التوجيه'};
  if(serviceFromUrl&&queryServices[serviceFromUrl]){data.service=queryServices[serviceFromUrl];render();}
 }
+
+const pricingRoot=document.getElementById('livePricing');
+if(pricingRoot){
+ const notice=document.getElementById('pricingNotice');
+ const escapeHtml=value=>String(value==null?'':value).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+ const amountLabel=(minor,currency)=>{
+  const amount=Number(minor);
+  if(!Number.isFinite(amount)||amount<=0)return '';
+  try{
+   const options=new Intl.NumberFormat('en',{style:'currency',currency}).resolvedOptions();
+   const digits=Number.isInteger(options.maximumFractionDigits)?options.maximumFractionDigits:2;
+   return new Intl.NumberFormat('ar-EG',{style:'currency',currency,maximumFractionDigits:digits}).format(amount/(10**digits));
+  }catch{return '';}
+ };
+ const amountLine=(label,value,currency)=>{
+  const formatted=amountLabel(value,currency);
+  return formatted?'<div class="live-price-line"><span>'+label+'</span><strong>'+escapeHtml(formatted)+'</strong></div>':'';
+ };
+ fetch('/api/public/catalog',{headers:{accept:'application/json'},credentials:'same-origin'})
+  .then(response=>{if(!response.ok)throw new Error('catalog unavailable');return response.json();})
+  .then(result=>{
+   if(result.ok!==true||!Array.isArray(result.categories))return;
+   const plans=result.categories.flatMap(category=>(Array.isArray(category.plans)?category.plans:[]).map(plan=>({category,plan})));
+   if(!plans.length)return;
+   pricingRoot.innerHTML=plans.map(({category,plan})=>{
+    const currency=/^[A-Z]{3}$/.test(plan.currency||'')?plan.currency:'';
+    const amounts=plan.amountsMinor||{};
+    const prices=currency?amountLine('رسوم التأسيس',amounts.setup,currency)+amountLine('شهريًا',amounts.monthly,currency)+amountLine('سنويًا',amounts.annual,currency):'';
+    const features=Array.isArray(plan.features)?plan.features.filter(v=>typeof v==='string'&&v.trim()).map(v=>'<li>'+escapeHtml(v)+'</li>').join(''):'';
+    return '<article class="live-plan-card"><small>'+escapeHtml(category.name?.ar||'خدمة')+'</small><h2>'+escapeHtml(plan.name?.ar||'باقة')+'</h2><p>'+escapeHtml(plan.description?.ar||'')+'</p><div class="live-price-lines">'+(prices||'<div class="live-price-pending">السعر قيد التحديد بعد مراجعة النطاق.</div>')+'</div>'+(features?'<ul>'+features+'</ul>':'')+'<a class="btn primary" href="/#contact">ناقش احتياجك ↗</a></article>';
+   }).join('');
+   if(notice)notice.hidden=true;
+  })
+  .catch(()=>{});
+}
