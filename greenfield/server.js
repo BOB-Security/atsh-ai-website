@@ -58,6 +58,19 @@ function createApp(overrides = {}) {
       return res.status(503).json({ error: 'schema_inspection_unavailable' });
     }
   });
+  app.get('/api/public/catalog', async (_req, res) => {
+    try {
+      const categories = await database.listPublicCatalog();
+      res.setHeader('Cache-Control', 'public, max-age=60, stale-while-revalidate=120');
+      return res.status(200).json({ ok: true, currencyNote: 'All amounts are returned in minor currency units as stored in the approved catalog.', categories });
+    } catch (error) {
+      if (error.code === 'CATALOG_NOT_CONFIGURED' || error.code === 'CATALOG_SCHEMA_MISMATCH') {
+        return res.status(503).json({ error: 'catalog_not_ready', message: 'قائمة الخدمات والباقات غير متاحة حتى اكتمال إعدادها ومراجعتها.' });
+      }
+      console.error('Public catalog read failed:', error.code || 'unknown');
+      return res.status(503).json({ error: 'catalog_unavailable', message: 'تعذر تحميل قائمة الخدمات الآن.' });
+    }
+  });
   app.post('/api/public/inquiries', async (req, res) => {
     if (!config.intakeEnabled || !config.publicOrganizationId) {
       return res.status(503).json({
