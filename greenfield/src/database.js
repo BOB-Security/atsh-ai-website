@@ -412,7 +412,32 @@ function createDatabase(config, dependencies = {}) {
     } finally { client.release(); }
   }
 
+  async function getSiteSettings(organizationId) {
+    if (!organizationId) { const error = new Error('Organization is missing.'); error.code = 'SITE_SETTINGS_NOT_CONFIGURED'; throw error; }
+    const client = await getPool().connect();
+    try {
+      const schema = await client.query("SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name='site_settings'");
+      const names = new Set(schema.rows.map(row => row.column_name));
+      if (!['organization_id','settings','updated_by','updated_at'].every(name => names.has(name))) { const error = new Error('Site settings schema is not installed.'); error.code = 'SITE_SETTINGS_SCHEMA_MISMATCH'; throw error; }
+      const result = await client.query('SELECT settings, updated_at FROM site_settings WHERE organization_id=$1', [organizationId]);
+      return result.rows[0] || { settings: {}, updated_at: null };
+    } finally { client.release(); }
+  }
+  async function saveSiteSettings(organizationId, userId, settings) {
+    if (!organizationId || !userId) { const error = new Error('Organization or actor is missing.'); error.code = 'SITE_SETTINGS_NOT_CONFIGURED'; throw error; }
+    const client = await getPool().connect();
+    try {
+      const schema = await client.query("SELECT table_name,column_name FROM information_schema.columns WHERE table_schema='public' AND table_name IN ('site_settings','audit_logs')");
+      const found = new Map(); for (const row of schema.rows) { if (!found.has(row.table_name)) found.set(row.table_name,new Set()); found.get(row.table_name).add(row.column_name); }
+      if (!['organization_id','settings','updated_by','updated_at'].every(name => found.get('site_settings')?.has(name)) || !['organization_id','actor_user_id','action','entity_type','entity_id','details','ip_hash','created_at'].every(name => found.get('audit_logs')?.has(name))) { const error = new Error('Site settings or audit schema is not installed.'); error.code = 'SITE_SETTINGS_SCHEMA_MISMATCH'; throw error; }
+      await client.query('BEGIN');
+      await client.query('INSERT INTO site_settings (organization_id,settings,updated_by,updated_at) VALUES ($1,$2::jsonb,$3,now()) ON CONFLICT (organization_id) DO UPDATE SET settings=EXCLUDED.settings,updated_by=EXCLUDED.updated_by,updated_at=now()', [organizationId,JSON.stringify(settings),userId]);
+      await client.query("INSERT INTO audit_logs (organization_id,actor_user_id,action,entity_type,entity_id,details,ip_hash) VALUES ($1,$2,'site.settings.update','site_settings',$1,$3::jsonb,NULL)", [organizationId,userId,JSON.stringify({keys:Object.keys(settings)})]);
+      await client.query('COMMIT'); return {settings,updated_at:new Date().toISOString()};
+    } catch(error) { try { await client.query('ROLLBACK'); } catch {} if(error.code==='42P01'||error.code==='42703')error.code='SITE_SETTINGS_SCHEMA_MISMATCH'; throw error; }
+    finally { client.release(); }
+  }
   async function close() { if (pool) { const current = pool; pool = undefined; await current.end(); } }
-  return { checkConnection, inspectSchema, createInquiry, listPublicCatalog, findAdminUser, createAdminSession, getAdminSession, deleteAdminSession, getAdminOverview, listAdminCatalog, listAdminLeads, close };
+  return { checkConnection, inspectSchema, createInquiry, listPublicCatalog, findAdminUser, createAdminSession, getAdminSession, deleteAdminSession, getAdminOverview, listAdminCatalog, listAdminLeads, getSiteSettings, saveSiteSettings, close };
 }
 module.exports = { createDatabase };
