@@ -66,3 +66,20 @@ test('public catalog refuses to query without a configured organization',async()
  assert.equal(connected,false);
  await db.close();
 });
+
+test('admin authentication fails closed when audit log schema is absent',async()=>{
+ const authSchema={
+  users:['id','organization_id','email','full_name','password_hash','status','last_login_at'],
+  organizations:['id','status'],
+  roles:['id','organization_id','name','permissions'],
+  user_roles:['user_id','role_id'],
+  auth_sessions:['id','user_id','token_hash','expires_at','last_seen_at','created_at']
+ };
+ const fake=fakePool({schema:schemaRows(authSchema)});
+ const db=createDatabase(config,{poolFactory:fake.poolFactory});
+ await assert.rejects(db.findAdminUser('owner@example.com'),error=>error.code==='ADMIN_SCHEMA_MISMATCH');
+ assert.equal(fake.calls.length,1);
+ assert.match(fake.calls[0].sql,/information_schema\.columns/);
+ assert.equal(fake.released,1);
+ await db.close();
+});
