@@ -6,6 +6,23 @@ test('health works without database',async t=>{const base=await withServer(t,con
 test('home page serves from clean public root',async t=>{const base=await withServer(t,config,{checkConnection:async()=>false,inspectSchema:async()=>[]});const r=await fetch(base+'/');assert.equal(r.status,200);assert.match(await r.text(),/فكرتك تستحق/);});
 test('readiness reports database failure',async t=>{const base=await withServer(t,config,{checkConnection:async()=>{const e=new Error('offline');e.code='ECONNREFUSED';throw e;},inspectSchema:async()=>[]});const r=await fetch(base+'/ready');assert.equal(r.status,503);assert.deepEqual(await r.json(),{ok:false,database:'unavailable',code:'DATABASE_CONNECTION_FAILED'});});
 test('schema diagnostics require bearer token',async t=>{const cfg={...config,diagnosticsToken:'test-only-long-secret'};const base=await withServer(t,cfg,{checkConnection:async()=>true,inspectSchema:async()=>[{table_schema:'public',table_name:'example',column_name:'id',data_type:'uuid',is_nullable:'NO'}]});assert.equal((await fetch(base+'/api/diagnostics/database-schema')).status,404);const r=await fetch(base+'/api/diagnostics/database-schema',{headers:{authorization:'Bearer test-only-long-secret'}});assert.equal(r.status,200);assert.equal((await r.json()).readOnly,true);});
+test('public catalog returns only database-backed catalog data',async t=>{
+ const catalog=[{id:'category-1',slug:'web',name:{ar:'المواقع',en:'Web'},description:{ar:'',en:''},plans:[{id:'plan-1',slug:'web-basic',name:{ar:'أساسي',en:'Basic'},description:{ar:'',en:''},amountsMinor:{setup:'50000',monthly:'0',annual:'0'},currency:'EGP',features:['Responsive design']}]}];
+ const base=await withServer(t,config,{checkConnection:async()=>true,inspectSchema:async()=>[],listPublicCatalog:async()=>catalog});
+ const response=await fetch(base+'/api/public/catalog');
+ assert.equal(response.status,200);
+ const result=await response.json();
+ assert.equal(result.ok,true);
+ assert.deepEqual(result.categories,catalog);
+ assert.match(response.headers.get('cache-control'),/max-age=60/);
+});
+test('public catalog fails closed when organization/schema is not configured',async t=>{
+ const db={checkConnection:async()=>true,inspectSchema:async()=>[],listPublicCatalog:async()=>{const e=new Error('not ready');e.code='CATALOG_SCHEMA_MISMATCH';throw e;}};
+ const base=await withServer(t,config,db);
+ const response=await fetch(base+'/api/public/catalog');
+ assert.equal(response.status,503);
+ assert.equal((await response.json()).error,'catalog_not_ready');
+});
 test('intake never claims an unsaved request succeeded',async t=>{const base=await withServer(t,config,{checkConnection:async()=>false,inspectSchema:async()=>[]});const r=await fetch(base+'/api/public/inquiries',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name:'Test'})});assert.equal(r.status,503);assert.equal((await r.json()).error,'intake_not_enabled');});
 
 test('home exposes the eight-step project configurator and honest submission state',async t=>{const base=await withServer(t,config,{checkConnection:async()=>false,inspectSchema:async()=>[]});const html=await (await fetch(base+'/')).text();assert.match(html,/id="projectWizard"/);assert.match(html,/مهيئ المشروع/);assert.doesNotMatch(html,/<form[^>]*id="inquiryForm"/);const js=await (await fetch(base+'/app.js')).text();assert.match(js,/الخطوة/);assert.match(js,/submission-disabled/);assert.match(js,/لم يتم إرسال الطلب بعد/);});
