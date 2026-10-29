@@ -157,3 +157,18 @@ test('admin leads require sales permission and use the authenticated organizatio
  assert.deepEqual((await response.json()).leads,sample);
  assert.equal(organizationUsed,'org-a');
 });
+
+test('admin login accepts the legacy scrypt$salt$hash format without rewriting stored credentials',async t=>{
+ const crypto=require('node:crypto');
+ const salt=crypto.randomBytes(16).toString('hex');
+ const hash=crypto.scryptSync('correct horse battery staple',salt,64).toString('hex');
+ const admin={id:'legacy-user',organization_id:'org-1',email:'owner@example.com',full_name:'Owner',password_hash:`scrypt$${salt}$${hash}`,status:'active',organization_status:'active',role_permission_sets:[['dashboard.read']]};
+ let created=null;
+ const db={checkConnection:async()=>true,inspectSchema:async()=>[],findAdminUser:async email=>email==='owner@example.com'?admin:null,createAdminSession:async(id,tokenHash)=>{created={id,tokenHash};return {id:'session-legacy'};}};
+ const base=await withServer(t,config,db);
+ const response=await fetch(base+'/api/admin/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:'owner@example.com',password:'correct horse battery staple'})});
+ assert.equal(response.status,200);
+ assert.equal((await response.json()).ok,true);
+ assert.ok(created);
+ assert.equal(admin.password_hash,`scrypt$${salt}$${hash}`);
+});
