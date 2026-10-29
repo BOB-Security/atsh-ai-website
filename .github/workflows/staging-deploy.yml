@@ -70,6 +70,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y postgresql-client
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f db/migrations/20261029_001_mfa.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f db/migrations/20261029_002_public_request_idempotency.sql
       - name: Configure staging runtime (staging database only)
         env:
           APP_NAME: ${{ inputs.app_name }}
