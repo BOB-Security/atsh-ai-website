@@ -58,3 +58,5 @@ test('MFA port wires encryption, migrations, enrollment-only sessions and sign-i
  assert.match(routes,/auth\/mfa\/verify/);
  assert.match(deploy,/MFA_ENCRYPTION_KEY/);
 });
+
+test('public homepage references existing ATSH AI logo, favicon and hero assets',()=>{const html=fs.readFileSync(path.join(root,'platform/public/index.html'),'utf8');const css=fs.readFileSync(path.join(root,'platform/public/styles.css'),'utf8');for(const asset of ['images/atsh-ai-logo-horizontal.svg','images/atsh-ai-logo-round.svg','images/atsh-hero.jpg','images/atsh-logo.jpg','images/atsh-emblem.jpg'])assert.ok(fs.existsSync(path.join(root,'platform/public',asset)),asset+' missing');assert.match(html,/href="\/images\/atsh-ai-logo-round\.svg"/);assert.match(html,/src="\/images\/atsh-ai-logo-horizontal\.svg"/);assert.match(html,/src="\/images\/atsh-hero\.jpg"/);assert.match(css,/\.hero-brand-image/);});
