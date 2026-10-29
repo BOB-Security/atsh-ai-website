@@ -38,7 +38,7 @@ app.post('/api/public/quotes/lookup', sameOrigin, async (req, res) => {
 });
 app.post('/api/public/quotes/respond', sameOrigin, async (req, res) => {
   try {
-    const result = await respondToQuote(config, req.body && req.body.token, req.body && req.body.decision);
+    const result = await respondToQuote(config, req.body && req.body.token, req.body && req.body.decision, requestIpHash(req));
     if (result.expired) return res.status(410).json({ error: 'quote_expired', reference: result.reference, message: 'انتهت صلاحية عرض السعر.' });
     res.setHeader('Cache-Control', 'no-store');
     return res.json({ ok: true, quote: result });
