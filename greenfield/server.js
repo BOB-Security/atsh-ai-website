@@ -7,6 +7,7 @@ const rateLimit = require('express-rate-limit');
 const { loadConfig } = require('./src/config');
 const { createDatabase } = require('./src/database');
 const { defaultCatalog } = require('./src/default-catalog');
+const { inspectPortalCompatibility } = require('./src/portal-schema');
 function safeEqual(a, b) {
   if (typeof a !== 'string' || typeof b !== 'string' || !a || !b) return false;
   const left = Buffer.from(a); const right = Buffer.from(b);
@@ -57,6 +58,18 @@ function createApp(overrides = {}) {
     } catch (error) {
       console.error('Database schema inspection failed:', error.code || 'unknown');
       return res.status(503).json({ error: 'schema_inspection_unavailable' });
+    }
+  });
+  app.get('/api/diagnostics/customer-portal-readiness', async (req, res) => {
+    if (!config.diagnosticsToken || !safeEqual(req.get('authorization') || '', 'Bearer ' + config.diagnosticsToken)) return res.status(404).json({ error: 'not_found' });
+    try {
+      const columns = await database.inspectSchema();
+      const compatibility = inspectPortalCompatibility(columns);
+      res.setHeader('Cache-Control', 'no-store');
+      return res.status(200).json({ ok: true, ...compatibility });
+    } catch (error) {
+      console.error('Customer portal schema inspection failed:', error.code || 'unknown');
+      return res.status(503).json({ error: 'portal_schema_inspection_unavailable', readOnly: true });
     }
   });
   app.post('/api/admin/login', rateLimit({ windowMs: 900000, limit: 8, standardHeaders: 'draft-8', legacyHeaders: false }), async (req, res) => {
