@@ -81,7 +81,8 @@ jobs:
           set -euo pipefail
           az webapp config appsettings set --resource-group "$RESOURCE_GROUP" --name "$APP_NAME" --settings \
             NODE_ENV=production WEBSITE_NODE_DEFAULT_VERSION='~22' SCM_DO_BUILD_DURING_DEPLOYMENT=true \
-            DATABASE_URL="$DATABASE_URL" PGSSL=require DB_DIAGNOSTICS_TOKEN="$DB_DIAGNOSTICS_TOKEN" --output none
+            DATABASE_URL="$DATABASE_URL" PGSSL=require DB_DIAGNOSTICS_TOKEN="$DB_DIAGNOSTICS_TOKEN" \
+            INQUIRY_INTAKE_ENABLED=false PUBLIC_ORGANIZATION_ID='' --output none
           az webapp config set --resource-group "$RESOURCE_GROUP" --name "$APP_NAME" --startup-file "npm start" --output none
       - name: Deploy greenfield package
         uses: azure/webapps-deploy@v3
