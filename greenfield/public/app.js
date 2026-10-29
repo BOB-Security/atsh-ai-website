@@ -57,6 +57,6 @@ if(wizard){
  }
  back.addEventListener('click',()=>{if(current>0){current--;render();}});
  next.addEventListener('click',()=>{if(current===steps.length-1){current=0;render();wizard.scrollIntoView({behavior:'smooth',block:'start'});return;}const msg=valid();if(msg){error.textContent=msg;error.hidden=false;return;}current++;render();wizard.scrollIntoView({behavior:'smooth',block:'start'});});
- document.querySelectorAll('[data-service]').forEach(a=>a.addEventListener('click',()=>{const found=steps[0].options.find(o=>o[0]===a.dataset.service||o[0].startsWith(a.dataset.service));if(found){data.service=found[0];current=0;render();wizard.scrollIntoView({behavior:'smooth',block:'start'});}}));
+ document.querySelectorAll('[data-service]').forEach(a=>a.addEventListener('click',()=>{const aliases={'المواقع والمنصات':'موقع أو منصة','التطبيقات والأنظمة':'تطبيق أو نظام','الذكاء الاصطناعي والأتمتة':'ذكاء اصطناعي أو أتمتة','التكامل والدعم التقني':'تكامل أو دعم تقني'};const wanted=aliases[a.dataset.service]||a.dataset.service;const found=steps[0].options.find(o=>o[0]===wanted);if(found){data.service=found[0];current=0;render();wizard.scrollIntoView({behavior:'smooth',block:'start'});}}));
  render();
 }
