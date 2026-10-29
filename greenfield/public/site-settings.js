@@ -5,6 +5,17 @@
   if(!response.ok)return;
   const result=await response.json();
   const settings=result.settings||{};
+  const path=window.location.pathname.toLowerCase();
+  const pageKey=path==='/'||path.endsWith('/index.html')?'home':path.endsWith('/services.html')?'services':path.endsWith('/pricing.html')?'pricing':path.endsWith('/process.html')?'process':path.endsWith('/about.html')?'about':path.endsWith('/faq.html')?'faq':'';
+  const page=settings.page_content&&pageKey?settings.page_content[pageKey]:null;
+  if(page&&typeof page.title==='string'&&page.title.trim()){
+   const heading=document.querySelector('.hero h1, .page-hero h1');
+   if(heading)heading.textContent=page.title.trim();
+  }
+  if(page&&typeof page.description==='string'&&page.description.trim()){
+   const description=document.querySelector('.hero .lead, .page-hero>p:not(.eyebrow)');
+   if(description)description.textContent=page.description.trim();
+  }
   const root=document.documentElement;
   if(/^#[0-9a-f]{6}$/i.test(settings.primary_color||'')){root.style.setProperty('--purple',settings.primary_color);root.style.setProperty('--lilac',settings.primary_color);}
   if(/^#[0-9a-f]{6}$/i.test(settings.accent_color||''))root.style.setProperty('--gold',settings.accent_color);
