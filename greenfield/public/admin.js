@@ -408,3 +408,95 @@ function setupAdminWorkspace(){
 
 setupAdminWorkspace();
 checkSession();
+
+
+/* Admin account recovery: request link, validate token, reset password. */
+const recoveryPanel=document.getElementById('adminRecoveryPanel');
+const recoveryAvailability=document.getElementById('adminRecoveryAvailability');
+const recoveryRequestForm=document.getElementById('adminRecoveryRequestForm');
+const recoveryResetForm=document.getElementById('adminRecoveryResetForm');
+const recoveryRequestMessage=document.getElementById('adminRecoveryRequestMessage');
+const recoveryResetMessage=document.getElementById('adminRecoveryResetMessage');
+let recoveryToken='';
+function recoveryMessage(root,message,kind='info'){if(root){root.textContent=message;root.dataset.kind=kind;}}
+async function checkRecoveryAvailability(){
+ if(!recoveryAvailability)return false;
+ try{
+  const response=await fetch('/api/admin/password-recovery/status',{headers:{accept:'application/json'},cache:'no-store'});
+  const result=await response.json().catch(()=>({}));
+  const ready=response.ok&&result.configured===true;
+  recoveryAvailability.textContent=ready
+   ?'الخدمة جاهزة. سنرسل رابطًا مؤقتًا إلى البريد المرتبط بالحساب إذا كان نشطًا.'
+   :'استرجاع الحساب غير مفعّل بعد. يلزم إعداد خدمة البريد ومفتاحها وقاعدة بيانات الاسترجاع؛ تواصل مع مسؤول النظام مؤقتًا.';
+  recoveryAvailability.dataset.kind=ready?'success':'warning';
+  return ready;
+ }catch{
+  recoveryAvailability.textContent='تعذر التحقق من خدمة الاسترجاع. أعد المحاولة لاحقًا.';
+  recoveryAvailability.dataset.kind='error';return false;
+ }
+}
+function showRecovery(){
+ if(!recoveryPanel)return;
+ recoveryPanel.hidden=false;
+ if(loginForm)loginForm.hidden=true;
+ if(recoveryRequestForm)recoveryRequestForm.hidden=Boolean(recoveryToken);
+ if(recoveryResetForm)recoveryResetForm.hidden=!recoveryToken;
+ if(recoveryToken){
+  const title=document.getElementById('adminRecoveryTitle');if(title)title.textContent='تعيين كلمة مرور جديدة';
+  recoveryMessage(recoveryResetMessage,'أدخل كلمة المرور الجديدة لإكمال الاسترجاع.');
+  const password=document.getElementById('adminRecoveryNewPassword');if(password)password.focus();
+ }else{
+  const title=document.getElementById('adminRecoveryTitle');if(title)title.textContent='استرجاع حساب الإدارة';
+  const email=document.getElementById('adminRecoveryEmail');if(email)email.focus();
+  checkRecoveryAvailability();
+ }
+}
+const showRecoveryButton=document.getElementById('adminShowRecovery');
+if(showRecoveryButton)showRecoveryButton.addEventListener('click',showRecovery);
+const hideRecoveryButton=document.getElementById('adminHideRecovery');
+if(hideRecoveryButton)hideRecoveryButton.addEventListener('click',()=>{
+ if(recoveryPanel)recoveryPanel.hidden=true;
+ if(loginForm)loginForm.hidden=false;
+ recoveryToken='';
+ if(location.hash.startsWith('#reset='))history.replaceState(null,'',location.pathname+location.search);
+});
+if(recoveryRequestForm)recoveryRequestForm.addEventListener('submit',async event=>{
+ event.preventDefault();
+ const button=recoveryRequestForm.querySelector('button[type="submit"]');if(button)button.disabled=true;
+ recoveryMessage(recoveryRequestMessage,'جارٍ إرسال الطلب…');
+ try{
+  const email=String(recoveryRequestForm.elements.namedItem('email')?.value||'').trim();
+  const response=await fetch('/api/admin/password-recovery/request',{method:'POST',headers:{'content-type':'application/json','accept':'application/json'},body:JSON.stringify({email})});
+  const result=await response.json().catch(()=>({}));
+  if(!response.ok||!result.ok){recoveryMessage(recoveryRequestMessage,result.message||'تعذر بدء الاسترجاع. لم يتم تغيير كلمة المرور.','error');return;}
+  recoveryMessage(recoveryRequestMessage,result.message||'إذا كان البريد مرتبطًا بحساب نشط، فستصلك رسالة بخطوات الاسترجاع.','success');
+  recoveryRequestForm.reset();
+ }catch{recoveryMessage(recoveryRequestMessage,'تعذر الاتصال بخدمة الاسترجاع. لم يتم تغيير كلمة المرور.','error');}
+ finally{if(button)button.disabled=false;}
+});
+if(recoveryResetForm)recoveryResetForm.addEventListener('submit',async event=>{
+ event.preventDefault();
+ const password=String(recoveryResetForm.elements.namedItem('password')?.value||'');
+ const confirm=String(recoveryResetForm.elements.namedItem('confirm_password')?.value||'');
+ if(password.length<12){recoveryMessage(recoveryResetMessage,'كلمة المرور يجب أن تتكون من 12 حرفًا على الأقل.','error');return;}
+ if(password!==confirm){recoveryMessage(recoveryResetMessage,'كلمتا المرور غير متطابقتين.','error');return;}
+ const button=recoveryResetForm.querySelector('button[type="submit"]');if(button)button.disabled=true;
+ recoveryMessage(recoveryResetMessage,'جارٍ التحقق من الرابط وتغيير كلمة المرور…');
+ try{
+  const response=await fetch('/api/admin/password-recovery/complete',{method:'POST',headers:{'content-type':'application/json','accept':'application/json'},body:JSON.stringify({token:recoveryToken,password})});
+  const result=await response.json().catch(()=>({}));
+  if(!response.ok||!result.ok){recoveryMessage(recoveryResetMessage,result.message||'تعذر تغيير كلمة المرور. اطلب رابطًا جديدًا.','error');return;}
+  recoveryMessage(recoveryResetMessage,result.message||'تم تغيير كلمة المرور. يمكنك تسجيل الدخول الآن.','success');
+  recoveryResetForm.reset();recoveryToken='';
+  if(location.hash.startsWith('#reset='))history.replaceState(null,'',location.pathname+location.search);
+  const title=document.getElementById('adminRecoveryTitle');if(title)title.textContent='تم استرجاع الحساب';
+  if(loginForm)loginForm.hidden=false;
+  const email=document.getElementById('adminEmail');if(email)email.focus();
+ }catch{recoveryMessage(recoveryResetMessage,'تعذر الاتصال بخدمة الاسترجاع. لم يتم تأكيد تغيير كلمة المرور.','error');}
+ finally{if(button)button.disabled=false;}
+});
+if(location.hash.startsWith('#reset=')){
+ recoveryToken=decodeURIComponent(location.hash.slice(7)).trim();
+ if(!/^[A-Za-z0-9_-]{32,128}$/.test(recoveryToken))recoveryToken='';
+ if(recoveryToken)showRecovery();
+}
