@@ -29,7 +29,7 @@ test('catalog does not invent services or prices before database mapping', async
 });
 test('project intake never reports success before persistence is configured', async () => {
   const response = await fetch(base + '/api/public/project-inquiries', {
-    method: 'POST', headers: { 'content-type': 'application/json' },
+    method: 'POST', headers: { 'content-type': 'application/json', 'idempotency-key': 'test-inquiry-key-1234567890' },
     body: JSON.stringify({ name: 'Test', email: 'test@example.com', brief: 'A sufficiently long project brief', serviceType: 'website', scope: 'small', brand: 'ready', hosting: 'later', languages: ['ar'], addons: [], consent: true })
   });
   assert.equal(response.status, 503);
