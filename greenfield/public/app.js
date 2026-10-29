@@ -114,7 +114,7 @@ if(pricingRoot){
     const features=Array.isArray(plan.features)?plan.features.filter(v=>typeof v==='string'&&v.trim()).map(v=>'<li>'+escapeHtml(v)+'</li>').join(''):'';
     return '<article class="live-plan-card"><small>'+escapeHtml(category.name?.ar||'خدمة')+'</small><h2>'+escapeHtml(plan.name?.ar||'باقة')+'</h2><p>'+escapeHtml(plan.description?.ar||'')+'</p><div class="live-price-lines">'+(prices||'<div class="live-price-pending">السعر قيد التحديد بعد مراجعة النطاق.</div>')+'</div>'+(features?'<ul>'+features+'</ul>':'')+'<a class="btn primary" href="/#contact">ناقش احتياجك ↗</a></article>';
    }).join('');
-   if(notice)notice.hidden=true;
+   if(notice)notice.hidden=result.provisional!==true;
   })
   .catch(()=>{});
 }
