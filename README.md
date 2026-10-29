@@ -5,3 +5,6 @@ Fresh implementation branch governed by the pinned executive reference. Producti
 CI workflow was re-triggered after staging workflow hardening.
 
 The current clean-build branch includes a read-only live schema inventory and a database-backed inquiry adapter; production data is not modified by CI.
+
+
+The clean rebuild now includes project lifecycle controls with an audited client-approval gate before deployment, plus lead/quote workflow APIs.
