@@ -148,7 +148,8 @@ function createApp(overrides = {}) {
         'الخدمات والباقات': {
           service_categories: ['id','organization_id','slug','name_ar','name_en','description_ar','description_en','active','sort_order'],
           service_plans: ['id','organization_id','category_id','slug','name_ar','name_en','description_ar','description_en','setup_amount_minor','monthly_amount_minor','annual_amount_minor','currency','features','active','sort_order']
-        }
+        },
+        'إعدادات الموقع': { site_settings: ['organization_id','settings','updated_by','updated_at'] }
       };
       const report = Object.entries(groups).map(([name, tables]) => {
         const missing = [];
@@ -199,6 +200,28 @@ function createApp(overrides = {}) {
       console.error('Admin logout failed:', error.code || 'unknown');
       return res.status(503).json({ error: 'admin_unavailable' });
     }
+  });
+  app.get('/api/admin/site-settings', async (req,res)=>{
+    try{const auth=await getCurrentAdmin(req);if(!auth)return res.status(401).json({error:'authentication_required'});if(!auth.permissions.includes('*')&&!auth.permissions.includes('site.manage'))return res.status(403).json({error:'permission_denied'});
+    const result=await database.getSiteSettings(auth.user.organization_id);res.setHeader('Cache-Control','no-store');return res.json({ok:true,settings:result.settings||{},updatedAt:result.updated_at||null});
+    }catch(error){if(error.code==='SITE_SETTINGS_SCHEMA_MISMATCH')return res.status(503).json({error:'site_settings_not_ready',message:'يلزم تطبيق ترحيل إعدادات الموقع.'});console.error('Admin site settings read failed:',error.code||'unknown');return res.status(503).json({error:'site_settings_unavailable'});}
+  });
+  app.put('/api/admin/site-settings', async (req,res)=>{
+    const csrfCookie=readCookie(req.headers.cookie,'atsh_admin_csrf');if(!csrfCookie||!safeEqual(csrfCookie,req.get('x-csrf-token')||''))return res.status(403).json({error:'csrf_validation_failed'});
+    try{const auth=await getCurrentAdmin(req);if(!auth)return res.status(401).json({error:'authentication_required'});if(!auth.permissions.includes('*')&&!auth.permissions.includes('site.manage'))return res.status(403).json({error:'permission_denied'});
+    const input=req.body?.settings;const allowed=['hero_title','hero_description','logo_url','primary_color','accent_color','contact_email'];
+    if(!input||typeof input!=='object'||Array.isArray(input)||Object.keys(input).some(key=>!allowed.includes(key)))return res.status(400).json({error:'invalid_settings'});
+    const limits={hero_title:180,hero_description:1000,logo_url:1000,primary_color:7,accent_color:7,contact_email:254};const settings={};
+    for(const key of allowed){const value=input[key]==null?'':input[key];if(typeof value!=='string'||value.length>limits[key])return res.status(400).json({error:'invalid_settings'});settings[key]=value.trim();}
+    for(const key of ['primary_color','accent_color'])if(settings[key]&&!/^#[0-9a-f]{6}$/i.test(settings[key]))return res.status(400).json({error:'invalid_settings',message:'صيغة اللون غير صحيحة.'});
+    if(settings.logo_url&& !/^https:\/\//i.test(settings.logo_url))return res.status(400).json({error:'invalid_settings',message:'رابط الشعار يجب أن يبدأ بـ https.'});
+    if(settings.contact_email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(settings.contact_email))return res.status(400).json({error:'invalid_settings',message:'البريد الإلكتروني غير صحيح.'});
+    const saved=await database.saveSiteSettings(auth.user.organization_id,auth.user.id,settings);res.setHeader('Cache-Control','no-store');return res.json({ok:true,settings:saved.settings,updatedAt:saved.updated_at});
+    }catch(error){if(error.code==='SITE_SETTINGS_SCHEMA_MISMATCH')return res.status(503).json({error:'site_settings_not_ready',message:'يلزم تطبيق ترحيل إعدادات الموقع.'});console.error('Admin site settings save failed:',error.code||'unknown');return res.status(503).json({error:'site_settings_unavailable',message:'تعذر حفظ إعدادات الموقع.'});}
+  });
+  app.get('/api/public/site-settings',async(_req,res)=>{
+    try{if(!config.publicOrganizationId)return res.json({ok:true,settings:{}});const result=await database.getSiteSettings(config.publicOrganizationId);res.setHeader('Cache-Control','public,max-age=30,stale-while-revalidate=60');return res.json({ok:true,settings:result.settings||{}});}
+    catch(error){if(error.code==='SITE_SETTINGS_SCHEMA_MISMATCH')return res.status(200).json({ok:true,settings:{}});console.error('Public site settings read failed:',error.code||'unknown');return res.status(200).json({ok:true,settings:{}});}
   });
   app.get('/api/admin/overview', async (req, res) => {
     try {

@@ -54,6 +54,36 @@ async function loadSchemaReadiness(){
   }
  }catch(error){root.replaceChildren();const p=document.createElement('p');p.textContent=error?.name==='AbortError'?'استغرق فحص قاعدة البيانات وقتًا أطول من المسموح. أعد الفحص أو راجع اتصال قاعدة البيانات.':'تعذر الاتصال بخدمة فحص الجاهزية.';root.append(p);}
 }
+const siteSettingsForm=document.getElementById('adminSiteSettingsForm');
+function siteSettingsMessage(message,kind='info'){const root=document.getElementById('adminSiteSettingsMessage');if(root){root.textContent=message;root.dataset.kind=kind;}}
+async function loadSiteSettings(){
+ if(!siteSettingsForm)return;
+ siteSettingsMessage('جارٍ تحميل إعدادات الموقع…');
+ try{
+  const response=await fetch('/api/admin/site-settings',{credentials:'same-origin',headers:{accept:'application/json'}});
+  const result=await response.json().catch(()=>({}));
+  if(!response.ok||!result.ok){siteSettingsMessage(response.status===403?'لا يملك هذا الحساب صلاحية إدارة إعدادات الموقع.':'إعدادات الموقع غير متاحة. تأكد من تطبيق ترحيل قاعدة البيانات.','error');return;}
+  const values=result.settings||{};
+  for(const key of ['hero_title','hero_description','logo_url','primary_color','accent_color','contact_email']){
+   const field=siteSettingsForm.elements.namedItem(key);if(field&&typeof values[key]==='string')field.value=values[key];
+  }
+  siteSettingsMessage('تم تحميل الإعدادات الحالية.','success');
+ }catch{siteSettingsMessage('تعذر الاتصال بإعدادات الموقع.','error');}
+}
+if(siteSettingsForm)siteSettingsForm.addEventListener('submit',async event=>{
+ event.preventDefault();
+ const submit=siteSettingsForm.querySelector('button[type="submit"]');if(submit)submit.disabled=true;
+ const settings={};for(const key of ['hero_title','hero_description','logo_url','primary_color','accent_color','contact_email'])settings[key]=String(siteSettingsForm.elements.namedItem(key)?.value||'').trim();
+ siteSettingsMessage('جارٍ حفظ الإعدادات…');
+ try{
+  const response=await fetch('/api/admin/site-settings',{method:'PUT',credentials:'same-origin',headers:{'content-type':'application/json','accept':'application/json','x-csrf-token':csrfToken},body:JSON.stringify({settings})});
+  const result=await response.json().catch(()=>({}));
+  if(!response.ok||!result.ok){siteSettingsMessage(result.message||'تعذر حفظ الإعدادات. لم يتم تأكيد أي تغيير.','error');return;}
+  siteSettingsMessage('تم حفظ الإعدادات. افتح الموقع في نافذة جديدة أو حدّثه لرؤية التغييرات.','success');
+ }catch{siteSettingsMessage('تعذر الاتصال بخدمة الحفظ.','error');}
+ finally{if(submit)submit.disabled=false;}
+});
+const reloadSiteSettings=document.getElementById('adminReloadSiteSettings');if(reloadSiteSettings)reloadSiteSettings.addEventListener('click',loadSiteSettings);
 async function loadOverview(){
  const response=await fetch('/api/admin/overview',{credentials:'same-origin',headers:{accept:'application/json'}});
  const result=await response.json().catch(()=>({}));
@@ -127,7 +157,7 @@ async function checkSession(){
   const response=await fetch('/api/admin/me',{credentials:'same-origin',headers:{accept:'application/json'}});
   if(!response.ok)return;
   const result=await response.json();
-  if(result.ok&&result.user){csrfToken=result.csrfToken||'';showSignedIn(result.user);await loadOverview();await loadSchemaReadiness();await loadCatalog();await loadLeads();}
+  if(result.ok&&result.user){csrfToken=result.csrfToken||'';showSignedIn(result.user);await loadOverview();await loadSchemaReadiness();await loadCatalog();await loadLeads();await loadSiteSettings();}
  }catch{}
 }
 if(loginForm)loginForm.addEventListener('submit',async event=>{
