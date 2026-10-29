@@ -135,6 +135,8 @@ if(serviceCatalogRoot){
   .then(response=>{if(!response.ok)throw new Error('catalog unavailable');return response.json();})
   .then(result=>{
    if(result.ok!==true||!Array.isArray(result.categories)||!result.categories.length)return;
+   const pricingNotice=document.getElementById('servicePricingNotice');
+   if(pricingNotice)pricingNotice.hidden=result.provisional!==true;
    const categories=result.categories.filter(category=>category&&category.id);
    if(!categories.length)return;
    serviceCatalogRoot.innerHTML='<div class="service-catalog">'+categories.map(category=>{
