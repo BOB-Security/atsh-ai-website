@@ -91,4 +91,4 @@ async function respondToQuote(config,token,decision){
   await audit(client,oid,null,'quote.customer_response','quote',quote.id,{reference:quote.reference,decision},null);return result.rows[0];
  });
 }
-module.exports={listLeads,updateLead,createQuote,listQuotes,issueQuote,getPublicQuote,respondToQuote};
+module.exports={listLeads,updateLead,createQuote,listQuotes,issueQuote,getPublicQuote,respondToQuote,normalizeQuoteItems};
