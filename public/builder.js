@@ -14,7 +14,7 @@ let current=0,locale='ar';
 const $=id=>document.getElementById(id);
 function escapeHtml(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function label(ar,en){return locale==='ar'?ar:en;}
-function optionCard(key,ar,en,selected,group){return '<label class="option-card '+(selected?'selected':'')+'"><input type="'+group+'" name="opt-'+key+'" value="'+escapeHtml(key)+'" '+(selected?'checked':'')+'><span>'+label(ar,en)+'</span></label>';}
+function optionCard(key,ar,en,selected,group){return '<label class="option-card '+(selected?'selected':'')+'"><input type="'+group+'" name="'+(group==='radio'?'choice':'opt-'+key)+'" value="'+escapeHtml(key)+'" '+(selected?'checked':'')+'><span>'+label(ar,en)+'</span></label>';}
 function render(){
  const step=steps[current];$('stepLabel').textContent=label('الخطوة '+(current+1)+' من 8','Step '+(current+1)+' of 8');$('stepTitle').textContent=label(step.title,step.en);$('progressBar').style.width=((current+1)/8*100)+'%';$('stepDots').innerHTML=steps.map((s,i)=>'<button type="button" class="step-dot '+(i===current?'current':i<current?'done':'')+'" aria-label="'+escapeHtml(label(s.title,s.en))+'" data-go="'+i+'">'+(i<current?'✓':i+1)+'</button>').join('');$('prevStep').disabled=current===0;$('nextStep').textContent=current===7?label('إرسال الطلب','Submit request'):label('التالي ←','Next →');
  let html='';
