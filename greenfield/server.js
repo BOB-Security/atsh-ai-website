@@ -6,6 +6,7 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const { loadConfig } = require('./src/config');
 const { createDatabase } = require('./src/database');
+const { defaultCatalog } = require('./src/default-catalog');
 function safeEqual(a, b) {
   if (typeof a !== 'string' || typeof b !== 'string' || !a || !b) return false;
   const left = Buffer.from(a); const right = Buffer.from(b);
@@ -192,10 +193,27 @@ function createApp(overrides = {}) {
     try {
       const categories = await database.listPublicCatalog();
       res.setHeader('Cache-Control', 'public, max-age=60, stale-while-revalidate=120');
-      return res.status(200).json({ ok: true, currencyNote: 'All amounts are returned in minor currency units as stored in the approved catalog.', categories });
+      if (!categories.length) {
+        return res.status(200).json({
+          ok: true,
+          provisional: true,
+          currencyNote: 'Starter estimates only. Amounts are in minor currency units and are not a final offer.',
+          categories: defaultCatalog
+        });
+      }
+      return res.status(200).json({ ok: true, provisional: false, currencyNote: 'All amounts are returned in minor currency units as stored in the organization catalog.', categories });
     } catch (error) {
-      if (error.code === 'CATALOG_NOT_CONFIGURED' || error.code === 'CATALOG_SCHEMA_MISMATCH') {
-        return res.status(503).json({ error: 'catalog_not_ready', message: 'قائمة الخدمات والباقات غير متاحة حتى اكتمال إعدادها ومراجعتها.' });
+      if (error.code === 'CATALOG_NOT_CONFIGURED') {
+        res.setHeader('Cache-Control', 'public, max-age=60, stale-while-revalidate=120');
+        return res.status(200).json({
+          ok: true,
+          provisional: true,
+          currencyNote: 'Starter estimates only. Amounts are in minor currency units and are not a final offer.',
+          categories: defaultCatalog
+        });
+      }
+      if (error.code === 'CATALOG_SCHEMA_MISMATCH') {
+        return res.status(503).json({ error: 'catalog_not_ready', message: 'كتالوج الأسعار يحتاج إلى مراجعة توافق قاعدة البيانات.' });
       }
       console.error('Public catalog read failed:', error.code || 'unknown');
       return res.status(503).json({ error: 'catalog_unavailable', message: 'تعذر تحميل قائمة الخدمات الآن.' });
