@@ -47,7 +47,7 @@ test('MFA port wires encryption, migrations, enrollment-only sessions and sign-i
  const server=fs.readFileSync(path.join(root,'platform/server.js'),'utf8');
  const mfa=fs.readFileSync(path.join(root,'platform/src/mfa.js'),'utf8');
  const routes=fs.readFileSync(path.join(root,'platform/src/mfa-routes.js'),'utf8');
- const deploy=fs.readFileSync(path.join(root,'.github/workflows/platform-staging-deploy.yml'),'utf8');
+ const deploy=fs.readFileSync(path.join(root,'.github/workflows/azure-provision-deploy.yml'),'utf8');
  for(const file of ['018_privileged_mfa.sql','019_mfa_enrollment_sessions.sql','020_mfa_pending_expiry.sql']) assert.ok(fs.existsSync(path.join(root,'db',file)),file+' missing');
  assert.match(config,/MFA_ENCRYPTION_KEY/);
  assert.match(auth,/mfa_enrollment_only/);
