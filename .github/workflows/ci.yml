@@ -48,13 +48,16 @@ jobs:
           PGPASSWORD: atsh_test_password
         run: |
           set -euo pipefail
-          psql "postgresql://atsh_test@127.0.0.1:5432/atsh_test" -v ON_ERROR_STOP=1 -c "CREATE TABLE users (id UUID PRIMARY KEY); CREATE TABLE schema_migrations (filename TEXT PRIMARY KEY, applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW());"
+          psql "postgresql://atsh_test@127.0.0.1:5432/atsh_test" -v ON_ERROR_STOP=1 -c "CREATE TABLE users (id UUID PRIMARY KEY); CREATE TABLE organizations (id UUID PRIMARY KEY); CREATE TABLE leads (id UUID PRIMARY KEY); CREATE TABLE schema_migrations (filename TEXT PRIMARY KEY, applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW());"
       - name: Apply additive MFA migration twice to prove idempotency
         env:
           PGPASSWORD: atsh_test_password
         run: |
           set -euo pipefail
           psql "postgresql://atsh_test@127.0.0.1:5432/atsh_test" -v ON_ERROR_STOP=1 -f db/migrations/20261029_001_mfa.sql
+          psql "postgresql://atsh_test@127.0.0.1:5432/atsh_test" -v ON_ERROR_STOP=1 -f db/migrations/20261029_002_public_request_idempotency.sql
           psql "postgresql://atsh_test@127.0.0.1:5432/atsh_test" -v ON_ERROR_STOP=1 -f db/migrations/20261029_001_mfa.sql
-          count=$(psql "postgresql://atsh_test@127.0.0.1:5432/atsh_test" -Atc "SELECT count(*) FROM schema_migrations WHERE filename='20261029_001_mfa.sql'")
-          [[ "$count" == "1" ]]
+          psql "postgresql://atsh_test@127.0.0.1:5432/atsh_test" -v ON_ERROR_STOP=1 -f db/migrations/20261029_002_public_request_idempotency.sql
+          mfa_count=$(psql "postgresql://atsh_test@127.0.0.1:5432/atsh_test" -Atc "SELECT count(*) FROM schema_migrations WHERE filename='20261029_001_mfa.sql'")
+          idempotency_count=$(psql "postgresql://atsh_test@127.0.0.1:5432/atsh_test" -Atc "SELECT count(*) FROM schema_migrations WHERE filename='20261029_002_public_request_idempotency.sql'")
+          [[ "$mfa_count" == "1" && "$idempotency_count" == "1" ]]
