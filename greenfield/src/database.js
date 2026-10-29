@@ -65,7 +65,7 @@ function createDatabase(config) {
       } else {
         const createdCustomer = await client.query(
           "INSERT INTO customers (organization_id, display_name, email, phone, preferred_locale, status, source) VALUES ($1,$2,$3,$4,'ar','lead','website') ON CONFLICT (organization_id, email) DO NOTHING RETURNING id",
-          [config.publicOrganizationId, input.name, input.email, input.phone || null]
+          [config.publicOrganizationId, input.name, input.email.toLowerCase(), input.phone || null]
         );
         if (createdCustomer.rows[0]) {
           customerId = createdCustomer.rows[0].id;
