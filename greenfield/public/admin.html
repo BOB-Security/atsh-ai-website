@@ -39,6 +39,23 @@
 <button class="btn primary" type="submit">حفظ إعدادات الموقع</button>
 </form>
 </div>
+
+<div class="admin-panel">
+<div class="admin-panel-heading"><div><small>محتوى الصفحات الحالية</small><h2>تعديل صفحات الموقع</h2></div><button id="adminReloadPages" class="btn secondary" type="button">إعادة تحميل</button></div>
+<p class="admin-subtext">عدّل عناوين ووصف الصفحات الموجودة دون الحاجة إلى تعديل ملفات الكود. اترك الحقل فارغًا إذا أردت إبقاء النص الأصلي كما هو.</p>
+<form id="adminPageContentForm" class="admin-form">
+<div class="admin-page-edit-grid">
+<div class="admin-page-edit"><h3>الرئيسية</h3><label for="pageHomeTitle">العنوان الرئيسي</label><input id="pageHomeTitle" name="home_title" maxlength="180"><label for="pageHomeDescription">الوصف</label><textarea id="pageHomeDescription" name="home_description" rows="3" maxlength="1000"></textarea></div>
+<div class="admin-page-edit"><h3>الخدمات</h3><label for="pageServicesTitle">العنوان</label><input id="pageServicesTitle" name="services_title" maxlength="180"><label for="pageServicesDescription">الوصف</label><textarea id="pageServicesDescription" name="services_description" rows="3" maxlength="1000"></textarea></div>
+<div class="admin-page-edit"><h3>التسعير</h3><label for="pagePricingTitle">العنوان</label><input id="pagePricingTitle" name="pricing_title" maxlength="180"><label for="pagePricingDescription">الوصف</label><textarea id="pagePricingDescription" name="pricing_description" rows="3" maxlength="1000"></textarea></div>
+<div class="admin-page-edit"><h3>آلية العمل</h3><label for="pageProcessTitle">العنوان</label><input id="pageProcessTitle" name="process_title" maxlength="180"><label for="pageProcessDescription">الوصف</label><textarea id="pageProcessDescription" name="process_description" rows="3" maxlength="1000"></textarea></div>
+<div class="admin-page-edit"><h3>من نحن</h3><label for="pageAboutTitle">العنوان</label><input id="pageAboutTitle" name="about_title" maxlength="180"><label for="pageAboutDescription">الوصف</label><textarea id="pageAboutDescription" name="about_description" rows="3" maxlength="1000"></textarea></div>
+<div class="admin-page-edit"><h3>الأسئلة الشائعة</h3><label for="pageFaqTitle">العنوان</label><input id="pageFaqTitle" name="faq_title" maxlength="180"><label for="pageFaqDescription">الوصف</label><textarea id="pageFaqDescription" name="faq_description" rows="3" maxlength="1000"></textarea></div>
+</div>
+<p id="adminPageContentMessage" class="admin-message" role="status" aria-live="polite">يتم تحميل محتوى الصفحات…</p>
+<button class="btn primary" type="submit">حفظ تعديلات الصفحات</button>
+</form>
+</div>
 <div class="admin-panel admin-catalog-panel"><div class="admin-panel-heading"><div><small>الخدمات والباقات</small><h2>الكتالوج الحالي</h2></div><button id="adminReloadCatalog" class="btn secondary" type="button">تحديث البيانات</button></div><p class="admin-subtext">عرض للقراءة فقط في هذه المرحلة. تعديل الأسعار أو تفعيل الباقات لن يكون متاحًا قبل اعتماد سجل التدقيق والصلاحيات.</p><div id="adminCatalogList" class="admin-catalog-list" aria-live="polite"></div></div>
 <div class="admin-panel"><div class="admin-panel-heading"><div><small>المبيعات</small><h2>أحدث الطلبات</h2></div><button id="adminReloadLeads" class="btn secondary" type="button">تحديث الطلبات</button></div><p class="admin-subtext">عرض آخر 50 طلبًا حسب صلاحيات حسابك. هذه المرحلة للقراءة فقط.</p><div id="adminLeadsList" class="admin-leads-list" aria-live="polite"></div></div><div class="admin-panel"><h2>الوصول حسب الصلاحيات</h2><div id="adminPermissionList" class="admin-permissions"></div></div>
 </section>
