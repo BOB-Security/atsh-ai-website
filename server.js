@@ -174,11 +174,13 @@ const server = http.createServer(async (req, res) => {
       'X-Frame-Options': 'DENY',
       'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
       'Content-Security-Policy': "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
-      'Cache-Control': path.extname(resolved) === '.html' ? 'no-cache' : 'public, max-age=3600'
+      'Cache-Control': (path.extname(resolved) === '.html' || ['.css', '.js'].includes(path.extname(resolved).toLowerCase())) ? 'no-cache, must-revalidate' : 'public, max-age=3600'
     });
     if (req.method === 'HEAD') return res.end();
     if (path.extname(resolved) === '.html' && !url.pathname.startsWith('/admin') && !url.pathname.startsWith('/staff')) {
       let html = await fs.promises.readFile(resolved, 'utf8');
+      // Version the primary stylesheet on every HTML response so browsers cannot keep a stale layout.
+      html = html.replace('href="/styles.css"', 'href="/styles.css?v=cinematic-20261029-2"');
       if (!html.includes('href="/cms.css"')) html = html.replace('</head>', '<link rel="stylesheet" href="/cms.css"></head>');
       if (!html.includes('src="/site-cms.js"')) html = html.replace('</body>', '<script src="/site-cms.js" defer></script></body>');
       return res.end(html);

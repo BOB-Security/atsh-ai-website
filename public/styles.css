@@ -75,3 +75,10 @@ body:before{opacity:.035;background-image:linear-gradient(rgba(255,255,255,.04) 
  .hero-note{margin-top:28px}
 }
 @media(max-width:390px){.site-header .brand-word{font-size:16px!important}.site-header .brand-mark{width:36px!important;height:36px!important;flex-basis:36px!important}.hero-copy h1{font-size:38px}}
+
+
+/* Hard guard for the approved cinematic hero layout; keep the background treatment authoritative. */
+.hero{background:linear-gradient(270deg,rgba(8,11,18,.99) 0%,rgba(8,11,18,.94) 27%,rgba(8,11,18,.72) 46%,rgba(8,11,18,.12) 78%,rgba(8,11,18,.08) 100%),url('/images/atsh-hero.jpg') left center/cover no-repeat!important}
+.hero-grid{grid-template-columns:minmax(0,1fr)!important}
+.hero-visual{display:none!important}
+@media(max-width:760px){.hero{background-image:linear-gradient(270deg,rgba(8,11,18,.95),rgba(8,11,18,.80)),url('/images/atsh-hero.jpg')!important;background-position:center,30% center!important}}
