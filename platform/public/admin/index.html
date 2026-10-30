@@ -1,1 +1,123 @@
-<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="robots" content="noindex,nofollow"><meta name="viewport" content="width=device-width,initial-scale=1"><title>لوحة الإدارة — ATSH AI</title><link rel="stylesheet" href="/styles.css"><link rel="stylesheet" href="/admin.css"><script src="/admin.js" defer></script></head><body><header class="header"><a class="brand" href="/">atsh<span>·</span>ai</a><strong>لوحة التشغيل المركزية</strong><button id="logout" class="button ghost" hidden>تسجيل الخروج</button></header><main class="wrap section"><section id="login-panel" class="login-panel"><p class="eyebrow">وصول آمن</p><h1>تسجيل الدخول</h1><form id="login-form"><label>البريد الإلكتروني<input name="email" type="email" required autocomplete="username"></label><label>كلمة المرور<input name="password" type="password" required autocomplete="current-password"></label><button class="button primary">دخول</button><p id="login-status" role="status"></p></form><section id="mfa-panel" hidden aria-live="polite"></section></section><section id="console" hidden><div class="console-head"><div><p class="eyebrow">ATSH AI OPERATIONS</p><h1>مركز التحكم</h1><p id="whoami" class="muted"></p></div><button id="refresh" class="button ghost">تحديث البيانات</button></div><nav class="tabs"><button data-panel="dashboard" class="active">الملخص</button><button data-panel="leads">الطلبات</button><button data-panel="customers">العملاء</button><button data-panel="projects">المشاريع</button><button data-panel="change-requests">تغييرات النطاق</button><button data-panel="tasks">المهام</button><button data-panel="quotes">عروض الأسعار</button><button data-panel="catalog">كتالوج الخدمات</button><button data-panel="site-content">محتوى الموقع</button><button data-panel="hosting">الاستضافة</button><button data-panel="subscriptions">الاشتراكات</button><button data-panel="backups">النسخ الاحتياطي</button><button data-panel="tickets">الدعم</button><button data-panel="knowledge">قاعدة المعرفة</button><button data-panel="ai-agents">مساعدو AI</button><button data-panel="integrations">التكاملات</button><button data-panel="team">الفريق</button><button data-panel="notifications">الإشعارات</button><button data-panel="audit">سجل العمليات</button></nav><p id="console-status" role="status"></p><div id="panel-dashboard" class="panel"></div><div id="panel-leads" class="panel" hidden></div><div id="panel-customers" class="panel" hidden></div><div id="panel-projects" class="panel" hidden></div><div id="panel-change-requests" class="panel" hidden></div><div id="panel-tasks" class="panel" hidden></div><div id="panel-quotes" class="panel" hidden></div><div id="panel-catalog" class="panel" hidden></div><div id="panel-site-content" class="panel" hidden></div><div id="panel-hosting" class="panel" hidden></div><div id="panel-subscriptions" class="panel" hidden></div><div id="panel-backups" class="panel" hidden></div><div id="panel-tickets" class="panel" hidden></div><div id="panel-knowledge" class="panel" hidden></div><div id="panel-ai-agents" class="panel" hidden></div><div id="panel-integrations" class="panel" hidden></div><div id="panel-team" class="panel" hidden></div><div id="panel-notifications" class="panel" hidden></div><div id="panel-audit" class="panel" hidden></div></section></main></body></html>
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex,nofollow">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#0b1020">
+<title>مركز التحكم — ATSH AI</title>
+<link rel="stylesheet" href="/styles.css">
+<link rel="stylesheet" href="/admin.css">
+<script src="/admin.js" defer></script>
+</head>
+<body class="admin-body">
+<header class="header admin-header">
+  <a class="brand" href="/" aria-label="ATSH AI">atsh<span>·</span>ai</a>
+  <div class="admin-header-context"><span class="admin-live-dot"></span><span>مركز تشغيل ATSH AI</span></div>
+  <div class="admin-header-actions">
+    <button id="nav-toggle" class="button ghost nav-toggle" type="button" aria-expanded="false" aria-controls="admin-navigation">القائمة</button>
+    <button id="logout" class="button ghost" hidden>تسجيل الخروج</button>
+  </div>
+</header>
+<main class="admin-wrap">
+  <section id="login-panel" class="login-panel">
+    <div class="login-brand-mark">A</div>
+    <p class="eyebrow">وصول إداري محمي</p>
+    <h1>تسجيل الدخول</h1>
+    <p class="muted">سجّل الدخول للوصول إلى مركز تشغيل الشركة.</p>
+    <form id="login-form">
+      <label>البريد الإلكتروني<input name="email" type="email" required autocomplete="username"></label>
+      <label>كلمة المرور<input name="password" type="password" required autocomplete="current-password"></label>
+      <button class="button primary">دخول آمن</button>
+      <p id="login-status" role="status"></p>
+    </form>
+    <section id="mfa-panel" hidden aria-live="polite"></section>
+  </section>
+
+  <section id="console" class="admin-layout" hidden>
+    <aside id="admin-navigation" class="admin-sidebar">
+      <div class="sidebar-heading">
+        <span class="eyebrow">WORKSPACE</span>
+        <strong>مساحة الإدارة</strong>
+      </div>
+      <label class="nav-search-label" for="admin-nav-search">بحث في القائمة</label>
+      <input id="admin-nav-search" class="nav-search" type="search" placeholder="ابحث عن شاشة…" autocomplete="off">
+      <nav class="tabs" aria-label="أقسام لوحة الإدارة">
+        <section class="nav-group" data-nav-group="الرئيسية">
+          <h2>الرئيسية</h2>
+          <button data-panel="dashboard" class="active"><span class="nav-icon">⌂</span><span>نظرة عامة</span></button>
+          <button data-panel="notifications"><span class="nav-icon">◉</span><span>مركز التنبيهات</span></button>
+        </section>
+        <section class="nav-group" data-nav-group="العملاء والمبيعات">
+          <h2>العملاء والمبيعات</h2>
+          <button data-panel="leads"><span class="nav-icon">↗</span><span>الطلبات المحتملة</span></button>
+          <button data-panel="customers"><span class="nav-icon">♙</span><span>العملاء</span></button>
+          <button data-panel="quotes"><span class="nav-icon">▤</span><span>عروض الأسعار</span></button>
+        </section>
+        <section class="nav-group" data-nav-group="تنفيذ المشاريع">
+          <h2>تنفيذ المشاريع</h2>
+          <button data-panel="projects"><span class="nav-icon">▣</span><span>المشاريع</span></button>
+          <button data-panel="change-requests"><span class="nav-icon">↻</span><span>تغييرات النطاق</span></button>
+          <button data-panel="tasks"><span class="nav-icon">☷</span><span>المهام</span></button>
+        </section>
+        <section class="nav-group" data-nav-group="المنتج والموقع">
+          <h2>المنتج والموقع</h2>
+          <button data-panel="catalog"><span class="nav-icon">▦</span><span>الخدمات والكتالوج</span></button>
+          <button data-panel="site-content"><span class="nav-icon">▧</span><span>المحتوى والتصميم</span></button>
+          <button data-panel="hosting"><span class="nav-icon">⌘</span><span>أصول الاستضافة</span></button>
+          <button data-panel="subscriptions"><span class="nav-icon">⟳</span><span>الاشتراكات</span></button>
+          <button data-panel="backups"><span class="nav-icon">◫</span><span>النسخ الاحتياطي</span></button>
+        </section>
+        <section class="nav-group" data-nav-group="الذكاء والتكامل">
+          <h2>الذكاء والتكامل</h2>
+          <button data-panel="knowledge"><span class="nav-icon">▥</span><span>قاعدة المعرفة</span></button>
+          <button data-panel="ai-agents"><span class="nav-icon">✳</span><span>مساعدو AI</span></button>
+          <button data-panel="integrations"><span class="nav-icon">⌘</span><span>التكاملات</span></button>
+          <button data-panel="tickets"><span class="nav-icon">✉</span><span>الدعم الفني</span></button>
+        </section>
+        <section class="nav-group" data-nav-group="الإدارة والحوكمة">
+          <h2>الإدارة والحوكمة</h2>
+          <button data-panel="team"><span class="nav-icon">♧</span><span>الفريق والصلاحيات</span></button>
+          <button data-panel="audit"><span class="nav-icon">≡</span><span>سجل التدقيق</span></button>
+        </section>
+      </nav>
+      <div class="sidebar-foot"><span class="admin-live-dot"></span><span>بيئة تشغيل آمنة</span></div>
+    </aside>
+
+    <div class="admin-main">
+      <div class="console-head">
+        <div>
+          <p class="eyebrow">ATSH AI / OPERATIONS</p>
+          <h1 id="panel-heading">نظرة عامة</h1>
+          <p id="whoami" class="muted"></p>
+        </div>
+        <div class="console-head-actions">
+          <span class="last-sync-label">بيانات مباشرة من النظام</span>
+          <button id="refresh" class="button ghost">تحديث البيانات</button>
+        </div>
+      </div>
+      <p id="console-status" role="status" aria-live="polite"></p>
+      <div id="panel-dashboard" class="panel"></div>
+      <div id="panel-leads" class="panel" hidden></div>
+      <div id="panel-customers" class="panel" hidden></div>
+      <div id="panel-projects" class="panel" hidden></div>
+      <div id="panel-change-requests" class="panel" hidden></div>
+      <div id="panel-tasks" class="panel" hidden></div>
+      <div id="panel-quotes" class="panel" hidden></div>
+      <div id="panel-catalog" class="panel" hidden></div>
+      <div id="panel-site-content" class="panel" hidden></div>
+      <div id="panel-hosting" class="panel" hidden></div>
+      <div id="panel-subscriptions" class="panel" hidden></div>
+      <div id="panel-backups" class="panel" hidden></div>
+      <div id="panel-tickets" class="panel" hidden></div>
+      <div id="panel-knowledge" class="panel" hidden></div>
+      <div id="panel-ai-agents" class="panel" hidden></div>
+      <div id="panel-integrations" class="panel" hidden></div>
+      <div id="panel-team" class="panel" hidden></div>
+      <div id="panel-notifications" class="panel" hidden></div>
+      <div id="panel-audit" class="panel" hidden></div>
+    </div>
+  </section>
+</main>
+</body>
+</html>
